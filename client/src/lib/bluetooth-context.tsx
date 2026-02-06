@@ -91,10 +91,15 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const positionRef = useRef<[number, number] | null>(null);
+  const selfInfoRef = useRef<SelfInfo | null>(null);
 
   useEffect(() => {
     positionRef.current = observerPosition;
   }, [observerPosition]);
+
+  useEffect(() => {
+    selfInfoRef.current = selfInfo;
+  }, [selfInfo]);
 
   useEffect(() => {
     getCurrentPosition()
@@ -174,7 +179,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         latitude: pos[0],
         longitude: pos[1],
         senderName: null,
-        receiverName: "Observer",
+        receiverName: selfInfoRef.current?.name || "Observer",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
@@ -237,7 +242,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
               latitude: pos[0],
               longitude: pos[1],
               senderName: repeaterName,
-              receiverName: "Observer",
+              receiverName: selfInfoRef.current?.name || "Observer",
             });
             scanResultsSubmitted++;
           } catch {}
