@@ -272,6 +272,7 @@ export interface DiscoverResult {
 export async function discoverRepeaters(
   observerLat?: number,
   observerLon?: number,
+  onStatus?: (status: string) => void,
 ): Promise<DiscoverResult | null> {
   if (!connection) return null;
   try {
@@ -281,7 +282,9 @@ export async function discoverRepeaters(
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
+    onStatus?.("advertising");
     await connection.sendSelfAdvert(Constants.SelfAdvertTypes.Flood);
+    onStatus?.("waiting");
     await new Promise((r) => setTimeout(r, 5000));
 
     const rawContacts = await connection.getContacts();
@@ -301,6 +304,7 @@ export async function discoverRepeaters(
       (c) => c.type === Constants.AdvType.Repeater,
     );
 
+    onStatus?.("querying");
     const repeaters: RepeaterDiscoverResult[] = [];
     for (const repeater of repeaterContacts) {
       let stats: RepeaterStats | null = null;

@@ -18,6 +18,17 @@ import {
 import { getCurrentPosition, watchPosition, clearWatch } from "@/lib/geolocation";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
+export type ScanStatus = "idle" | "advertising" | "waiting" | "querying" | "submitting" | "done" | "error";
+
+export interface LastScanResult {
+  contactsFound: number;
+  repeatersFound: number;
+  repeatersWithStats: number;
+  scanResultsSubmitted: number;
+  timestamp: Date;
+  errorMessage?: string;
+}
+
 interface BluetoothContextValue {
   connected: boolean;
   connecting: boolean;
@@ -37,6 +48,8 @@ interface BluetoothContextValue {
   selfInfo: SelfInfo | null;
   batteryMilliVolts: number | null;
   contacts: MeshContact[];
+  scanStatus: ScanStatus;
+  lastScanResult: LastScanResult | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   toggleScan: () => void;
@@ -72,6 +85,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   const [selfInfo, setSelfInfo] = useState<SelfInfo | null>(null);
   const [batteryMilliVolts, setBatteryMilliVolts] = useState<number | null>(null);
   const [contacts, setContacts] = useState<MeshContact[]>([]);
+  const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
+  const [lastScanResult, setLastScanResult] = useState<LastScanResult | null>(null);
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const positionRef = useRef<[number, number] | null>(null);
@@ -169,51 +184,93 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
   const runDiscoverRepeaters = useCallback(async () => {
     const pos = positionRef.current;
-    const result = await discoverRepeaters(pos?.[0], pos?.[1]);
-    if (!result) return;
+    setScanStatus("advertising");
 
-    setContacts(result.contacts);
-    setLastScanTime(result.timestamp);
-
-    for (const contact of result.contacts) {
-      const nodeId = publicKeyHex(contact.publicKey);
-      const coords = contactLatLon(contact);
-
-      try {
-        await apiRequest("POST", "/api/nodes", {
-          nodeId,
-          name: contact.advName || nodeId,
-          latitude: coords?.lat ?? null,
-          longitude: coords?.lon ?? null,
+    try {
+      const result = await discoverRepeaters(pos?.[0], pos?.[1], (status) => {
+        setScanStatus(status as ScanStatus);
+      });
+      if (!result) {
+        setScanStatus("error");
+        setLastScanResult({
+          contactsFound: 0,
+          repeatersFound: 0,
+          repeatersWithStats: 0,
+          scanResultsSubmitted: 0,
+          timestamp: new Date(),
+          errorMessage: "No radio connection or scan failed",
         });
-      } catch {}
-    }
+        return;
+      }
 
-    if (pos) {
-      for (const rep of result.repeaters) {
-        const repeaterName = rep.contact.advName || publicKeyHex(rep.contact.publicKey);
-        const repeaterCoords = contactLatLon(rep.contact);
+      setContacts(result.contacts);
+      setLastScanTime(result.timestamp);
 
-        if (rep.stats) {
-          try {
-            await apiRequest("POST", "/api/scan-results", {
-              observerId: "local-observer",
-              nodeId: publicKeyHex(rep.contact.publicKey),
-              rssi: rep.stats.lastRssi,
-              snr: rep.stats.lastSnr,
-              latitude: repeaterCoords?.lat ?? pos[0],
-              longitude: repeaterCoords?.lon ?? pos[1],
-              senderName: repeaterName,
-              receiverName: "Observer",
-            });
-          } catch {}
+      setScanStatus("submitting");
+
+      for (const contact of result.contacts) {
+        const nodeId = publicKeyHex(contact.publicKey);
+        const coords = contactLatLon(contact);
+
+        try {
+          await apiRequest("POST", "/api/nodes", {
+            nodeId,
+            name: contact.advName || nodeId,
+            latitude: coords?.lat ?? null,
+            longitude: coords?.lon ?? null,
+          });
+        } catch {}
+      }
+
+      let scanResultsSubmitted = 0;
+
+      if (pos) {
+        for (const rep of result.repeaters) {
+          const repeaterName = rep.contact.advName || publicKeyHex(rep.contact.publicKey);
+          const repeaterCoords = contactLatLon(rep.contact);
+
+          if (rep.stats) {
+            try {
+              await apiRequest("POST", "/api/scan-results", {
+                observerId: "local-observer",
+                nodeId: publicKeyHex(rep.contact.publicKey),
+                rssi: rep.stats.lastRssi,
+                snr: rep.stats.lastSnr,
+                latitude: repeaterCoords?.lat ?? pos[0],
+                longitude: repeaterCoords?.lon ?? pos[1],
+                senderName: repeaterName,
+                receiverName: "Observer",
+              });
+              scanResultsSubmitted++;
+            } catch {}
+          }
         }
       }
-    }
 
-    queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
+      const scanResult: LastScanResult = {
+        contactsFound: result.contacts.length,
+        repeatersFound: result.repeaters.length,
+        repeatersWithStats: result.repeaters.filter((r) => r.stats !== null).length,
+        scanResultsSubmitted,
+        timestamp: result.timestamp,
+      };
+      setLastScanResult(scanResult);
+      setScanStatus("done");
+
+      queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
+    } catch (err: any) {
+      setScanStatus("error");
+      setLastScanResult({
+        contactsFound: 0,
+        repeatersFound: 0,
+        repeatersWithStats: 0,
+        scanResultsSubmitted: 0,
+        timestamp: new Date(),
+        errorMessage: err?.message || "Scan failed unexpectedly",
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -301,10 +358,17 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     setSelfInfo(null);
     setBatteryMilliVolts(null);
     setContacts([]);
+    setScanStatus("idle");
+    setLastScanResult(null);
   }, [releaseWakeLock]);
 
   const toggleScan = useCallback(() => {
-    setIsScanning((prev) => !prev);
+    setIsScanning((prev) => {
+      if (prev) {
+        setScanStatus("idle");
+      }
+      return !prev;
+    });
   }, []);
 
   return (
@@ -328,6 +392,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         selfInfo,
         batteryMilliVolts,
         contacts,
+        scanStatus,
+        lastScanResult,
         connect: connectHandler,
         disconnect,
         toggleScan,

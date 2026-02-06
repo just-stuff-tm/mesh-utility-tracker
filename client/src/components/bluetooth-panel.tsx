@@ -1,8 +1,20 @@
-import { Bluetooth, BluetoothOff, Radio, Wifi, WifiOff, Loader2, Shield, Battery, Cpu, Users } from "lucide-react";
+import { Bluetooth, BluetoothOff, Radio, Wifi, WifiOff, Loader2, Shield, Battery, Cpu, Users, CheckCircle2, AlertCircle, Signal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
+
+function getScanStatusLabel(status: string): string {
+  switch (status) {
+    case "advertising": return "Sending advert...";
+    case "waiting": return "Waiting for responses...";
+    case "querying": return "Querying repeaters...";
+    case "submitting": return "Saving results...";
+    case "done": return "Scan complete";
+    case "error": return "Scan failed";
+    default: return "Idle";
+  }
+}
 
 export function BluetoothPanel() {
   const {
@@ -20,6 +32,8 @@ export function BluetoothPanel() {
     selfInfo,
     batteryMilliVolts,
     contacts,
+    scanStatus,
+    lastScanResult,
     connect,
     disconnect,
     toggleScan,
@@ -108,6 +122,51 @@ export function BluetoothPanel() {
             </>
           )}
         </div>
+
+        {connected && scanStatus !== "idle" && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              {scanStatus === "done" ? (
+                <CheckCircle2 className="h-3.5 w-3.5 text-chart-3" />
+              ) : scanStatus === "error" ? (
+                <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+              ) : (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              )}
+              <span className="text-xs" data-testid="text-scan-status">
+                {getScanStatusLabel(scanStatus)}
+              </span>
+            </div>
+
+            {lastScanResult && (
+              <div className="bg-muted/50 rounded-md p-2 space-y-1">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <div className="flex items-center gap-1">
+                    <Users className="h-3 w-3 text-muted-foreground" />
+                    <span data-testid="text-contacts-found">{lastScanResult.contactsFound} contacts</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Radio className="h-3 w-3 text-muted-foreground" />
+                    <span data-testid="text-repeaters-found">{lastScanResult.repeatersFound} repeaters</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Signal className="h-3 w-3 text-muted-foreground" />
+                    <span data-testid="text-stats-received">{lastScanResult.repeatersWithStats} with signal</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-muted-foreground" />
+                    <span data-testid="text-results-submitted">{lastScanResult.scanResultsSubmitted} saved</span>
+                  </div>
+                </div>
+                {lastScanResult.errorMessage && (
+                  <p className="text-xs text-destructive" data-testid="text-scan-error">
+                    {lastScanResult.errorMessage}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       {connected && (
