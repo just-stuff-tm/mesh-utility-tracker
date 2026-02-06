@@ -13,15 +13,12 @@ import NotFound from "@/pages/not-found";
 import MapPage from "@/pages/map-page";
 import NodesPage from "@/pages/nodes-page";
 import HistoryPage from "@/pages/history-page";
-import SettingsPage from "@/pages/settings-page";
-
 function Router() {
   return (
     <Switch>
       <Route path="/" component={MapPage} />
       <Route path="/nodes" component={NodesPage} />
       <Route path="/history" component={HistoryPage} />
-      <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );

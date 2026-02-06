@@ -1,4 +1,4 @@
-import { Map, Radio, Settings, Activity, DollarSign } from "lucide-react";
+import { Map, Radio, Activity, DollarSign } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import appIconPath from "@assets/app_icon_1770389147147.png";
 import {
@@ -19,7 +19,6 @@ const navItems = [
   { title: "Coverage Map", url: "/", icon: Map },
   { title: "Nodes", url: "/nodes", icon: Radio },
   { title: "Scan History", url: "/history", icon: Activity },
-  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
