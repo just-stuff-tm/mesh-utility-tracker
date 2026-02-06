@@ -106,7 +106,7 @@ export default function HistoryPage() {
                       {(scan.senderName || scan.receiverName) && (
                         <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
                           {scan.senderName && <span>Sender: {scan.senderName}</span>}
-                          {scan.receiverName && <span>Receiver: {scan.receiverName}</span>}
+                          {scan.receiverName && <span>Observer: {scan.receiverName}</span>}
                         </div>
                       )}
                     </div>
