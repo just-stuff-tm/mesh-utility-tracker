@@ -138,9 +138,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       setBatteryMilliVolts(data.milliVolts);
     }));
 
-    unsubs.push(on("new_advert", (advert: any) => {
+    unsubs.push(on("new_advert", () => {
       setMessagesReceived((prev) => prev + 1);
-      submitContactAsNode(advert);
     }));
 
     unsubs.push(on("rx_log", () => {
@@ -148,21 +147,6 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     }));
 
     return () => unsubs.forEach((fn) => fn());
-  }, []);
-
-  const submitContactAsNode = useCallback(async (advert: any) => {
-    try {
-      const name = advert.advName || "Unknown";
-      const nodeId = publicKeyHex(advert.publicKey);
-
-      await apiRequest("POST", "/api/nodes", {
-        nodeId,
-        name,
-        latitude: null,
-        longitude: null,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
-    } catch {}
   }, []);
 
 
