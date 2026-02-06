@@ -351,36 +351,73 @@ export async function discoverRepeaters(
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
+    const discoveredAdverts: MeshContact[] = [];
+    const onNewAdvert = (data: any) => {
+      remoteLog("log", `NewAdvert received during scan: "${data.advName}" type=${data.type} pathLen=${data.outPathLen}`);
+      discoveredAdverts.push({
+        publicKey: data.publicKey,
+        type: data.type,
+        flags: data.flags,
+        outPathLen: data.outPathLen,
+        advName: data.advName,
+        lastAdvert: data.lastAdvert,
+        advLat: data.advLat,
+        advLon: data.advLon,
+        lastMod: data.lastMod,
+      });
+    };
+
+    connection.on(Constants.PushCodes.NewAdvert, onNewAdvert);
+
     onStatus?.("advertising");
     remoteLog("log", "Sending flood advert...");
     await connection.sendAdvert(Constants.SelfAdvertTypes.Flood);
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 5s for responses...");
-    await new Promise((r) => setTimeout(r, 5000));
+    remoteLog("log", "Waiting 8s for responses...");
+    await new Promise((r) => setTimeout(r, 8000));
+
+    connection.off(Constants.PushCodes.NewAdvert, onNewAdvert);
+
+    remoteLog("log", `Collected ${discoveredAdverts.length} NewAdvert events during scan window`);
 
     const rawContacts = await connection.getContacts();
-    remoteLog("log", "Got", rawContacts.length, "contacts after advert");
-    const contacts: MeshContact[] = rawContacts.map((c: any) => ({
-      publicKey: c.publicKey,
-      type: c.type,
-      flags: c.flags,
-      outPathLen: c.outPathLen,
-      advName: c.advName,
-      lastAdvert: c.lastAdvert,
-      advLat: c.advLat,
-      advLon: c.advLon,
-      lastMod: c.lastMod,
-    }));
+    remoteLog("log", "Got", rawContacts.length, "contacts from getContacts");
 
-    for (const c of contacts) {
-      remoteLog("log", `Contact: "${c.advName}" type=${c.type} flags=${c.flags} pathLen=${c.outPathLen} lat=${c.advLat} lon=${c.advLon}`);
+    const contactMap = new Map<string, MeshContact>();
+
+    for (const adv of discoveredAdverts) {
+      const key = publicKeyHex(adv.publicKey);
+      contactMap.set(key, adv);
     }
 
-    remoteLog("log", "AdvType.Repeater =", Constants.AdvType.Repeater);
+    for (const c of rawContacts) {
+      const mapped: MeshContact = {
+        publicKey: c.publicKey,
+        type: c.type,
+        flags: c.flags,
+        outPathLen: c.outPathLen,
+        advName: c.advName,
+        lastAdvert: c.lastAdvert,
+        advLat: c.advLat,
+        advLon: c.advLon,
+        lastMod: c.lastMod,
+      };
+      const key = publicKeyHex(mapped.publicKey);
+      if (!contactMap.has(key)) {
+        contactMap.set(key, mapped);
+      }
+    }
+
+    const contacts = Array.from(contactMap.values());
+
+    for (const c of contacts) {
+      remoteLog("log", `Contact: "${c.advName}" type=${c.type} flags=${c.flags} pathLen=${c.outPathLen}`);
+    }
+
     const repeaterContacts = contacts.filter(
       (c) => c.type === Constants.AdvType.Repeater,
     );
-    remoteLog("log", "Found", repeaterContacts.length, "repeaters out of", contacts.length, "contacts");
+    remoteLog("log", "Found", repeaterContacts.length, "repeaters out of", contacts.length, "total contacts");
 
     onStatus?.("querying");
     const repeaters: RepeaterDiscoverResult[] = [];
