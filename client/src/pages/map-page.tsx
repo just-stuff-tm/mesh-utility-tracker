@@ -81,7 +81,7 @@ export default function MapPage() {
           href="https://cash.app/$yuptm"
           target="_blank"
           rel="noopener noreferrer"
-          className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500/15 to-green-500/15 backdrop-blur-sm border border-emerald-500/25 px-2.5 py-1.5 transition-all duration-200 hover:from-emerald-500/25 hover:to-green-500/25 hover:border-emerald-500/40"
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500/15 to-green-500/15 backdrop-blur-sm border border-emerald-500/25 px-2.5 py-1.5 transition-all duration-200 hover:from-emerald-500/25 hover:to-green-500/25 hover:border-emerald-500/40"
           data-testid="link-support-floating"
         >
           <Heart className="h-3 w-3 text-emerald-500" />
