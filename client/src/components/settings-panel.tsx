@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Settings, Timer, MapPin, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,30 +5,47 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { useBluetoothContext } from "@/lib/bluetooth-context";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
 
-interface SettingsPanelProps {
-  scanInterval: number;
-  onScanIntervalChange: (val: number) => void;
-  autoCenter: boolean;
-  onAutoCenterChange: (val: boolean) => void;
-  smartScanEnabled: boolean;
-  onSmartScanChange: (val: boolean) => void;
-  smartScanDays: number;
-  onSmartScanDaysChange: (val: number) => void;
-  onMarkDeadZone: () => void;
-}
+export function SettingsPanel() {
+  const { toast } = useToast();
+  const {
+    scanInterval,
+    setScanInterval,
+    autoCenter,
+    setAutoCenter,
+    smartScanEnabled,
+    setSmartScanEnabled,
+    smartScanDays,
+    setSmartScanDays,
+    observerPosition,
+  } = useBluetoothContext();
 
-export function SettingsPanel({
-  scanInterval,
-  onScanIntervalChange,
-  autoCenter,
-  onAutoCenterChange,
-  smartScanEnabled,
-  onSmartScanChange,
-  smartScanDays,
-  onSmartScanDaysChange,
-  onMarkDeadZone,
-}: SettingsPanelProps) {
+  const markDeadZoneMutation = useMutation({
+    mutationFn: async (data: { centerLat: number; centerLng: number }) => {
+      const res = await apiRequest("POST", "/api/coverage-zones/dead-zone", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
+      toast({ title: "Dead zone marked at your current location" });
+    },
+  });
+
+  const handleMarkDeadZone = () => {
+    if (!observerPosition) {
+      toast({ title: "Location not available", variant: "destructive" });
+      return;
+    }
+    markDeadZoneMutation.mutate({
+      centerLat: observerPosition[0],
+      centerLng: observerPosition[1],
+    });
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -45,7 +61,7 @@ export function SettingsPanel({
           </div>
           <Slider
             value={[scanInterval]}
-            onValueChange={([v]) => onScanIntervalChange(v)}
+            onValueChange={([v]) => setScanInterval(v)}
             min={10}
             max={300}
             step={5}
@@ -65,7 +81,7 @@ export function SettingsPanel({
           </div>
           <Switch
             checked={autoCenter}
-            onCheckedChange={onAutoCenterChange}
+            onCheckedChange={setAutoCenter}
             data-testid="switch-auto-center"
           />
         </div>
@@ -77,7 +93,7 @@ export function SettingsPanel({
             <Label className="text-xs">Smart Scanning</Label>
             <Switch
               checked={smartScanEnabled}
-              onCheckedChange={onSmartScanChange}
+              onCheckedChange={setSmartScanEnabled}
               data-testid="switch-smart-scan"
             />
           </div>
@@ -91,7 +107,7 @@ export function SettingsPanel({
               </Label>
               <Slider
                 value={[smartScanDays]}
-                onValueChange={([v]) => onSmartScanDaysChange(v)}
+                onValueChange={([v]) => setSmartScanDays(v)}
                 min={1}
                 max={14}
                 step={1}
@@ -114,7 +130,7 @@ export function SettingsPanel({
           <Button
             size="sm"
             variant="outline"
-            onClick={onMarkDeadZone}
+            onClick={handleMarkDeadZone}
             className="w-full"
             data-testid="button-mark-dead-zone"
           >

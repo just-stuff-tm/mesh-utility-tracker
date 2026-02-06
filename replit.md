@@ -101,3 +101,5 @@ Preferred communication style: Simple, everyday language.
 - **2026-02-06**: Removed unused Rectangle import from coverage-map.tsx
 - **2026-02-06**: Replaced rectangular grid with proper honeycomb hex tiling — shared/grid.ts holds constants (HEX_SIZE, ROW_SPACING, COL_SPACING) and functions (snapToHexGrid, getHexVertices) used by both frontend and backend. Odd rows offset for perfect tiling with no gaps or overlaps.
 - **2026-02-06**: Added map layer switcher (Dark/Standard/Satellite) using Leaflet LayersControl with themed CSS
+- **2026-02-06**: Fixed mobile z-index: Sheet z-[2000] above Leaflet map (z-1000); moved LayersControl to topright; RSSI legend at top-14
+- **2026-02-06**: Lifted Bluetooth state to global BluetoothContext provider — BLE connection, scanning, geolocation, and settings persist across all page navigations. Added Wake Lock API to prevent screen sleep during active scanning.

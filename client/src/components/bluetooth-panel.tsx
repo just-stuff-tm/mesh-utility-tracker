@@ -1,90 +1,25 @@
-import { useState, useEffect, useCallback } from "react";
-import { Bluetooth, BluetoothOff, Radio, Wifi, WifiOff, Loader2 } from "lucide-react";
+import { Bluetooth, BluetoothOff, Radio, Wifi, WifiOff, Loader2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  connectToRadio,
-  disconnectRadio,
-  isBluetoothSupported,
-  onMessage,
-  sendNodeDiscover,
-  isConnected as checkConnected,
-} from "@/lib/bluetooth";
+import { useBluetoothContext } from "@/lib/bluetooth-context";
 
-interface BluetoothPanelProps {
-  onNodeDiscovered?: (data: string) => void;
-  onConnectionChange?: (connected: boolean, deviceName: string | null) => void;
-  scanInterval: number;
-  isScanning: boolean;
-  onScanToggle: () => void;
-}
-
-export function BluetoothPanel({
-  onNodeDiscovered,
-  onConnectionChange,
-  scanInterval,
-  isScanning,
-  onScanToggle,
-}: BluetoothPanelProps) {
-  const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [deviceName, setDeviceName] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
-  const [messagesReceived, setMessagesReceived] = useState(0);
-  const supported = isBluetoothSupported();
-
-  useEffect(() => {
-    const unsubscribe = onMessage((data) => {
-      if (data === "__DISCONNECTED__") {
-        setConnected(false);
-        setDeviceName(null);
-        onConnectionChange?.(false, null);
-        return;
-      }
-      setMessagesReceived((prev) => prev + 1);
-      onNodeDiscovered?.(data);
-    });
-    return unsubscribe;
-  }, [onNodeDiscovered, onConnectionChange]);
-
-  useEffect(() => {
-    if (!connected || !isScanning) return;
-    const interval = setInterval(async () => {
-      const sent = await sendNodeDiscover();
-      if (sent) {
-        setLastScanTime(new Date());
-      }
-    }, scanInterval * 1000);
-
-    sendNodeDiscover().then((sent) => {
-      if (sent) setLastScanTime(new Date());
-    });
-
-    return () => clearInterval(interval);
-  }, [connected, isScanning, scanInterval]);
-
-  const handleConnect = useCallback(async () => {
-    setConnecting(true);
-    setError(null);
-    const result = await connectToRadio();
-    setConnecting(false);
-    if (result.success) {
-      setConnected(true);
-      setDeviceName(result.deviceName);
-      onConnectionChange?.(true, result.deviceName);
-    } else {
-      setError(result.error || "Connection failed");
-    }
-  }, [onConnectionChange]);
-
-  const handleDisconnect = useCallback(async () => {
-    await disconnectRadio();
-    setConnected(false);
-    setDeviceName(null);
-    onConnectionChange?.(false, null);
-  }, [onConnectionChange]);
+export function BluetoothPanel() {
+  const {
+    connected,
+    connecting,
+    deviceName,
+    error,
+    supported,
+    isScanning,
+    scanInterval,
+    lastScanTime,
+    messagesReceived,
+    wakeLockActive,
+    connect,
+    disconnect,
+    toggleScan,
+  } = useBluetoothContext();
 
   return (
     <div className="space-y-3">
@@ -124,7 +59,7 @@ export function BluetoothPanel({
           {!connected ? (
             <Button
               size="sm"
-              onClick={handleConnect}
+              onClick={connect}
               disabled={connecting || !supported}
               className="flex-1"
               data-testid="button-connect-bluetooth"
@@ -141,7 +76,7 @@ export function BluetoothPanel({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleDisconnect}
+                onClick={disconnect}
                 className="flex-1"
                 data-testid="button-disconnect-bluetooth"
               >
@@ -151,7 +86,7 @@ export function BluetoothPanel({
               <Button
                 size="sm"
                 variant={isScanning ? "destructive" : "default"}
-                onClick={onScanToggle}
+                onClick={toggleScan}
                 className="flex-1"
                 data-testid="button-toggle-scan"
               >
@@ -178,10 +113,23 @@ export function BluetoothPanel({
               <span className="text-muted-foreground">Messages</span>
               <p className="font-medium">{messagesReceived}</p>
             </div>
-            <div className="col-span-2">
+            <div>
               <span className="text-muted-foreground">Last Scan</span>
               <p className="font-medium">
                 {lastScanTime ? lastScanTime.toLocaleTimeString() : "Never"}
+              </p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Wake Lock</span>
+              <p className="font-medium flex items-center gap-1">
+                {wakeLockActive ? (
+                  <>
+                    <Shield className="h-3 w-3 text-chart-3" />
+                    Active
+                  </>
+                ) : (
+                  "Inactive"
+                )}
               </p>
             </div>
           </div>

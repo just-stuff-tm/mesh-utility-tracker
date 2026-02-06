@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { Settings, Timer, MapPin, AlertTriangle, Radio, Info, Trash2 } from "lucide-react";
+import { Settings, Timer, MapPin, AlertTriangle, Info, Trash2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,37 +9,21 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useBluetoothContext } from "@/lib/bluetooth-context";
 import type { CoverageZone } from "@shared/schema";
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const [scanInterval, setScanInterval] = useState(() => {
-    const saved = localStorage.getItem("mesh-scan-interval");
-    return saved ? parseInt(saved) : 40;
-  });
-  const [autoCenter, setAutoCenter] = useState(() => {
-    return localStorage.getItem("mesh-auto-center") !== "false";
-  });
-  const [smartScan, setSmartScan] = useState(() => {
-    return localStorage.getItem("mesh-smart-scan") !== "false";
-  });
-  const [smartScanDays, setSmartScanDays] = useState(() => {
-    const saved = localStorage.getItem("mesh-smart-scan-days");
-    return saved ? parseInt(saved) : 5;
-  });
-
-  useEffect(() => {
-    localStorage.setItem("mesh-scan-interval", scanInterval.toString());
-  }, [scanInterval]);
-  useEffect(() => {
-    localStorage.setItem("mesh-auto-center", autoCenter.toString());
-  }, [autoCenter]);
-  useEffect(() => {
-    localStorage.setItem("mesh-smart-scan", smartScan.toString());
-  }, [smartScan]);
-  useEffect(() => {
-    localStorage.setItem("mesh-smart-scan-days", smartScanDays.toString());
-  }, [smartScanDays]);
+  const {
+    scanInterval,
+    setScanInterval,
+    autoCenter,
+    setAutoCenter,
+    smartScanEnabled,
+    setSmartScanEnabled,
+    smartScanDays,
+    setSmartScanDays,
+  } = useBluetoothContext();
 
   const { data: deadZones = [] } = useQuery<CoverageZone[]>({
     queryKey: ["/api/coverage-zones", "dead"],
@@ -100,13 +83,13 @@ export default function SettingsPage() {
               </p>
             </div>
             <Switch
-              checked={smartScan}
-              onCheckedChange={setSmartScan}
+              checked={smartScanEnabled}
+              onCheckedChange={setSmartScanEnabled}
               data-testid="switch-settings-smart-scan"
             />
           </div>
 
-          {smartScan && (
+          {smartScanEnabled && (
             <div className="space-y-2 pl-1">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <Label className="text-xs text-muted-foreground">
