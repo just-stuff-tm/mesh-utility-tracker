@@ -332,23 +332,67 @@ function pubKeyPrefixHex(prefix: Uint8Array): string {
   return Array.from(prefix).map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
 }
 
-function parseStatusData(data: Uint8Array): RepeaterStats | null {
-  try {
-    if (data.byteLength < 44) {
-      remoteLog("log", `StatusData too short (${data.byteLength} bytes), raw=${Array.from(data).map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
-      return null;
-    }
-    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    const battMilliVolts = view.getUint16(0, true);
-    const noiseFloor = view.getInt16(4, true);
-    const lastRssi = view.getInt16(6, true);
-    const lastSnr = view.getInt16(42, true);
-    remoteLog("log", `StatusData: batt=${battMilliVolts}mV rssi=${lastRssi} snr=${lastSnr} noiseFloor=${noiseFloor}`);
-    return { rssi: lastRssi, snr: lastSnr };
-  } catch (err) {
-    remoteLog("warn", "parseStatusData failed:", err);
+const PUSH_CODE_CONTROL_DATA = 0x8E;
+const CONTROL_NODE_DISCOVER_RESP = 0x90;
+const CMD_SEND_CONTROL_DATA = 55;
+const CONTROL_NODE_DISCOVER_REQ = 0x80;
+
+interface NodeDiscoverEntry {
+  snr: number;
+  rssi: number;
+  name: string;
+  publicKeyPrefix: string;
+}
+
+function buildNodeDiscoverReq(filter: number): Uint8Array {
+  const tag = Math.floor(Math.random() * 0xFFFFFFFF);
+  const data = new Uint8Array(1 + 1 + 1 + 4);
+  data[0] = CMD_SEND_CONTROL_DATA;
+  data[1] = CONTROL_NODE_DISCOVER_REQ | 0x01;
+  data[2] = filter;
+  data[3] = tag & 0xFF;
+  data[4] = (tag >> 8) & 0xFF;
+  data[5] = (tag >> 16) & 0xFF;
+  data[6] = (tag >> 24) & 0xFF;
+  remoteLog("log", `node_discover cmd: ${Array.from(data).map(b => b.toString(16).padStart(2, "0")).join(" ")}, filter=${filter}, tag=${tag}`);
+  return data;
+}
+
+function parseControlDataFrame(frame: Uint8Array): NodeDiscoverEntry | null {
+  if (frame.length < 5 || frame[0] !== PUSH_CODE_CONTROL_DATA) return null;
+
+  const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength);
+  const snrRaw = view.getInt8(1);
+  const snr = snrRaw / 4;
+  const rssi = view.getInt8(2);
+  const pathLen = frame[3];
+  let off = 4 + pathLen;
+
+  if (off >= frame.length) {
+    remoteLog("log", `ControlData: no payload after path (pathLen=${pathLen})`);
     return null;
   }
+
+  const controlType = frame[off];
+  if ((controlType & 0xF0) !== CONTROL_NODE_DISCOVER_RESP) {
+    remoteLog("log", `ControlData: controlType=0x${controlType.toString(16)}, not NODE_DISCOVER_RESP`);
+    return null;
+  }
+  off += 1;
+
+  const remaining = frame.slice(off);
+  remoteLog("log", `NodeDiscoverResp: snr=${snr} rssi=${rssi} pathLen=${pathLen} payload=${Array.from(remaining).map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
+
+  let name = "";
+  let publicKeyPrefix = "";
+  if (remaining.length >= 6) {
+    publicKeyPrefix = Array.from(remaining.slice(0, 6)).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+    if (remaining.length > 6) {
+      name = new TextDecoder().decode(remaining.slice(6)).replace(/\0/g, "").trim();
+    }
+  }
+
+  return { snr, rssi, name, publicKeyPrefix };
 }
 
 export async function discoverRepeaters(
@@ -368,16 +412,19 @@ export async function discoverRepeaters(
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
-    const statusResponses = new Map<string, RepeaterStats>();
+    const discoveredNodes = new Map<string, { stats: RepeaterStats; name: string }>();
     const discoveredAdverts = new Map<string, MeshContact>();
 
-    const onStatusResponse = (response: any) => {
-      const key = pubKeyPrefixHex(response.pubKeyPrefix);
-      remoteLog("log", `StatusResponse from prefix=${key}, statusData length=${response.statusData?.byteLength ?? 0}`);
-      const parsed = parseStatusData(response.statusData);
-      if (parsed) {
-        statusResponses.set(key, parsed);
-        remoteLog("log", `Signal from ${key}: RSSI=${parsed.rssi} dBm, SNR=${parsed.snr} dB`);
+    const onRawFrame = (frame: Uint8Array) => {
+      if (frame.length > 0 && frame[0] === PUSH_CODE_CONTROL_DATA) {
+        const entry = parseControlDataFrame(frame);
+        if (entry) {
+          remoteLog("log", `Discovered node "${entry.name}": RSSI=${entry.rssi} SNR=${entry.snr} prefix=${entry.publicKeyPrefix}`);
+          discoveredNodes.set(entry.publicKeyPrefix, {
+            stats: { rssi: entry.rssi, snr: entry.snr },
+            name: entry.name,
+          });
+        }
       }
     };
 
@@ -397,53 +444,53 @@ export async function discoverRepeaters(
       });
     };
 
-    connection.on(Constants.PushCodes.StatusResponse, onStatusResponse);
+    connection.on("rx", onRawFrame);
     connection.on(Constants.PushCodes.NewAdvert, onNewAdvert);
 
     onStatus?.("broadcasting");
-    remoteLog("log", "Sending zero-hop broadcast telemetry request (0x27 to 0xFFFF)...");
-    await connection.sendToRadioFrame(new Uint8Array([0x27, 0xFF, 0xFF]));
+    remoteLog("log", "Sending node_discover request (SEND_CONTROL_DATA with NODE_DISCOVER_REQ)...");
+    const nodeDiscoverCmd = buildNodeDiscoverReq(0);
+    await connection.sendToRadioFrame(nodeDiscoverCmd);
 
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 20s for StatusResponse + NewAdvert responses...");
+    remoteLog("log", "Waiting 20s for node_discover responses...");
     await new Promise((r) => setTimeout(r, 20000));
 
-    connection.off(Constants.PushCodes.StatusResponse, onStatusResponse);
+    connection.off("rx", onRawFrame);
     connection.off(Constants.PushCodes.NewAdvert, onNewAdvert);
-    remoteLog("log", `Collected ${statusResponses.size} StatusResponses, ${discoveredAdverts.size} NewAdverts`);
+    remoteLog("log", `Collected ${discoveredNodes.size} node_discover responses, ${discoveredAdverts.size} NewAdverts`);
 
     const contacts: MeshContact[] = [];
     const repeaters: RepeaterDiscoverResult[] = [];
 
     for (const [key, contact] of Array.from(discoveredAdverts.entries())) {
       contacts.push(contact);
-      const signalData = statusResponses.get(key);
-      if (signalData) {
-        remoteLog("log", `"${contact.advName}": RSSI=${signalData.rssi} dBm, SNR=${signalData.snr} dB`);
-        repeaters.push({ contact, stats: signalData });
+      const nodeData = discoveredNodes.get(key);
+      if (nodeData) {
+        remoteLog("log", `"${contact.advName}": RSSI=${nodeData.stats.rssi} dBm, SNR=${nodeData.stats.snr} dB`);
+        repeaters.push({ contact, stats: nodeData.stats });
+        discoveredNodes.delete(key);
       } else {
         repeaters.push({ contact, stats: null });
       }
     }
 
-    for (const [key, signalData] of Array.from(statusResponses.entries())) {
-      if (!discoveredAdverts.has(key)) {
-        remoteLog("log", `StatusResponse from ${key} (RSSI=${signalData.rssi}, SNR=${signalData.snr}) with no matching advert`);
-        repeaters.push({
-          contact: {
-            publicKey: new Uint8Array(32),
-            type: 0,
-            flags: 0,
-            outPathLen: 0,
-            advName: `Unknown (${key.substring(0, 8)})`,
-            lastAdvert: 0,
-            advLat: 0,
-            advLon: 0,
-            lastMod: 0,
-          },
-          stats: signalData,
-        });
-      }
+    for (const [key, nodeData] of Array.from(discoveredNodes.entries())) {
+      remoteLog("log", `node_discover response "${nodeData.name}" (${key}) RSSI=${nodeData.stats.rssi} SNR=${nodeData.stats.snr} — no matching advert`);
+      repeaters.push({
+        contact: {
+          publicKey: new Uint8Array(32),
+          type: 0,
+          flags: 0,
+          outPathLen: 0,
+          advName: nodeData.name || `Unknown (${key.substring(0, 8)})`,
+          lastAdvert: 0,
+          advLat: 0,
+          advLon: 0,
+          lastMod: 0,
+        },
+        stats: nodeData.stats,
+      });
     }
 
     remoteLog("log", "Discovery complete:", repeaters.length, "nodes found");
