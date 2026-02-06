@@ -35,11 +35,11 @@ interface RssiStyle {
 }
 
 function getRssiStyle(rssi: number): RssiStyle {
-  if (rssi >= -50) return { fill: "#22c55e", border: "#16a34a", fillOpacity: 0.55, label: "Excellent", level: 5 };
-  if (rssi >= -60) return { fill: "#4ade80", border: "#22c55e", fillOpacity: 0.50, label: "Very Good", level: 4 };
-  if (rssi >= -70) return { fill: "#84cc16", border: "#65a30d", fillOpacity: 0.45, label: "Good", level: 3 };
-  if (rssi >= -80) return { fill: "#facc15", border: "#eab308", fillOpacity: 0.42, label: "Fair", level: 2 };
-  if (rssi >= -90) return { fill: "#f97316", border: "#ea580c", fillOpacity: 0.42, label: "Poor", level: 1 };
+  if (rssi >= -70) return { fill: "#22c55e", border: "#16a34a", fillOpacity: 0.55, label: "Excellent", level: 5 };
+  if (rssi >= -80) return { fill: "#4ade80", border: "#22c55e", fillOpacity: 0.50, label: "Very Good", level: 4 };
+  if (rssi >= -85) return { fill: "#84cc16", border: "#65a30d", fillOpacity: 0.45, label: "Good", level: 3 };
+  if (rssi >= -90) return { fill: "#facc15", border: "#eab308", fillOpacity: 0.42, label: "Fair", level: 2 };
+  if (rssi >= -100) return { fill: "#f97316", border: "#ea580c", fillOpacity: 0.42, label: "Poor", level: 1 };
   return { fill: "#ef4444", border: "#dc2626", fillOpacity: 0.45, label: "Very Weak", level: 0 };
 }
 
@@ -183,12 +183,12 @@ export function CoverageMap({
             RSSI Signal Strength
           </p>
           {[
-            { color: "#22c55e", label: "Excellent", range: "> -50 dBm" },
-            { color: "#4ade80", label: "Very Good", range: "-50 to -60" },
-            { color: "#84cc16", label: "Good", range: "-60 to -70" },
-            { color: "#facc15", label: "Fair", range: "-70 to -80" },
-            { color: "#f97316", label: "Poor", range: "-80 to -90" },
-            { color: "#ef4444", label: "Very Weak", range: "< -90 dBm" },
+            { color: "#22c55e", label: "Excellent", range: "> -70 dBm" },
+            { color: "#4ade80", label: "Very Good", range: "-70 to -80" },
+            { color: "#84cc16", label: "Good", range: "-80 to -85" },
+            { color: "#facc15", label: "Fair", range: "-85 to -90" },
+            { color: "#f97316", label: "Poor", range: "-90 to -100" },
+            { color: "#ef4444", label: "Very Weak", range: "< -100 dBm" },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-2">
               <div
