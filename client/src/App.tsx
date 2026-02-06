@@ -9,6 +9,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BluetoothProvider } from "@/lib/bluetooth-context";
 import { Heart } from "lucide-react";
+import { CompatibilityDialog } from "@/components/compatibility-dialog";
 import NotFound from "@/pages/not-found";
 import MapPage from "@/pages/map-page";
 import NodesPage from "@/pages/nodes-page";
@@ -63,6 +64,7 @@ function App() {
                 </div>
               </div>
             </SidebarProvider>
+            <CompatibilityDialog />
             <Toaster />
           </BluetoothProvider>
         </TooltipProvider>

@@ -116,3 +116,6 @@ Preferred communication style: Simple, everyday language.
 - **2026-02-06**: Recalibrated RSSI scale — Good now covers -80 to -90 dBm, Fair -90 to -100, Poor -100 to -110, Very Weak < -110. Better suited for LoRa long-range signals.
 - **2026-02-06**: Added floating "Support" tab at top-right of map view linking to CashApp ($yuptm).
 - **2026-02-06**: Mobile slide-out sheet auto-closes after tapping action buttons (Connect, Scan, etc.) but stays open for sliders and toggles.
+- **2026-02-06**: Added PWA manifest (manifest.json) and apple-touch-icon for installable app experience on all platforms.
+- **2026-02-06**: Added CompatibilityDialog — shows on first load if Web Bluetooth is unavailable (e.g. Safari, Firefox). Guides iOS users to Bluefy, Android/desktop users to Chrome/Edge, and explains PWA installation. Dismisses for 7 days via localStorage. Skips dialog if already in PWA standalone mode, Bluefy, or a browser with Web Bluetooth support.
+- **2026-02-06**: Added checkConnectionAlive() — probes radio with battery query (5s timeout) on visibility change to detect stale BLE connections after iOS backgrounding.
