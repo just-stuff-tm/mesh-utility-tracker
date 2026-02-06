@@ -242,6 +242,16 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
             scanResultsSubmitted++;
           } catch {}
         }
+
+        const repeatersWithStats = result.repeaters.filter((r) => r.stats !== null).length;
+        if (repeatersWithStats === 0) {
+          try {
+            await apiRequest("POST", "/api/coverage-zones/dead-zone", {
+              centerLat: pos[0],
+              centerLng: pos[1],
+            });
+          } catch {}
+        }
       }
 
       const scanResult: LastScanResult = {
