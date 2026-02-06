@@ -385,21 +385,15 @@ export async function discoverRepeaters(
     onStatus?.("querying");
     const repeaters: RepeaterDiscoverResult[] = [];
     const zeroHop = repeaterContacts.filter((c) => c.outPathLen === 0);
-    const notZeroHop = repeaterContacts.filter((c) => c.outPathLen !== 0);
-    remoteLog("log", `Repeaters: ${zeroHop.length} zero-hop (direct), ${notZeroHop.length} multi-hop/unreachable`);
-
-    for (const repeater of notZeroHop) {
-      repeaters.push({ contact: repeater, stats: null });
-    }
+    const skipped = repeaterContacts.filter((c) => c.outPathLen !== 0);
+    remoteLog("log", `Repeaters: ${zeroHop.length} zero-hop (direct), ${skipped.length} multi-hop/unreachable (skipped)`);
 
     for (const repeater of zeroHop) {
-      let stats: RepeaterStats | null = null;
-
       try {
         remoteLog("log", "Querying status for zero-hop repeater:", repeater.advName || publicKeyHex(repeater.publicKey));
         const statusResult = await connection.getStatus(repeater.publicKey);
         remoteLog("log", "Status result:", statusResult.last_rssi, "dBm,", statusResult.last_snr, "dB SNR");
-        stats = {
+        const stats: RepeaterStats = {
           battMilliVolts: statusResult.batt_milli_volts,
           noiseFloor: statusResult.noise_floor,
           lastRssi: statusResult.last_rssi,
@@ -409,14 +403,13 @@ export async function discoverRepeaters(
           totalAirTimeSecs: statusResult.total_air_time_secs,
           totalUpTimeSecs: statusResult.total_up_time_secs,
         };
+        repeaters.push({ contact: repeater, stats });
       } catch (err) {
         remoteLog("warn", "getStatus failed for", repeater.advName || publicKeyHex(repeater.publicKey), err);
       }
-
-      repeaters.push({ contact: repeater, stats });
     }
 
-    remoteLog("log", "Discovery complete:", repeaters.length, "repeaters,", repeaters.filter(r => r.stats).length, "with stats");
+    remoteLog("log", "Discovery complete:", repeaters.length, "repeaters responded with stats");
     return { contacts, repeaters, timestamp: new Date() };
   } catch (err: any) {
     remoteLog("error", "discoverRepeaters error:", err?.message || err);
