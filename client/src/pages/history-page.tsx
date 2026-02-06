@@ -7,9 +7,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ScanResult } from "@shared/schema";
 
 function getSignalBadge(rssi: number): { label: string; variant: "default" | "secondary" | "destructive" } {
-  if (rssi >= -70) return { label: "Strong", variant: "default" };
-  if (rssi >= -90) return { label: "Medium", variant: "secondary" };
-  return { label: "Weak", variant: "destructive" };
+  if (rssi >= -70) return { label: "Excellent", variant: "default" };
+  if (rssi >= -80) return { label: "Very Good", variant: "default" };
+  if (rssi >= -90) return { label: "Good", variant: "secondary" };
+  if (rssi >= -100) return { label: "Fair", variant: "secondary" };
+  if (rssi >= -110) return { label: "Poor", variant: "destructive" };
+  return { label: "Very Weak", variant: "destructive" };
 }
 
 function formatTime(date: string | Date | null): string {
