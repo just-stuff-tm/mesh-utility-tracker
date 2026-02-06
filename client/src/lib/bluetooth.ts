@@ -312,15 +312,9 @@ export function contactLatLon(contact: MeshContact): { lat: number; lon: number 
   };
 }
 
-export interface NeighbourInfo {
-  publicKeyPrefix: Uint8Array;
-  heardSecondsAgo: number;
-  snr: number;
-}
-
 export interface RepeaterStats {
-  lastSnr: number;
-  neighbours: NeighbourInfo[];
+  rssi: number;
+  snr: number;
 }
 
 export interface RepeaterDiscoverResult {
@@ -355,68 +349,62 @@ export async function discoverRepeaters(
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
-    const discoveredAdverts = new Map<string, MeshContact>();
+    const discoveredNodes = new Map<string, { contact: MeshContact; stats: RepeaterStats | null }>();
+    let lastRxLog: { rssi: number; snr: number } | null = null;
+
+    const onLogRxData = (data: any) => {
+      lastRxLog = { rssi: data.lastRssi, snr: data.lastSnr };
+      remoteLog("log", `LogRxData: RSSI=${data.lastRssi} dBm, SNR=${data.lastSnr} dB`);
+    };
 
     const onNewAdvert = (data: any) => {
       const key = pubKeyPrefixHex(data.publicKey.slice(0, 6));
-      remoteLog("log", `NewAdvert received: "${data.advName}" type=${data.type} pathLen=${data.outPathLen} prefix=${key}`);
-      discoveredAdverts.set(key, {
-        publicKey: data.publicKey,
-        type: data.type,
-        flags: data.flags,
-        outPathLen: data.outPathLen,
-        advName: data.advName,
-        lastAdvert: data.lastAdvert,
-        advLat: data.advLat,
-        advLon: data.advLon,
-        lastMod: data.lastMod,
+      const rxStats = lastRxLog;
+      lastRxLog = null;
+      remoteLog("log", `NewAdvert: "${data.advName}" type=${data.type} pathLen=${data.outPathLen} prefix=${key} RSSI=${rxStats?.rssi ?? "?"} SNR=${rxStats?.snr ?? "?"}`);
+      discoveredNodes.set(key, {
+        contact: {
+          publicKey: data.publicKey,
+          type: data.type,
+          flags: data.flags,
+          outPathLen: data.outPathLen,
+          advName: data.advName,
+          lastAdvert: data.lastAdvert,
+          advLat: data.advLat,
+          advLon: data.advLon,
+          lastMod: data.lastMod,
+        },
+        stats: rxStats ? { rssi: rxStats.rssi, snr: rxStats.snr } : null,
       });
     };
 
+    connection.on(Constants.PushCodes.LogRxData, onLogRxData);
     connection.on(Constants.PushCodes.NewAdvert, onNewAdvert);
 
     onStatus?.("advertising");
-    remoteLog("log", "Sending flood self-advert to discover nearby repeaters...");
+    remoteLog("log", "Sending flood self-advert to discover nearby nodes...");
     await connection.sendAdvert(Constants.SelfAdvertTypes.Flood);
 
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 20s for NewAdvert responses...");
+    remoteLog("log", "Waiting 20s for responses...");
     await new Promise((r) => setTimeout(r, 20000));
 
+    connection.off(Constants.PushCodes.LogRxData, onLogRxData);
     connection.off(Constants.PushCodes.NewAdvert, onNewAdvert);
-    remoteLog("log", `Discovered ${discoveredAdverts.size} nodes via NewAdvert events`);
+    remoteLog("log", `Discovered ${discoveredNodes.size} nodes`);
 
-    const contacts = Array.from(discoveredAdverts.values());
+    const contacts: MeshContact[] = [];
     const repeaters: RepeaterDiscoverResult[] = [];
 
-    onStatus?.("querying");
-    for (const contact of contacts) {
-      if (contact.type !== Constants.AdvType.Repeater) {
-        remoteLog("log", `Skipping non-repeater "${contact.advName}" (type=${contact.type})`);
-        repeaters.push({ contact, stats: null });
-        continue;
-      }
-
-      try {
-        remoteLog("log", `Querying neighbours from repeater "${contact.advName}"...`);
-        const result = await connection.getNeighbours(contact.publicKey, 10, 0, 2);
-        const neighbours: NeighbourInfo[] = (result.neighbours || []).map((n: any) => ({
-          publicKeyPrefix: n.publicKeyPrefix,
-          heardSecondsAgo: n.heardSecondsAgo,
-          snr: n.snr,
-        }));
-        const bestSnr = neighbours.length > 0
-          ? Math.max(...neighbours.map((n: NeighbourInfo) => n.snr))
-          : 0;
-        remoteLog("log", `Repeater "${contact.advName}": ${neighbours.length} neighbours, best SNR=${bestSnr} dB`);
-        repeaters.push({ contact, stats: { lastSnr: bestSnr, neighbours } });
-      } catch (err: any) {
-        remoteLog("warn", `getNeighbours failed for "${contact.advName}": ${err?.message || err}`);
-        repeaters.push({ contact, stats: null });
+    for (const entry of Array.from(discoveredNodes.values())) {
+      contacts.push(entry.contact);
+      repeaters.push({ contact: entry.contact, stats: entry.stats });
+      if (entry.stats) {
+        remoteLog("log", `"${entry.contact.advName}": RSSI=${entry.stats.rssi} dBm, SNR=${entry.stats.snr} dB`);
       }
     }
 
-    remoteLog("log", "Discovery complete:", repeaters.length, "nodes found,", contacts.length, "total discovered");
+    remoteLog("log", "Discovery complete:", repeaters.length, "nodes found");
     return { contacts, repeaters, timestamp: new Date() };
   } catch (err: any) {
     remoteLog("error", "discoverRepeaters error:", err?.message || err);
