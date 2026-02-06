@@ -57,6 +57,7 @@ export const scanResults = pgTable("scan_results", {
   timestamp: timestamp("timestamp").defaultNow(),
   senderName: text("sender_name"),
   receiverName: text("receiver_name"),
+  radioId: text("radio_id"),
 });
 
 export const insertScanResultSchema = createInsertSchema(scanResults).omit({ id: true, timestamp: true });
@@ -74,6 +75,7 @@ export const coverageZones = pgTable("coverage_zones", {
   lastScanned: timestamp("last_scanned").defaultNow(),
   isDeadZone: boolean("is_dead_zone").default(false),
   polygon: jsonb("polygon"),
+  radioId: text("radio_id"),
 });
 
 export const insertCoverageZoneSchema = createInsertSchema(coverageZones).omit({ id: true, lastScanned: true });

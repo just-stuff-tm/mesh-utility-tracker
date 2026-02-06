@@ -35,6 +35,7 @@ export interface IStorage {
   updateCoverageZone(id: string, data: Partial<InsertCoverageZone>): Promise<CoverageZone | undefined>;
   deleteCoverageZone(id: string): Promise<boolean>;
   findNearbyZone(lat: number, lng: number, radiusMeters: number): Promise<CoverageZone | undefined>;
+  deleteDataByRadioId(radioId: string): Promise<{ scanResults: number; coverageZones: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -151,6 +152,16 @@ export class DatabaseStorage implements IStorage {
   async deleteCoverageZone(id: string): Promise<boolean> {
     const result = await db.delete(coverageZones).where(eq(coverageZones.id, id)).returning();
     return result.length > 0;
+  }
+
+  async deleteDataByRadioId(radioId: string): Promise<{ scanResults: number; coverageZones: number }> {
+    const deletedScans = await db.delete(scanResults)
+      .where(eq(scanResults.radioId, radioId))
+      .returning();
+    const deletedZones = await db.delete(coverageZones)
+      .where(eq(coverageZones.radioId, radioId))
+      .returning();
+    return { scanResults: deletedScans.length, coverageZones: deletedZones.length };
   }
 
   async findNearbyZone(lat: number, lng: number, radiusMeters: number): Promise<CoverageZone | undefined> {

@@ -99,6 +99,7 @@ export async function registerRoutes(
           isDeadZone: false,
           centerLat: existingZone.centerLat,
           centerLng: existingZone.centerLng,
+          radioId: parsed.radioId || existingZone.radioId,
         });
       } else {
         await storage.createCoverageZone({
@@ -110,6 +111,7 @@ export async function registerRoutes(
           scanCount: 1,
           isDeadZone: false,
           polygon: null,
+          radioId: parsed.radioId || null,
         });
       }
 
@@ -139,7 +141,7 @@ export async function registerRoutes(
 
   app.post("/api/coverage-zones/dead-zone", async (req, res) => {
     try {
-      const { centerLat, centerLng } = req.body;
+      const { centerLat, centerLng, radioId } = req.body;
       if (typeof centerLat !== "number" || typeof centerLng !== "number") {
         return res.status(400).json({ message: "centerLat and centerLng are required" });
       }
@@ -154,6 +156,7 @@ export async function registerRoutes(
           scanCount: 0,
           centerLat: existingZone.centerLat,
           centerLng: existingZone.centerLng,
+          radioId: radioId || existingZone.radioId,
         });
         return res.json(updated);
       }
@@ -167,6 +170,7 @@ export async function registerRoutes(
         scanCount: 0,
         isDeadZone: true,
         polygon: null,
+        radioId: radioId || null,
       });
       res.json(zone);
     } catch (err: any) {
@@ -181,6 +185,19 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Zone not found" });
       }
       res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/data/:radioId", async (req, res) => {
+    try {
+      const { radioId } = req.params;
+      if (!radioId || radioId.length < 10) {
+        return res.status(400).json({ message: "Valid radioId required" });
+      }
+      const result = await storage.deleteDataByRadioId(radioId);
+      res.json({ success: true, deleted: result });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

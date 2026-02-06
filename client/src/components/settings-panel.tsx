@@ -1,4 +1,5 @@
-import { Settings, Timer, MapPin, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { Settings, Timer, MapPin, AlertTriangle, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -6,12 +7,14 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
+import { publicKeyHex } from "@/lib/bluetooth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 
 export function SettingsPanel() {
   const { toast } = useToast();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const {
     scanInterval,
     setScanInterval,
@@ -22,7 +25,35 @@ export function SettingsPanel() {
     smartScanDays,
     setSmartScanDays,
     observerPosition,
+    connected,
+    selfInfo,
   } = useBluetoothContext();
+
+  const deleteDataMutation = useMutation({
+    mutationFn: async (radioId: string) => {
+      const res = await apiRequest("DELETE", `/api/data/${radioId}`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
+      setConfirmDelete(false);
+      toast({
+        title: "Data deleted",
+        description: `Removed ${data.deleted.scanResults} scan results and ${data.deleted.coverageZones} coverage zones`,
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete data", variant: "destructive" });
+    },
+  });
+
+  const handleDeleteData = () => {
+    if (!selfInfo?.publicKey) return;
+    const radioId = publicKeyHex(selfInfo.publicKey);
+    deleteDataMutation.mutate(radioId);
+  };
 
   const markDeadZoneMutation = useMutation({
     mutationFn: async (data: { centerLat: number; centerLng: number }) => {
@@ -137,6 +168,60 @@ export function SettingsPanel() {
             <AlertTriangle className="h-3 w-3 mr-1" />
             Mark Dead Zone
           </Button>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs">Delete My Data</Label>
+          </div>
+          {connected && selfInfo ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Delete all scan results and coverage zones recorded by <span className="font-medium text-foreground">{selfInfo.name}</span>
+              </p>
+              {!confirmDelete ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-full text-destructive border-destructive/30"
+                  data-testid="button-delete-data"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Delete My Data
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleDeleteData}
+                    disabled={deleteDataMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-confirm-delete"
+                  >
+                    {deleteDataMutation.isPending ? "Deleting..." : "Confirm Delete"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setConfirmDelete(false)}
+                    className="flex-1"
+                    data-testid="button-cancel-delete"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">
+              Connect to your radio to delete data recorded by that device
+            </p>
+          )}
         </div>
       </Card>
     </div>

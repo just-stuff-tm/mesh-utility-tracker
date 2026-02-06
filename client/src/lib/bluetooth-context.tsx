@@ -167,21 +167,20 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
 
-  const checkSmartScanSkip = useCallback(async (): Promise<boolean> => {
+  const checkSmartScanSkip = useCallback((): boolean => {
     if (!smartScanEnabledRef.current) return false;
     const pos = positionRef.current;
     if (!pos) return false;
 
     try {
       const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
-      const res = await fetch("/api/coverage-zones");
-      if (!res.ok) return false;
-      const zones = await res.json();
+      const cachedZones = queryClient.getQueryData<any[]>(["/api/coverage-zones"]);
+      if (!cachedZones) return false;
       const freshnessMs = smartScanDaysRef.current * 24 * 60 * 60 * 1000;
       const now = Date.now();
       const tolerance = 0.00005;
 
-      for (const z of zones) {
+      for (const z of cachedZones) {
         if (
           Math.abs(z.centerLat - snapLat) < tolerance &&
           Math.abs(z.centerLng - snapLng) < tolerance &&
@@ -223,6 +222,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
       let scanResultsSubmitted = 0;
 
+      const radioId = selfInfoRef.current?.publicKey
+        ? publicKeyHex(selfInfoRef.current.publicKey)
+        : null;
+
       if (pos) {
         for (const rep of result.repeaters) {
           if (!rep.stats) continue;
@@ -249,6 +252,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
               longitude: pos[1],
               senderName: repeaterName,
               receiverName: selfInfoRef.current?.name || "Observer",
+              radioId,
             });
             scanResultsSubmitted++;
           } catch {}
@@ -259,6 +263,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
             await apiRequest("POST", "/api/coverage-zones/dead-zone", {
               centerLat: pos[0],
               centerLng: pos[1],
+              radioId,
             });
           } catch {}
         }
@@ -296,8 +301,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const runAutoScan = async () => {
-      const skip = await checkSmartScanSkip();
+    const runAutoScan = () => {
+      const skip = checkSmartScanSkip();
       if (skip) {
         setScanStatus("done");
         setLastScanResult((prev) => prev ? { ...prev, errorMessage: "Smart scan: area recently covered, skipped" } : {
