@@ -67,7 +67,7 @@ export default function MapPage() {
           href="https://cash.app/$yuptm"
           target="_blank"
           rel="noopener noreferrer"
-          className="absolute top-3 right-3 z-[1000] flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500/15 to-green-500/15 backdrop-blur-sm border border-emerald-500/25 px-2.5 py-1.5 transition-all duration-200 hover:from-emerald-500/25 hover:to-green-500/25 hover:border-emerald-500/40"
+          className="absolute top-3 right-3 z-[1000] flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500/15 to-green-500/15 backdrop-blur-sm border border-emerald-500/25 px-2.5 py-1.5 transition-all duration-200 hover:from-emerald-500/25 hover:to-green-500/25 hover:border-emerald-500/40 text-center"
           data-testid="link-support-floating"
         >
           <Heart className="h-3 w-3 text-emerald-500" />
@@ -119,7 +119,6 @@ export default function MapPage() {
           />
         </div>
       </div>
-
       <div className="w-[300px] border-l border-border bg-background hidden lg:flex flex-col">
         <ScrollArea className="flex-1">
           <div className="p-3 pb-8">
