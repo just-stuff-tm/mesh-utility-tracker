@@ -149,6 +149,9 @@ export async function registerRoutes(
       if (existingZone) {
         const updated = await storage.updateCoverageZone(existingZone.id, {
           isDeadZone: true,
+          avgRssi: null,
+          avgSnr: null,
+          scanCount: 0,
           centerLat: existingZone.centerLat,
           centerLng: existingZone.centerLng,
         });
