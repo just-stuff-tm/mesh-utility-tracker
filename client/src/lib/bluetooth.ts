@@ -381,6 +381,8 @@ export async function discoverRepeaters(
     }
 
     const collectedResponses: { pubKeyPrefix: Uint8Array; statusData: Uint8Array }[] = [];
+    const discoveredAdverts = new Map<string, MeshContact>();
+
     const onStatusResponse = (response: any) => {
       remoteLog("log", `StatusResponse received from prefix=${pubKeyPrefixHex(response.pubKeyPrefix)}`);
       collectedResponses.push({
@@ -389,7 +391,24 @@ export async function discoverRepeaters(
       });
     };
 
+    const onNewAdvert = (data: any) => {
+      const key = pubKeyPrefixHex(data.publicKey.slice(0, 6));
+      remoteLog("log", `NewAdvert received: "${data.advName}" type=${data.type} pathLen=${data.outPathLen} prefix=${key}`);
+      discoveredAdverts.set(key, {
+        publicKey: data.publicKey,
+        type: data.type,
+        flags: data.flags,
+        outPathLen: data.outPathLen,
+        advName: data.advName,
+        lastAdvert: data.lastAdvert,
+        advLat: data.advLat,
+        advLon: data.advLon,
+        lastMod: data.lastMod,
+      });
+    };
+
     connection.on(Constants.PushCodes.StatusResponse, onStatusResponse);
+    connection.on(Constants.PushCodes.NewAdvert, onNewAdvert);
 
     onStatus?.("advertising");
     remoteLog("log", "Sending broadcast telemetry request (CMD_SEND_TELEMETRY_REQ 0xFFFF)...");
@@ -399,44 +418,22 @@ export async function discoverRepeaters(
     await connection.sendCommandSendTelemetryReq(broadcastKey);
 
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 20s for status responses...");
+    remoteLog("log", "Waiting 20s for responses...");
     await new Promise((r) => setTimeout(r, 20000));
 
     connection.off(Constants.PushCodes.StatusResponse, onStatusResponse);
-    remoteLog("log", `Collected ${collectedResponses.length} StatusResponse events during discovery window`);
+    connection.off(Constants.PushCodes.NewAdvert, onNewAdvert);
+    remoteLog("log", `Collected ${collectedResponses.length} StatusResponses, ${discoveredAdverts.size} NewAdverts`);
 
-    onStatus?.("querying");
-    remoteLog("log", "Fetching contacts list to match responses...");
-    const rawContacts = await connection.getContacts();
-    remoteLog("log", "getContacts returned", rawContacts.length, "contacts");
-
-    const contacts: MeshContact[] = rawContacts.map((c: any) => ({
-      publicKey: c.publicKey,
-      type: c.type,
-      flags: c.flags,
-      outPathLen: c.outPathLen,
-      advName: c.advName,
-      lastAdvert: c.lastAdvert,
-      advLat: c.advLat,
-      advLon: c.advLon,
-      lastMod: c.lastMod,
-    }));
-
-    for (const c of contacts) {
-      remoteLog("log", `Contact: "${c.advName}" type=${c.type} flags=${c.flags} pathLen=${c.outPathLen}`);
-    }
-
+    const contacts = Array.from(discoveredAdverts.values());
     const repeaters: RepeaterDiscoverResult[] = [];
 
     for (const resp of collectedResponses) {
       const prefixHex = pubKeyPrefixHex(resp.pubKeyPrefix);
-      const matchedContact = contacts.find((c) => {
-        const contactPrefix = pubKeyPrefixHex(c.publicKey.slice(0, 6));
-        return contactPrefix === prefixHex;
-      });
+      const matchedContact = discoveredAdverts.get(prefixHex);
 
       if (!matchedContact) {
-        remoteLog("warn", `StatusResponse from ${prefixHex} has no matching contact, skipping`);
+        remoteLog("warn", `StatusResponse from ${prefixHex} has no matching advert, skipping`);
         continue;
       }
 
@@ -449,7 +446,7 @@ export async function discoverRepeaters(
       }
     }
 
-    remoteLog("log", "Discovery complete:", repeaters.length, "repeaters responded with stats");
+    remoteLog("log", "Discovery complete:", repeaters.length, "repeaters with stats,", contacts.length, "total discovered");
     return { contacts, repeaters, timestamp: new Date() };
   } catch (err: any) {
     remoteLog("error", "discoverRepeaters error:", err?.message || err);
