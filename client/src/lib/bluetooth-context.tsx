@@ -48,6 +48,8 @@ interface BluetoothContextValue {
   deviceInfo: DeviceInfo | null;
   selfInfo: SelfInfo | null;
   batteryMilliVolts: number | null;
+  lastRadioName: string | null;
+  showReconnect: boolean;
   contacts: MeshContact[];
   scanStatus: ScanStatus;
   lastScanResult: LastScanResult | null;
@@ -55,6 +57,7 @@ interface BluetoothContextValue {
   disconnect: () => Promise<void>;
   toggleScan: () => void;
   forceScan: () => void;
+  dismissReconnect: () => void;
   setScanInterval: (interval: number) => void;
   setAutoCenter: (v: boolean) => void;
   setSmartScanEnabled: (v: boolean) => void;
@@ -90,6 +93,12 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [lastScanResult, setLastScanResult] = useState<LastScanResult | null>(null);
   const [nextScanCountdown, setNextScanCountdown] = useState<number | null>(null);
+  const [lastRadioName] = useState<string | null>(() => {
+    try { return localStorage.getItem("mesh_last_radio"); } catch { return null; }
+  });
+  const [showReconnect, setShowReconnect] = useState(() => {
+    try { return !!localStorage.getItem("mesh_last_radio"); } catch { return false; }
+  });
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const positionRef = useRef<[number, number] | null>(null);
@@ -379,6 +388,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     if (result.success) {
       setConnected(true);
       setDeviceName(result.deviceName);
+      setShowReconnect(false);
+      try { localStorage.setItem("mesh_last_radio", result.deviceName || "Radio"); } catch {}
 
       try {
         const info = await getSelfInfo();
@@ -428,6 +439,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     setNextScanCountdown(scanInterval);
   }, [connected, scanStatus, scanInterval, runDiscoverRepeaters]);
 
+  const dismissReconnect = useCallback(() => {
+    setShowReconnect(false);
+  }, []);
+
   return (
     <BluetoothContext.Provider
       value={{
@@ -452,10 +467,13 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         contacts,
         scanStatus,
         lastScanResult,
+        lastRadioName,
+        showReconnect,
         connect: connectHandler,
         disconnect,
         toggleScan,
         forceScan,
+        dismissReconnect,
         setScanInterval,
         setAutoCenter,
         setSmartScanEnabled,

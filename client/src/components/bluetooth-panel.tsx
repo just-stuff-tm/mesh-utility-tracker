@@ -35,9 +35,12 @@ export function BluetoothPanel() {
     contacts,
     scanStatus,
     lastScanResult,
+    lastRadioName,
+    showReconnect,
     connect,
     disconnect,
     toggleScan,
+    dismissReconnect,
   } = useBluetoothContext();
 
   const batteryPercent = batteryMilliVolts
@@ -76,6 +79,39 @@ export function BluetoothPanel() {
           <p className="text-xs text-muted-foreground">
             Web Bluetooth not available. Use Chrome/Edge on desktop or Android.
           </p>
+        )}
+
+        {!connected && showReconnect && lastRadioName && (
+          <div className="bg-muted/50 rounded-md p-2 space-y-2" data-no-close>
+            <p className="text-xs text-muted-foreground">
+              Previously connected to <span className="font-medium text-foreground">{lastRadioName}</span>
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={connect}
+                disabled={connecting || !supported}
+                className="flex-1"
+                data-testid="button-reconnect-bluetooth"
+                data-no-close
+              >
+                {connecting ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : (
+                  <Bluetooth className="h-3 w-3 mr-1" />
+                )}
+                {connecting ? "Connecting..." : "Reconnect"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={dismissReconnect}
+                data-testid="button-dismiss-reconnect"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
         )}
 
         <div className="flex gap-2">
