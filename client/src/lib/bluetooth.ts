@@ -1,34 +1,82 @@
-const MESHCORE_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const MESHCORE_TX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
-const MESHCORE_RX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+import { WebBleConnection, Constants } from "@liamcottle/meshcore.js";
 
-export interface BluetoothState {
-  isConnected: boolean;
-  isConnecting: boolean;
-  deviceName: string | null;
-  error: string | null;
+export interface MeshContact {
+  publicKey: Uint8Array;
+  type: number;
+  flags: number;
+  outPathLen: number;
+  advName: string;
+  lastAdvert: number;
+  advLat: number;
+  advLon: number;
+  lastMod: number;
 }
 
-export type MessageHandler = (data: string) => void;
+export interface DeviceInfo {
+  firmwareVer: number;
+  firmwareBuildDate: string;
+  manufacturerModel: string;
+}
 
-let device: BluetoothDevice | null = null;
-let txCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
-let rxCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
-let messageHandlers: MessageHandler[] = [];
+export interface SelfInfo {
+  name: string;
+  type: number;
+  txPower: number;
+  maxTxPower: number;
+  publicKey: Uint8Array;
+  advLat: number;
+  advLon: number;
+  radioFreq: number;
+  radioBw: number;
+  radioSf: number;
+  radioCr: number;
+}
 
-export function onMessage(handler: MessageHandler) {
-  messageHandlers.push(handler);
+export interface RxLogEntry {
+  lastSnr: number;
+  lastRssi: number;
+  raw: Uint8Array;
+}
+
+export type MeshEventType =
+  | "connected"
+  | "disconnected"
+  | "contact"
+  | "advert"
+  | "new_advert"
+  | "device_info"
+  | "self_info"
+  | "battery"
+  | "rx_log"
+  | "contacts_loaded";
+
+type EventHandler = (data?: any) => void;
+
+let connection: any = null;
+const eventHandlers: Map<MeshEventType, Set<EventHandler>> = new Map();
+
+export function on(event: MeshEventType, handler: EventHandler) {
+  if (!eventHandlers.has(event)) eventHandlers.set(event, new Set());
+  eventHandlers.get(event)!.add(handler);
   return () => {
-    messageHandlers = messageHandlers.filter((h) => h !== handler);
+    eventHandlers.get(event)?.delete(handler);
   };
 }
 
-function notifyHandlers(data: string) {
-  messageHandlers.forEach((h) => h(data));
+function emit(event: MeshEventType, data?: any) {
+  eventHandlers.get(event)?.forEach((h) => h(data));
 }
 
 export function isBluetoothSupported(): boolean {
   return typeof navigator !== "undefined" && "bluetooth" in navigator;
+}
+
+export function isConnected(): boolean {
+  return connection !== null;
+}
+
+export function getConnection(): any {
+  return connection;
 }
 
 export async function connectToRadio(): Promise<{
@@ -41,64 +89,167 @@ export async function connectToRadio(): Promise<{
   }
 
   try {
-    device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [MESHCORE_SERVICE_UUID] }],
-      optionalServices: [MESHCORE_SERVICE_UUID],
-    });
-
-    if (!device.gatt) {
-      return { success: false, deviceName: null, error: "GATT not available" };
+    const bleConnection = await WebBleConnection.open();
+    if (!bleConnection) {
+      return { success: false, deviceName: null, error: "No device selected" };
     }
 
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(MESHCORE_SERVICE_UUID);
+    connection = bleConnection;
+    const name = bleConnection.bleDevice?.name || "MeshCore Radio";
 
-    txCharacteristic = await service.getCharacteristic(MESHCORE_TX_CHAR_UUID);
-    rxCharacteristic = await service.getCharacteristic(MESHCORE_RX_CHAR_UUID);
-
-    await rxCharacteristic.startNotifications();
-    rxCharacteristic.addEventListener("characteristicvaluechanged", (event: any) => {
-      const value = event.target.value;
-      const decoder = new TextDecoder();
-      const text = decoder.decode(value);
-      notifyHandlers(text);
+    bleConnection.on("disconnected", () => {
+      connection = null;
+      emit("disconnected");
     });
 
-    device.addEventListener("gattserverdisconnected", () => {
-      notifyHandlers("__DISCONNECTED__");
+    bleConnection.on(Constants.ResponseCodes.Contact, (contact: any) => {
+      emit("contact", contact);
     });
 
-    return { success: true, deviceName: device.name || "Unknown Device" };
+    bleConnection.on(Constants.PushCodes.Advert, (data: any) => {
+      emit("advert", data);
+    });
+
+    bleConnection.on(Constants.PushCodes.NewAdvert, (data: any) => {
+      emit("new_advert", data);
+    });
+
+    bleConnection.on(Constants.ResponseCodes.DeviceInfo, (info: any) => {
+      emit("device_info", {
+        firmwareVer: info.firmwareVer,
+        firmwareBuildDate: info.firmware_build_date,
+        manufacturerModel: info.manufacturerModel,
+      } as DeviceInfo);
+    });
+
+    bleConnection.on(Constants.ResponseCodes.SelfInfo, (info: any) => {
+      emit("self_info", {
+        name: info.name,
+        type: info.type,
+        txPower: info.txPower,
+        maxTxPower: info.maxTxPower,
+        publicKey: info.publicKey,
+        advLat: info.advLat,
+        advLon: info.advLon,
+        radioFreq: info.radioFreq,
+        radioBw: info.radioBw,
+        radioSf: info.radioSf,
+        radioCr: info.radioCr,
+      } as SelfInfo);
+    });
+
+    bleConnection.on(Constants.ResponseCodes.BatteryVoltage, (data: any) => {
+      emit("battery", { milliVolts: data.batteryMilliVolts });
+    });
+
+    bleConnection.on(Constants.PushCodes.LogRxData, (data: any) => {
+      emit("rx_log", {
+        lastSnr: data.lastSnr,
+        lastRssi: data.lastRssi,
+        raw: data.raw,
+      } as RxLogEntry);
+    });
+
+    emit("connected");
+    return { success: true, deviceName: name };
   } catch (err: any) {
     return { success: false, deviceName: null, error: err.message || "Connection failed" };
   }
 }
 
 export async function disconnectRadio(): Promise<void> {
-  if (device?.gatt?.connected) {
-    device.gatt.disconnect();
+  if (connection) {
+    try {
+      await connection.close();
+    } catch {}
+    connection = null;
   }
-  device = null;
-  txCharacteristic = null;
-  rxCharacteristic = null;
 }
 
-export async function sendCommand(command: string): Promise<boolean> {
-  if (!txCharacteristic) return false;
-
+export async function getContacts(): Promise<MeshContact[]> {
+  if (!connection) return [];
   try {
-    const encoder = new TextEncoder();
-    await txCharacteristic.writeValue(encoder.encode(command + "\n"));
+    const contacts = await connection.getContacts();
+    return contacts.map((c: any) => ({
+      publicKey: c.publicKey,
+      type: c.type,
+      flags: c.flags,
+      outPathLen: c.outPathLen,
+      advName: c.advName,
+      lastAdvert: c.lastAdvert,
+      advLat: c.advLat,
+      advLon: c.advLon,
+      lastMod: c.lastMod,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function getSelfInfo(): Promise<SelfInfo | null> {
+  if (!connection) return null;
+  try {
+    return await connection.getSelfInfo();
+  } catch {
+    return null;
+  }
+}
+
+export async function getDeviceInfo(): Promise<DeviceInfo | null> {
+  if (!connection) return null;
+  try {
+    return await connection.deviceQuery(Constants.SupportedCompanionProtocolVersion);
+  } catch {
+    return null;
+  }
+}
+
+export async function getBatteryVoltage(): Promise<number | null> {
+  if (!connection) return null;
+  try {
+    const result = await connection.getBatteryVoltage();
+    return result?.batteryMilliVolts ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function sendSelfAdvert(type: "zero_hop" | "flood" = "zero_hop"): Promise<boolean> {
+  if (!connection) return false;
+  try {
+    const advertType = type === "flood"
+      ? Constants.SelfAdvertTypes.Flood
+      : Constants.SelfAdvertTypes.ZeroHop;
+    await connection.sendSelfAdvert(advertType);
     return true;
   } catch {
     return false;
   }
 }
 
-export async function sendNodeDiscover(): Promise<boolean> {
-  return sendCommand("node_discover");
+export async function setAdvertLatLon(lat: number, lon: number): Promise<boolean> {
+  if (!connection) return false;
+  try {
+    const latInt = Math.round(lat * 1e6);
+    const lonInt = Math.round(lon * 1e6);
+    await connection.setAdvertLatLong(latInt, lonInt);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export function isConnected(): boolean {
-  return device?.gatt?.connected ?? false;
+export function contactLatLon(contact: MeshContact): { lat: number; lon: number } | null {
+  if (contact.advLat === 0 && contact.advLon === 0) return null;
+  return {
+    lat: contact.advLat / 1e6,
+    lon: contact.advLon / 1e6,
+  };
+}
+
+export function publicKeyHex(key: Uint8Array): string {
+  return Array.from(key.slice(0, 4))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
 }

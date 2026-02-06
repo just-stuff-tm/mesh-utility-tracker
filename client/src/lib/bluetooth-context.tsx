@@ -3,9 +3,18 @@ import {
   connectToRadio,
   disconnectRadio,
   isBluetoothSupported,
-  onMessage,
-  sendNodeDiscover,
   isConnected as checkConnected,
+  getContacts,
+  getSelfInfo,
+  getBatteryVoltage,
+  sendSelfAdvert,
+  setAdvertLatLon,
+  contactLatLon,
+  publicKeyHex,
+  on,
+  type MeshContact,
+  type DeviceInfo,
+  type SelfInfo,
 } from "@/lib/bluetooth";
 import { getCurrentPosition, watchPosition, clearWatch } from "@/lib/geolocation";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -25,6 +34,10 @@ interface BluetoothContextValue {
   smartScanEnabled: boolean;
   smartScanDays: number;
   wakeLockActive: boolean;
+  deviceInfo: DeviceInfo | null;
+  selfInfo: SelfInfo | null;
+  batteryMilliVolts: number | null;
+  contacts: MeshContact[];
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   toggleScan: () => void;
@@ -56,6 +69,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   const [smartScanEnabled, setSmartScanEnabled] = useState(true);
   const [smartScanDays, setSmartScanDays] = useState(5);
   const [wakeLockActive, setWakeLockActive] = useState(false);
+  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
+  const [selfInfo, setSelfInfo] = useState<SelfInfo | null>(null);
+  const [batteryMilliVolts, setBatteryMilliVolts] = useState<number | null>(null);
+  const [contacts, setContacts] = useState<MeshContact[]>([]);
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const positionRef = useRef<[number, number] | null>(null);
@@ -76,55 +93,127 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     return () => clearWatch(watchId);
   }, []);
 
-  const submitScan = useCallback(async (data: string) => {
+  useEffect(() => {
+    const unsubs: (() => void)[] = [];
+
+    unsubs.push(on("disconnected", () => {
+      setConnected(false);
+      setDeviceName(null);
+      setDeviceInfo(null);
+      setSelfInfo(null);
+      setBatteryMilliVolts(null);
+      setContacts([]);
+      setIsScanning(false);
+    }));
+
+    unsubs.push(on("device_info", (info: DeviceInfo) => {
+      setDeviceInfo(info);
+    }));
+
+    unsubs.push(on("self_info", (info: SelfInfo) => {
+      setSelfInfo(info);
+    }));
+
+    unsubs.push(on("battery", (data: { milliVolts: number }) => {
+      setBatteryMilliVolts(data.milliVolts);
+    }));
+
+    unsubs.push(on("new_advert", (advert: any) => {
+      setMessagesReceived((prev) => prev + 1);
+      submitContactAsNode(advert);
+    }));
+
+    unsubs.push(on("rx_log", (data: { lastSnr: number; lastRssi: number }) => {
+      setMessagesReceived((prev) => prev + 1);
+      submitRxLog(data);
+    }));
+
+    return () => unsubs.forEach((fn) => fn());
+  }, []);
+
+  const submitContactAsNode = useCallback(async (advert: any) => {
     try {
-      const parsed = JSON.parse(data);
-      const pos = positionRef.current;
-      if (parsed.rssi !== undefined && parsed.snr !== undefined && pos) {
-        await apiRequest("POST", "/api/scan-results", {
-          observerId: "local-observer",
-          nodeId: parsed.nodeId || parsed.from || "unknown",
-          rssi: parsed.rssi,
-          snr: parsed.snr,
-          latitude: pos[0],
-          longitude: pos[1],
-          senderName: parsed.senderName || parsed.from || null,
-          receiverName: parsed.receiverName || "Observer",
+      const name = advert.advName || "Unknown";
+      const nodeId = publicKeyHex(advert.publicKey);
+      const lat = advert.advLat !== 0 ? advert.advLat / 1e6 : null;
+      const lon = advert.advLon !== 0 ? advert.advLon / 1e6 : null;
+
+      await apiRequest("POST", "/api/nodes", {
+        nodeId,
+        name,
+        latitude: lat,
+        longitude: lon,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
+    } catch {}
+  }, []);
+
+  const submitRxLog = useCallback(async (data: { lastSnr: number; lastRssi: number }) => {
+    const pos = positionRef.current;
+    if (!pos) return;
+
+    try {
+      await apiRequest("POST", "/api/scan-results", {
+        observerId: "local-observer",
+        nodeId: "mesh-rx",
+        rssi: data.lastRssi,
+        snr: data.lastSnr,
+        latitude: pos[0],
+        longitude: pos[1],
+        senderName: null,
+        receiverName: "Observer",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
+    } catch {}
+  }, []);
+
+  const fetchAndSubmitContacts = useCallback(async () => {
+    const contactList = await getContacts();
+    setContacts(contactList);
+
+    const pos = positionRef.current;
+    if (!pos) return;
+
+    for (const contact of contactList) {
+      const nodeId = publicKeyHex(contact.publicKey);
+      const coords = contactLatLon(contact);
+
+      try {
+        await apiRequest("POST", "/api/nodes", {
+          nodeId,
+          name: contact.advName || nodeId,
+          latitude: coords?.lat ?? null,
+          longitude: coords?.lon ?? null,
         });
-        queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
-      }
-    } catch {
+      } catch {}
     }
+
+    queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onMessage((data) => {
-      if (data === "__DISCONNECTED__") {
-        setConnected(false);
-        setDeviceName(null);
-        return;
-      }
-      setMessagesReceived((prev) => prev + 1);
-      submitScan(data);
-    });
-    return unsubscribe;
-  }, [submitScan]);
-
-  useEffect(() => {
     if (!connected || !isScanning) return;
-    const interval = setInterval(async () => {
-      const sent = await sendNodeDiscover();
-      if (sent) setLastScanTime(new Date());
-    }, scanInterval * 1000);
 
-    sendNodeDiscover().then((sent) => {
-      if (sent) setLastScanTime(new Date());
-    });
+    const doScan = async () => {
+      const pos = positionRef.current;
+      if (pos) {
+        await setAdvertLatLon(pos[0], pos[1]);
+      }
+      await sendSelfAdvert("flood");
+      setLastScanTime(new Date());
 
+      setTimeout(async () => {
+        await fetchAndSubmitContacts();
+      }, 5000);
+    };
+
+    doScan();
+    const interval = setInterval(doScan, scanInterval * 1000);
     return () => clearInterval(interval);
-  }, [connected, isScanning, scanInterval]);
+  }, [connected, isScanning, scanInterval, fetchAndSubmitContacts]);
 
   const acquireWakeLock = useCallback(async () => {
     try {
@@ -135,8 +224,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
           setWakeLockActive(false);
         });
       }
-    } catch {
-    }
+    } catch {}
   }, []);
 
   const releaseWakeLock = useCallback(async () => {
@@ -170,7 +258,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [connected, isScanning, acquireWakeLock]);
 
-  const connect = useCallback(async () => {
+  const connectHandler = useCallback(async () => {
     setConnecting(true);
     setError(null);
     const result = await connectToRadio();
@@ -178,6 +266,17 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     if (result.success) {
       setConnected(true);
       setDeviceName(result.deviceName);
+
+      setTimeout(async () => {
+        const info = await getSelfInfo();
+        if (info) setSelfInfo(info as any);
+
+        const battery = await getBatteryVoltage();
+        if (battery !== null) setBatteryMilliVolts(battery);
+
+        const contactList = await getContacts();
+        setContacts(contactList);
+      }, 500);
     } else {
       setError(result.error || "Connection failed");
     }
@@ -189,6 +288,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     setConnected(false);
     setDeviceName(null);
     setIsScanning(false);
+    setDeviceInfo(null);
+    setSelfInfo(null);
+    setBatteryMilliVolts(null);
+    setContacts([]);
   }, [releaseWakeLock]);
 
   const toggleScan = useCallback(() => {
@@ -212,7 +315,11 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         smartScanEnabled,
         smartScanDays,
         wakeLockActive,
-        connect,
+        deviceInfo,
+        selfInfo,
+        batteryMilliVolts,
+        contacts,
+        connect: connectHandler,
         disconnect,
         toggleScan,
         setScanInterval,
