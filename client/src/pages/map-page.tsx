@@ -6,6 +6,7 @@ import { BluetoothPanel } from "@/components/bluetooth-panel";
 import { ScanStats } from "@/components/scan-stats";
 import { SettingsPanel } from "@/components/settings-panel";
 import { NodeList } from "@/components/node-list";
+import { MapHud } from "@/components/map-hud";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -53,6 +54,10 @@ export default function MapPage() {
           selectedZone={selectedZone}
           onZoneClick={setSelectedZone}
         />
+
+        <div className="absolute top-3 left-12 lg:left-3 z-[1000] max-w-[240px]">
+          <MapHud />
+        </div>
 
         <div className="absolute top-3 left-3 z-[1000] lg:hidden">
           <Sheet>
