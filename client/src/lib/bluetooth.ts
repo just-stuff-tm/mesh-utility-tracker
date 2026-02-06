@@ -247,6 +247,46 @@ export function contactLatLon(contact: MeshContact): { lat: number; lon: number 
   };
 }
 
+export interface NodeDiscoverResult {
+  contacts: MeshContact[];
+  timestamp: Date;
+}
+
+export async function nodeDiscover(
+  observerLat?: number,
+  observerLon?: number,
+): Promise<NodeDiscoverResult | null> {
+  if (!connection) return null;
+  try {
+    if (observerLat !== undefined && observerLon !== undefined) {
+      const latInt = Math.round(observerLat * 1e6);
+      const lonInt = Math.round(observerLon * 1e6);
+      await connection.setAdvertLatLong(latInt, lonInt);
+    }
+
+    await connection.sendSelfAdvert(Constants.SelfAdvertTypes.Flood);
+
+    await new Promise((r) => setTimeout(r, 5000));
+
+    const contacts = await connection.getContacts();
+    const mapped: MeshContact[] = contacts.map((c: any) => ({
+      publicKey: c.publicKey,
+      type: c.type,
+      flags: c.flags,
+      outPathLen: c.outPathLen,
+      advName: c.advName,
+      lastAdvert: c.lastAdvert,
+      advLat: c.advLat,
+      advLon: c.advLon,
+      lastMod: c.lastMod,
+    }));
+
+    return { contacts: mapped, timestamp: new Date() };
+  } catch {
+    return null;
+  }
+}
+
 export function publicKeyHex(key: Uint8Array): string {
   return Array.from(key.slice(0, 4))
     .map((b) => b.toString(16).padStart(2, "0"))

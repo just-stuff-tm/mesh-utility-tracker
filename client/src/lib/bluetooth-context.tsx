@@ -7,8 +7,7 @@ import {
   getContacts,
   getSelfInfo,
   getBatteryVoltage,
-  sendSelfAdvert,
-  setAdvertLatLon,
+  nodeDiscover,
   contactLatLon,
   publicKeyHex,
   on,
@@ -168,14 +167,15 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
-  const fetchAndSubmitContacts = useCallback(async () => {
-    const contactList = await getContacts();
-    setContacts(contactList);
-
+  const runNodeDiscover = useCallback(async () => {
     const pos = positionRef.current;
-    if (!pos) return;
+    const result = await nodeDiscover(pos?.[0], pos?.[1]);
+    if (!result) return;
 
-    for (const contact of contactList) {
+    setContacts(result.contacts);
+    setLastScanTime(result.timestamp);
+
+    for (const contact of result.contacts) {
       const nodeId = publicKeyHex(contact.publicKey);
       const coords = contactLatLon(contact);
 
@@ -197,23 +197,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!connected || !isScanning) return;
 
-    const doScan = async () => {
-      const pos = positionRef.current;
-      if (pos) {
-        await setAdvertLatLon(pos[0], pos[1]);
-      }
-      await sendSelfAdvert("flood");
-      setLastScanTime(new Date());
-
-      setTimeout(async () => {
-        await fetchAndSubmitContacts();
-      }, 5000);
-    };
-
-    doScan();
-    const interval = setInterval(doScan, scanInterval * 1000);
+    runNodeDiscover();
+    const interval = setInterval(runNodeDiscover, scanInterval * 1000);
     return () => clearInterval(interval);
-  }, [connected, isScanning, scanInterval, fetchAndSubmitContacts]);
+  }, [connected, isScanning, scanInterval, runNodeDiscover]);
 
   const acquireWakeLock = useCallback(async () => {
     try {
