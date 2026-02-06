@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Menu, DollarSign, Heart } from "lucide-react";
+import { Menu, Heart } from "lucide-react";
 import { CoverageMap } from "@/components/coverage-map";
 import { BluetoothPanel } from "@/components/bluetooth-panel";
 import { ScanStats } from "@/components/scan-stats";
@@ -8,15 +8,18 @@ import { SettingsPanel } from "@/components/settings-panel";
 import { NodeList } from "@/components/node-list";
 import { MapHud } from "@/components/map-hud";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
+import { publicKeyHex } from "@/lib/bluetooth";
 import type { CoverageZone, MeshNode, ScanResult } from "@shared/schema";
 
 export default function MapPage() {
-  const { observerPosition, autoCenter, connected } = useBluetoothContext();
+  const { observerPosition, autoCenter, connected, selfInfo } = useBluetoothContext();
   const [selectedZone, setSelectedZone] = useState<CoverageZone | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  const radioId = selfInfo?.publicKey ? publicKeyHex(selfInfo.publicKey) : null;
 
   const { data: coverageZones = [] } = useQuery<CoverageZone[]>({
     queryKey: ["/api/coverage-zones"],
@@ -33,12 +36,23 @@ export default function MapPage() {
     refetchInterval: 15000,
   });
 
+  const myScans = useMemo(() => {
+    if (!radioId) return [];
+    return latestScans.filter((s) => s.radioId === radioId);
+  }, [latestScans, radioId]);
+
+  const myNodes = useMemo(() => {
+    if (!radioId) return [];
+    const myNodeIds = new Set(myScans.map((s) => s.nodeId));
+    return nodes.filter((n) => myNodeIds.has(n.nodeId));
+  }, [nodes, myScans, radioId]);
+
   const controlsContent = (
     <div className="space-y-4">
       <BluetoothPanel />
       <NodeList
-        nodes={nodes}
-        latestScans={latestScans}
+        nodes={myNodes}
+        latestScans={myScans}
         isLoading={nodesLoading}
       />
       <SettingsPanel />
@@ -98,6 +112,9 @@ export default function MapPage() {
                     const target = e.target as HTMLElement;
                     const isSlider = target.closest("[role='slider']") || target.closest("[data-orientation]");
                     const isSwitch = target.closest("[role='switch']");
+                    const isConnectBtn = target.closest("[data-testid='button-connect-bluetooth']");
+                    if (isConnectBtn) return;
+                    if (!connected) return;
                     if (!isSlider && !isSwitch && (target.closest("button") || target.closest("a"))) {
                       setTimeout(() => setSheetOpen(false), 300);
                     }
