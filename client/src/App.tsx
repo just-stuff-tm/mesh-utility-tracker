@@ -41,8 +41,8 @@ function App() {
             <SidebarProvider style={style as React.CSSProperties}>
               <div className="flex h-screen w-full">
                 <AppSidebar />
-                <div className="flex flex-col flex-1 min-w-0">
-                  <header className="flex items-center justify-between gap-2 p-2 border-b border-border sticky top-0 z-50 bg-background">
+                <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+                  <header className="flex items-center justify-between gap-2 p-2 border-b border-border shrink-0 z-50 bg-background">
                     <SidebarTrigger data-testid="button-sidebar-toggle" />
                     <div className="flex items-center gap-2">
                       <a

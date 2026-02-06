@@ -60,8 +60,8 @@ export default function MapPage() {
   );
 
   return (
-    <div className="flex h-full">
-      <div className="flex-1 relative">
+    <div className="flex h-full overflow-hidden">
+      <div className="flex-1 relative min-h-0">
         <CoverageMap
           coverageZones={coverageZones}
           observerPosition={observerPosition}
