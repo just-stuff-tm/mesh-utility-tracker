@@ -285,7 +285,9 @@ export function BluetoothPanel() {
                       Active
                     </>
                   ) : (
-                    "Inactive"
+                    <span className="text-muted-foreground">
+                      {"wakeLock" in navigator ? "Inactive" : "Not supported"}
+                    </span>
                   )}
                 </p>
               </div>

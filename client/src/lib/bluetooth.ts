@@ -235,7 +235,7 @@ export async function connectToRadio(): Promise<{
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error("BLE connection timed out waiting for radio handshake"));
-      }, 10000);
+      }, 20000);
 
       bleConnection.on("connected", () => {
         clearTimeout(timeout);
@@ -599,6 +599,19 @@ export async function discoverRepeaters(
   } catch (err: any) {
     remoteLog("error", "discoverRepeaters error:", err?.message || err);
     return null;
+  }
+}
+
+export async function checkConnectionAlive(): Promise<boolean> {
+  if (!connection) return false;
+  try {
+    const result = await Promise.race([
+      connection.getBatteryVoltage(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
+    ]);
+    return !!result;
+  } catch {
+    return false;
   }
 }
 

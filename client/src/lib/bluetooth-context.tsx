@@ -9,6 +9,7 @@ import {
   getBatteryVoltage,
   discoverRepeaters,
   publicKeyHex,
+  checkConnectionAlive,
   on,
   type MeshContact,
   type DeviceInfo,
@@ -368,11 +369,28 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   }, [connected, isScanning, acquireWakeLock, releaseWakeLock]);
 
   useEffect(() => {
-    if (!connected || !isScanning) return;
+    if (!connected) return;
 
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === "visible" && connected && isScanning) {
-        acquireWakeLock();
+      if (document.visibilityState === "visible" && connected) {
+        if (isScanning) acquireWakeLock();
+
+        const alive = await checkConnectionAlive();
+        if (!alive) {
+          setConnected(false);
+          setDeviceName(null);
+          setDeviceInfo(null);
+          setSelfInfo(null);
+          setBatteryMilliVolts(null);
+          setContacts([]);
+          setIsScanning(false);
+          setScanStatus("idle");
+          setShowReconnect(true);
+          setError("Radio disconnected while app was in background");
+        } else {
+          const battery = await getBatteryVoltage();
+          if (battery !== null) setBatteryMilliVolts(battery);
+        }
       }
     };
 
