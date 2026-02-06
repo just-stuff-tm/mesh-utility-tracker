@@ -373,8 +373,8 @@ export async function discoverRepeaters(
     remoteLog("log", "Sending zero-hop advert...");
     await connection.sendAdvert(Constants.SelfAdvertTypes.ZeroHop);
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 8s for responses...");
-    await new Promise((r) => setTimeout(r, 8000));
+    remoteLog("log", "Waiting 20s for responses...");
+    await new Promise((r) => setTimeout(r, 20000));
 
     connection.off(Constants.PushCodes.NewAdvert, onNewAdvert);
 

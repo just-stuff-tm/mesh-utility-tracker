@@ -62,9 +62,9 @@ export default function SettingsPage() {
           <Slider
             value={[scanInterval]}
             onValueChange={([v]) => setScanInterval(v)}
-            min={10}
+            min={40}
             max={300}
-            step={5}
+            step={10}
             data-testid="slider-settings-scan-interval"
           />
           <p className="text-xs text-muted-foreground">
