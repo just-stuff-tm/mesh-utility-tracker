@@ -333,7 +333,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       setConnected(true);
       setDeviceName(result.deviceName);
 
-      setTimeout(async () => {
+      try {
         const info = await getSelfInfo();
         if (info) setSelfInfo(info as any);
 
@@ -342,7 +342,9 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
         const contactList = await getContacts();
         setContacts(contactList);
-      }, 500);
+      } catch (err) {
+        console.error("[mesh] Post-connect queries failed:", err);
+      }
     } else {
       setError(result.error || "Connection failed");
     }

@@ -94,10 +94,10 @@ export async function connectToRadio(): Promise<{
       return { success: false, deviceName: null, error: "No device selected" };
     }
 
-    connection = bleConnection;
     const name = bleConnection.bleDevice?.name || "MeshCore Radio";
 
     bleConnection.on("disconnected", () => {
+      console.log("[mesh] BLE disconnected");
       connection = null;
       emit("disconnected");
     });
@@ -111,10 +111,12 @@ export async function connectToRadio(): Promise<{
     });
 
     bleConnection.on(Constants.PushCodes.NewAdvert, (data: any) => {
+      console.log("[mesh] NewAdvert received:", data?.advName);
       emit("new_advert", data);
     });
 
     bleConnection.on(Constants.ResponseCodes.DeviceInfo, (info: any) => {
+      console.log("[mesh] DeviceInfo:", info?.manufacturerModel, "fw:", info?.firmwareVer);
       emit("device_info", {
         firmwareVer: info.firmwareVer,
         firmwareBuildDate: info.firmware_build_date,
@@ -123,6 +125,7 @@ export async function connectToRadio(): Promise<{
     });
 
     bleConnection.on(Constants.ResponseCodes.SelfInfo, (info: any) => {
+      console.log("[mesh] SelfInfo:", info?.name, "type:", info?.type);
       emit("self_info", {
         name: info.name,
         type: info.type,
@@ -150,9 +153,23 @@ export async function connectToRadio(): Promise<{
       } as RxLogEntry);
     });
 
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("BLE connection timed out waiting for radio handshake"));
+      }, 10000);
+
+      bleConnection.on("connected", () => {
+        clearTimeout(timeout);
+        console.log("[mesh] Radio handshake complete, connection ready");
+        resolve();
+      });
+    });
+
+    connection = bleConnection;
     emit("connected");
     return { success: true, deviceName: name };
   } catch (err: any) {
+    console.error("[mesh] connectToRadio error:", err);
     return { success: false, deviceName: null, error: err.message || "Connection failed" };
   }
 }
@@ -170,6 +187,7 @@ export async function getContacts(): Promise<MeshContact[]> {
   if (!connection) return [];
   try {
     const contacts = await connection.getContacts();
+    console.log("[mesh] getContacts returned", contacts.length, "contacts");
     return contacts.map((c: any) => ({
       publicKey: c.publicKey,
       type: c.type,
@@ -181,7 +199,8 @@ export async function getContacts(): Promise<MeshContact[]> {
       advLon: c.advLon,
       lastMod: c.lastMod,
     }));
-  } catch {
+  } catch (err) {
+    console.error("[mesh] getContacts error:", err);
     return [];
   }
 }
@@ -189,8 +208,11 @@ export async function getContacts(): Promise<MeshContact[]> {
 export async function getSelfInfo(): Promise<SelfInfo | null> {
   if (!connection) return null;
   try {
-    return await connection.getSelfInfo();
-  } catch {
+    const info = await connection.getSelfInfo();
+    console.log("[mesh] getSelfInfo:", info?.name);
+    return info;
+  } catch (err) {
+    console.error("[mesh] getSelfInfo error:", err);
     return null;
   }
 }
@@ -198,8 +220,11 @@ export async function getSelfInfo(): Promise<SelfInfo | null> {
 export async function getDeviceInfo(): Promise<DeviceInfo | null> {
   if (!connection) return null;
   try {
-    return await connection.deviceQuery(Constants.SupportedCompanionProtocolVersion);
-  } catch {
+    const info = await connection.deviceQuery(Constants.SupportedCompanionProtocolVersion);
+    console.log("[mesh] getDeviceInfo:", info?.manufacturerModel);
+    return info;
+  } catch (err) {
+    console.error("[mesh] getDeviceInfo error:", err);
     return null;
   }
 }
@@ -208,8 +233,10 @@ export async function getBatteryVoltage(): Promise<number | null> {
   if (!connection) return null;
   try {
     const result = await connection.getBatteryVoltage();
+    console.log("[mesh] getBatteryVoltage:", result?.batteryMilliVolts, "mV");
     return result?.batteryMilliVolts ?? null;
-  } catch {
+  } catch (err) {
+    console.error("[mesh] getBatteryVoltage error:", err);
     return null;
   }
 }
@@ -274,20 +301,27 @@ export async function discoverRepeaters(
   observerLon?: number,
   onStatus?: (status: string) => void,
 ): Promise<DiscoverResult | null> {
-  if (!connection) return null;
+  if (!connection) {
+    console.warn("[mesh] discoverRepeaters: no connection");
+    return null;
+  }
   try {
     if (observerLat !== undefined && observerLon !== undefined) {
       const latInt = Math.round(observerLat * 1e6);
       const lonInt = Math.round(observerLon * 1e6);
+      console.log("[mesh] Setting advert position:", observerLat, observerLon);
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
     onStatus?.("advertising");
+    console.log("[mesh] Sending flood advert...");
     await connection.sendSelfAdvert(Constants.SelfAdvertTypes.Flood);
     onStatus?.("waiting");
+    console.log("[mesh] Waiting 5s for responses...");
     await new Promise((r) => setTimeout(r, 5000));
 
     const rawContacts = await connection.getContacts();
+    console.log("[mesh] Got", rawContacts.length, "contacts after advert");
     const contacts: MeshContact[] = rawContacts.map((c: any) => ({
       publicKey: c.publicKey,
       type: c.type,
@@ -303,6 +337,7 @@ export async function discoverRepeaters(
     const repeaterContacts = contacts.filter(
       (c) => c.type === Constants.AdvType.Repeater,
     );
+    console.log("[mesh] Found", repeaterContacts.length, "repeaters out of", contacts.length, "contacts");
 
     onStatus?.("querying");
     const repeaters: RepeaterDiscoverResult[] = [];
@@ -310,7 +345,9 @@ export async function discoverRepeaters(
       let stats: RepeaterStats | null = null;
 
       try {
+        console.log("[mesh] Querying status for repeater:", repeater.advName || publicKeyHex(repeater.publicKey));
         const statusResult = await connection.getStatus(repeater.publicKey);
+        console.log("[mesh] Status result:", statusResult.last_rssi, "dBm,", statusResult.last_snr, "dB SNR");
         stats = {
           battMilliVolts: statusResult.batt_milli_volts,
           noiseFloor: statusResult.noise_floor,
@@ -321,13 +358,17 @@ export async function discoverRepeaters(
           totalAirTimeSecs: statusResult.total_air_time_secs,
           totalUpTimeSecs: statusResult.total_up_time_secs,
         };
-      } catch {}
+      } catch (err) {
+        console.warn("[mesh] getStatus failed for", repeater.advName || publicKeyHex(repeater.publicKey), err);
+      }
 
       repeaters.push({ contact: repeater, stats });
     }
 
+    console.log("[mesh] Discovery complete:", repeaters.length, "repeaters,", repeaters.filter(r => r.stats).length, "with stats");
     return { contacts, repeaters, timestamp: new Date() };
-  } catch {
+  } catch (err) {
+    console.error("[mesh] discoverRepeaters error:", err);
     return null;
   }
 }
