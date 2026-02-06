@@ -143,9 +143,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       submitContactAsNode(advert);
     }));
 
-    unsubs.push(on("rx_log", (data: { lastSnr: number; lastRssi: number }) => {
+    unsubs.push(on("rx_log", () => {
       setMessagesReceived((prev) => prev + 1);
-      submitRxLog(data);
     }));
 
     return () => unsubs.forEach((fn) => fn());
@@ -166,25 +165,6 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
-  const submitRxLog = useCallback(async (data: { lastSnr: number; lastRssi: number }) => {
-    const pos = positionRef.current;
-    if (!pos) return;
-
-    try {
-      await apiRequest("POST", "/api/scan-results", {
-        observerId: "local-observer",
-        nodeId: "mesh-rx",
-        rssi: data.lastRssi,
-        snr: data.lastSnr,
-        latitude: pos[0],
-        longitude: pos[1],
-        senderName: null,
-        receiverName: selfInfoRef.current?.name || "Observer",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
-    } catch {}
-  }, []);
 
   const runDiscoverRepeaters = useCallback(async () => {
     const pos = positionRef.current;
