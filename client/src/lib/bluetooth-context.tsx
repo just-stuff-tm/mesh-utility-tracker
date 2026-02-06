@@ -36,6 +36,7 @@ interface BluetoothContextValue {
   supported: boolean;
   isScanning: boolean;
   scanInterval: number;
+  nextScanCountdown: number | null;
   lastScanTime: Date | null;
   messagesReceived: number;
   observerPosition: [number, number] | null;
@@ -86,6 +87,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   const [contacts, setContacts] = useState<MeshContact[]>([]);
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [lastScanResult, setLastScanResult] = useState<LastScanResult | null>(null);
+  const [nextScanCountdown, setNextScanCountdown] = useState<number | null>(null);
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const positionRef = useRef<[number, number] | null>(null);
@@ -269,11 +271,24 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!connected || !isScanning) return;
+    if (!connected || !isScanning) {
+      setNextScanCountdown(null);
+      return;
+    }
 
     runDiscoverRepeaters();
-    const interval = setInterval(runDiscoverRepeaters, scanInterval * 1000);
-    return () => clearInterval(interval);
+    setNextScanCountdown(scanInterval);
+    const scanTimer = setInterval(() => {
+      runDiscoverRepeaters();
+      setNextScanCountdown(scanInterval);
+    }, scanInterval * 1000);
+    const tickTimer = setInterval(() => {
+      setNextScanCountdown((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+    }, 1000);
+    return () => {
+      clearInterval(scanTimer);
+      clearInterval(tickTimer);
+    };
   }, [connected, isScanning, scanInterval, runDiscoverRepeaters]);
 
   const acquireWakeLock = useCallback(async () => {
@@ -378,6 +393,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         supported: isBluetoothSupported(),
         isScanning,
         scanInterval,
+        nextScanCountdown,
         lastScanTime,
         messagesReceived,
         observerPosition,

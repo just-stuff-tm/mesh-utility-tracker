@@ -25,6 +25,7 @@ export function BluetoothPanel() {
     supported,
     isScanning,
     scanInterval,
+    nextScanCountdown,
     lastScanTime,
     messagesReceived,
     wakeLockActive,
@@ -224,8 +225,10 @@ export function BluetoothPanel() {
           <Card className="p-3">
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <span className="text-muted-foreground">Scan Interval</span>
-                <p className="font-medium">{scanInterval}s</p>
+                <span className="text-muted-foreground">Next Scan</span>
+                <p className="font-medium" data-testid="text-next-scan-countdown">
+                  {nextScanCountdown !== null ? `${nextScanCountdown}s` : `${scanInterval}s`}
+                </p>
               </div>
               <div>
                 <span className="text-muted-foreground">Messages</span>
