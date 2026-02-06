@@ -348,7 +348,7 @@ export async function discoverRepeaters(
 
     onStatus?.("advertising");
     remoteLog("log", "Sending flood advert...");
-    await connection.sendSelfAdvert(Constants.SelfAdvertTypes.Flood);
+    await connection.sendAdvert(Constants.SelfAdvertTypes.Flood);
     onStatus?.("waiting");
     remoteLog("log", "Waiting 5s for responses...");
     await new Promise((r) => setTimeout(r, 5000));
