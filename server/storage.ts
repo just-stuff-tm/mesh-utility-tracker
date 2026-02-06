@@ -1,38 +1,176 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { db } from "./db";
+import {
+  users, observers, meshNodes, scanResults, coverageZones,
+  type User, type InsertUser,
+  type Observer, type InsertObserver,
+  type MeshNode, type InsertMeshNode,
+  type ScanResult, type InsertScanResult,
+  type CoverageZone, type InsertCoverageZone,
+} from "@shared/schema";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+
+  getObservers(): Promise<Observer[]>;
+  getObserver(id: string): Promise<Observer | undefined>;
+  createObserver(observer: InsertObserver): Promise<Observer>;
+  updateObserver(id: string, data: Partial<InsertObserver>): Promise<Observer | undefined>;
+
+  getNodes(): Promise<MeshNode[]>;
+  getNode(nodeId: string): Promise<MeshNode | undefined>;
+  upsertNode(node: InsertMeshNode): Promise<MeshNode>;
+
+  getScanResults(): Promise<ScanResult[]>;
+  getLatestScanResults(): Promise<ScanResult[]>;
+  createScanResult(scan: InsertScanResult): Promise<ScanResult>;
+
+  getCoverageZones(): Promise<CoverageZone[]>;
+  getDeadZones(): Promise<CoverageZone[]>;
+  getCoverageZone(id: string): Promise<CoverageZone | undefined>;
+  createCoverageZone(zone: InsertCoverageZone): Promise<CoverageZone>;
+  updateCoverageZone(id: string, data: Partial<InsertCoverageZone>): Promise<CoverageZone | undefined>;
+  deleteCoverageZone(id: string): Promise<boolean>;
+  findNearbyZone(lat: number, lng: number, radiusMeters: number): Promise<CoverageZone | undefined>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async getObservers(): Promise<Observer[]> {
+    return db.select().from(observers);
+  }
+
+  async getObserver(id: string): Promise<Observer | undefined> {
+    const [observer] = await db.select().from(observers).where(eq(observers.id, id));
+    return observer;
+  }
+
+  async createObserver(observer: InsertObserver): Promise<Observer> {
+    const [result] = await db.insert(observers).values(observer).returning();
+    return result;
+  }
+
+  async updateObserver(id: string, data: Partial<InsertObserver>): Promise<Observer | undefined> {
+    const [result] = await db.update(observers).set(data).where(eq(observers.id, id)).returning();
+    return result;
+  }
+
+  async getNodes(): Promise<MeshNode[]> {
+    return db.select().from(meshNodes).orderBy(desc(meshNodes.lastSeen));
+  }
+
+  async getNode(nodeId: string): Promise<MeshNode | undefined> {
+    const [node] = await db.select().from(meshNodes).where(eq(meshNodes.nodeId, nodeId));
+    return node;
+  }
+
+  async upsertNode(node: InsertMeshNode): Promise<MeshNode> {
+    const existing = await this.getNode(node.nodeId);
+    if (existing) {
+      const [updated] = await db.update(meshNodes)
+        .set({ ...node, lastSeen: new Date() })
+        .where(eq(meshNodes.nodeId, node.nodeId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(meshNodes).values(node).returning();
+    return created;
+  }
+
+  async getScanResults(): Promise<ScanResult[]> {
+    return db.select().from(scanResults).orderBy(desc(scanResults.timestamp)).limit(500);
+  }
+
+  async getLatestScanResults(): Promise<ScanResult[]> {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return db.select().from(scanResults)
+      .where(gte(scanResults.timestamp, oneDayAgo))
+      .orderBy(desc(scanResults.timestamp));
+  }
+
+  async createScanResult(scan: InsertScanResult): Promise<ScanResult> {
+    const [result] = await db.insert(scanResults).values(scan).returning();
+    return result;
+  }
+
+  async getCoverageZones(): Promise<CoverageZone[]> {
+    return db.select().from(coverageZones);
+  }
+
+  async getDeadZones(): Promise<CoverageZone[]> {
+    return db.select().from(coverageZones).where(eq(coverageZones.isDeadZone, true));
+  }
+
+  async getCoverageZone(id: string): Promise<CoverageZone | undefined> {
+    const [zone] = await db.select().from(coverageZones).where(eq(coverageZones.id, id));
+    return zone;
+  }
+
+  async createCoverageZone(zone: InsertCoverageZone): Promise<CoverageZone> {
+    const [result] = await db.insert(coverageZones).values(zone).returning();
+    return result;
+  }
+
+  async updateCoverageZone(id: string, data: Partial<InsertCoverageZone>): Promise<CoverageZone | undefined> {
+    const [result] = await db.update(coverageZones)
+      .set({ ...data, lastScanned: new Date() })
+      .where(eq(coverageZones.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteCoverageZone(id: string): Promise<boolean> {
+    const result = await db.delete(coverageZones).where(eq(coverageZones.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async findNearbyZone(lat: number, lng: number, radiusMeters: number): Promise<CoverageZone | undefined> {
+    const degreeRadius = radiusMeters / 111320;
+    const zones = await db.select().from(coverageZones)
+      .where(
+        and(
+          gte(coverageZones.centerLat, lat - degreeRadius),
+          lte(coverageZones.centerLat, lat + degreeRadius),
+          gte(coverageZones.centerLng, lng - degreeRadius),
+          lte(coverageZones.centerLng, lng + degreeRadius),
+        )
+      );
+
+    return zones.find((z) => {
+      const dist = haversineDistance(lat, lng, z.centerLat, z.centerLng);
+      return dist <= radiusMeters;
+    });
   }
 }
 
-export const storage = new MemStorage();
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export const storage = new DatabaseStorage();
