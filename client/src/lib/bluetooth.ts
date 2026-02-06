@@ -332,51 +332,21 @@ function pubKeyPrefixHex(prefix: Uint8Array): string {
   return Array.from(prefix).map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
 }
 
-function parseLppSensorData(data: Uint8Array): { rssi: number; snr: number } | null {
+function parseStatusData(data: Uint8Array): RepeaterStats | null {
   try {
-    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    let off = 0;
-    let rssi: number | null = null;
-    let snr: number | null = null;
-
-    while (off < data.byteLength - 2) {
-      const channel = data[off]; off += 1;
-      const type = data[off]; off += 1;
-
-      if (type === 0x02) {
-        const val = view.getInt16(off, false) / 100;
-        off += 2;
-        if (channel === 1) rssi = val;
-        else if (channel === 2) snr = val;
-        remoteLog("log", `LPP ch=${channel} type=AnalogInput val=${val}`);
-      } else if (type === 0x01) {
-        off += 1;
-        remoteLog("log", `LPP ch=${channel} type=DigitalInput val=${data[off - 1]}`);
-      } else if (type === 0x03) {
-        off += 2;
-        remoteLog("log", `LPP ch=${channel} type=AnalogOutput`);
-      } else if (type === 0x67) {
-        off += 2;
-        remoteLog("log", `LPP ch=${channel} type=Temperature`);
-      } else if (type === 0x68) {
-        off += 1;
-        remoteLog("log", `LPP ch=${channel} type=Humidity`);
-      } else if (type === 0x73) {
-        off += 2;
-        remoteLog("log", `LPP ch=${channel} type=Barometer`);
-      } else {
-        remoteLog("log", `LPP ch=${channel} type=0x${type.toString(16)} (unknown), stopping parse`);
-        break;
-      }
-    }
-
-    if (rssi === null && snr === null) {
-      remoteLog("log", `LPP: no RSSI/SNR found, raw=${Array.from(data).map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
+    if (data.byteLength < 44) {
+      remoteLog("log", `StatusData too short (${data.byteLength} bytes), raw=${Array.from(data).map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
       return null;
     }
-    return { rssi: rssi ?? 0, snr: snr ?? 0 };
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const battMilliVolts = view.getUint16(0, true);
+    const noiseFloor = view.getInt16(4, true);
+    const lastRssi = view.getInt16(6, true);
+    const lastSnr = view.getInt16(42, true);
+    remoteLog("log", `StatusData: batt=${battMilliVolts}mV rssi=${lastRssi} snr=${lastSnr} noiseFloor=${noiseFloor}`);
+    return { rssi: lastRssi, snr: lastSnr };
   } catch (err) {
-    remoteLog("warn", "parseLppSensorData failed:", err);
+    remoteLog("warn", "parseStatusData failed:", err);
     return null;
   }
 }
@@ -398,16 +368,16 @@ export async function discoverRepeaters(
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
-    const telemetryResponses = new Map<string, { rssi: number; snr: number }>();
+    const statusResponses = new Map<string, RepeaterStats>();
     const discoveredAdverts = new Map<string, MeshContact>();
 
-    const onTelemetryResponse = (response: any) => {
+    const onStatusResponse = (response: any) => {
       const key = pubKeyPrefixHex(response.pubKeyPrefix);
-      remoteLog("log", `TelemetryResponse from prefix=${key}, LPP data length=${response.lppSensorData?.byteLength ?? 0}`);
-      const parsed = parseLppSensorData(response.lppSensorData);
+      remoteLog("log", `StatusResponse from prefix=${key}, statusData length=${response.statusData?.byteLength ?? 0}`);
+      const parsed = parseStatusData(response.statusData);
       if (parsed) {
-        telemetryResponses.set(key, parsed);
-        remoteLog("log", `Parsed signal: RSSI=${parsed.rssi} dBm, SNR=${parsed.snr} dB from ${key}`);
+        statusResponses.set(key, parsed);
+        remoteLog("log", `Signal from ${key}: RSSI=${parsed.rssi} dBm, SNR=${parsed.snr} dB`);
       }
     };
 
@@ -427,41 +397,38 @@ export async function discoverRepeaters(
       });
     };
 
-    connection.on(Constants.PushCodes.TelemetryResponse, onTelemetryResponse);
+    connection.on(Constants.PushCodes.StatusResponse, onStatusResponse);
     connection.on(Constants.PushCodes.NewAdvert, onNewAdvert);
 
-    onStatus?.("advertising");
-    remoteLog("log", "Sending broadcast telemetry request (zero-hop discovery)...");
-    const broadcastKey = new Uint8Array(32);
-    broadcastKey[0] = 0xFF;
-    broadcastKey[1] = 0xFF;
-    await connection.sendCommandSendTelemetryReq(broadcastKey);
+    onStatus?.("broadcasting");
+    remoteLog("log", "Sending zero-hop broadcast telemetry request (0x27 to 0xFFFF)...");
+    await connection.sendToRadioFrame(new Uint8Array([0x27, 0xFF, 0xFF]));
 
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 20s for telemetry + advert responses...");
+    remoteLog("log", "Waiting 20s for StatusResponse + NewAdvert responses...");
     await new Promise((r) => setTimeout(r, 20000));
 
-    connection.off(Constants.PushCodes.TelemetryResponse, onTelemetryResponse);
+    connection.off(Constants.PushCodes.StatusResponse, onStatusResponse);
     connection.off(Constants.PushCodes.NewAdvert, onNewAdvert);
-    remoteLog("log", `Collected ${telemetryResponses.size} TelemetryResponses, ${discoveredAdverts.size} NewAdverts`);
+    remoteLog("log", `Collected ${statusResponses.size} StatusResponses, ${discoveredAdverts.size} NewAdverts`);
 
     const contacts: MeshContact[] = [];
     const repeaters: RepeaterDiscoverResult[] = [];
 
     for (const [key, contact] of Array.from(discoveredAdverts.entries())) {
       contacts.push(contact);
-      const signalData = telemetryResponses.get(key);
+      const signalData = statusResponses.get(key);
       if (signalData) {
         remoteLog("log", `"${contact.advName}": RSSI=${signalData.rssi} dBm, SNR=${signalData.snr} dB`);
-        repeaters.push({ contact, stats: { rssi: signalData.rssi, snr: signalData.snr } });
+        repeaters.push({ contact, stats: signalData });
       } else {
         repeaters.push({ contact, stats: null });
       }
     }
 
-    for (const [key, signalData] of Array.from(telemetryResponses.entries())) {
+    for (const [key, signalData] of Array.from(statusResponses.entries())) {
       if (!discoveredAdverts.has(key)) {
-        remoteLog("log", `TelemetryResponse from ${key} (RSSI=${signalData.rssi}, SNR=${signalData.snr}) with no matching advert`);
+        remoteLog("log", `StatusResponse from ${key} (RSSI=${signalData.rssi}, SNR=${signalData.snr}) with no matching advert`);
         repeaters.push({
           contact: {
             publicKey: new Uint8Array(32),
@@ -474,7 +441,7 @@ export async function discoverRepeaters(
             advLon: 0,
             lastMod: 0,
           },
-          stats: { rssi: signalData.rssi, snr: signalData.snr },
+          stats: signalData,
         });
       }
     }
