@@ -186,10 +186,37 @@ export async function connectToRadio(): Promise<{
       } as RxLogEntry);
     });
 
+    const PUSH_CODE_NAMES: Record<number, string> = {
+      0x00: "OK", 0x01: "ERROR", 0x02: "CONTACT_START", 0x03: "CONTACT", 0x04: "CONTACT_END",
+      0x05: "SELF_INFO", 0x06: "MSG_SENT", 0x07: "CONTACT_MSG_RECV", 0x08: "CHANNEL_MSG_RECV",
+      0x09: "CURRENT_TIME", 0x0A: "NO_MORE_MSGS", 0x0B: "CONTACT_URI", 0x0C: "BATTERY",
+      0x0D: "DEVICE_INFO", 0x0E: "PRIVATE_KEY", 0x0F: "DISABLED", 0x12: "CHANNEL_INFO",
+      0x18: "STATS", 0x32: "BINARY_REQ", 0x34: "SET_FLOOD_SCOPE",
+      0x37: "SEND_CONTROL_DATA",
+      0x80: "ADVERTISEMENT", 0x81: "PATH_UPDATE", 0x82: "ACK", 0x83: "MSGS_WAITING",
+      0x84: "RAW_DATA", 0x85: "LOGIN_SUCCESS", 0x86: "LOGIN_FAILED", 0x87: "STATUS_RESPONSE",
+      0x88: "LOG_DATA", 0x89: "TRACE_DATA", 0x8A: "NEW_ADVERT", 0x8B: "TELEMETRY_RESPONSE",
+      0x8C: "BINARY_RESPONSE", 0x8D: "PATH_DISCOVERY_RESPONSE", 0x8E: "CONTROL_DATA",
+      0x8F: "ADVERT_RESPONSE",
+    };
+
     bleConnection.on("rx", (frame: Uint8Array) => {
       const hex = Array.from(frame).map(b => b.toString(16).padStart(2, "0")).join(" ");
-      const pushCode = frame.length > 0 ? `0x${frame[0].toString(16).padStart(2, "0")}` : "?";
-      remoteLog("log", `[BLE RX] code=${pushCode} len=${frame.length} data=${hex}`);
+      const code = frame.length > 0 ? frame[0] : -1;
+      const codeName = PUSH_CODE_NAMES[code] || "UNKNOWN";
+      const codeHex = code >= 0 ? `0x${code.toString(16).padStart(2, "0")}` : "?";
+      let extra = "";
+      if (code === 0x00) extra = " (OK)";
+      else if (code === 0x01) extra = ` err=${frame.length > 1 ? frame[1] : "?"}`;
+      else if (code === 0x0C) extra = ` battery=${frame.length > 1 ? frame[1] : "?"}%`;
+      else if (code === 0x8E && frame.length >= 4) {
+        const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength);
+        extra = ` SNR=${view.getInt8(1)/4} RSSI=${view.getInt8(2)} pathLen=${frame[3]}`;
+        if (frame.length > 4) extra += ` ctrl=0x${frame[4].toString(16).padStart(2, "0")}`;
+      } else if (code === 0x8A && frame.length > 1) {
+        extra = ` (NewAdvert)`;
+      }
+      remoteLog("log", `[BLE RX] ${codeName}(${codeHex}) len=${frame.length}${extra} | ${hex}`);
     });
 
     await new Promise<void>((resolve, reject) => {
