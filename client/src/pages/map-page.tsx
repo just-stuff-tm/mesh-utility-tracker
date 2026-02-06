@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Menu } from "lucide-react";
+import { Settings } from "lucide-react";
 import { CoverageMap } from "@/components/coverage-map";
 import { BluetoothPanel } from "@/components/bluetooth-panel";
 import { ScanStats } from "@/components/scan-stats";
@@ -81,7 +81,7 @@ export default function MapPage() {
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <Button size="icon" variant="secondary" data-testid="button-mobile-controls">
-                <Menu className="h-4 w-4" />
+                <Settings className="h-4 w-4" />
               </Button>
             </SheetTrigger>
             <SheetContent
@@ -90,7 +90,7 @@ export default function MapPage() {
               onInteractOutside={() => setSheetOpen(false)}
             >
               <SheetHeader className="p-3 border-b border-border">
-                <SheetTitle className="text-sm">Controls</SheetTitle>
+                <SheetTitle className="text-sm">Settings</SheetTitle>
               </SheetHeader>
               <ScrollArea className="h-[calc(100vh-60px)]">
                 <div
@@ -100,7 +100,8 @@ export default function MapPage() {
                     const isSlider = target.closest("[role='slider']") || target.closest("[data-orientation]");
                     const isSwitch = target.closest("[role='switch']");
                     const isConnectBtn = target.closest("[data-testid='button-connect-bluetooth']");
-                    if (isConnectBtn) return;
+                    const isNoClose = target.closest("[data-no-close]");
+                    if (isConnectBtn || isNoClose) return;
                     if (!connected) return;
                     if (!isSlider && !isSwitch && (target.closest("button") || target.closest("a"))) {
                       setTimeout(() => setSheetOpen(false), 300);

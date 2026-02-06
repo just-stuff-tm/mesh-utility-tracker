@@ -164,6 +164,7 @@ export function SettingsPanel() {
             onClick={handleMarkDeadZone}
             className="w-full"
             data-testid="button-mark-dead-zone"
+            data-no-close
           >
             <AlertTriangle className="h-3 w-3 mr-1" />
             Mark Dead Zone
@@ -189,12 +190,13 @@ export function SettingsPanel() {
                   onClick={() => setConfirmDelete(true)}
                   className="w-full text-destructive border-destructive/30"
                   data-testid="button-delete-data"
+                  data-no-close
                 >
                   <Trash2 className="h-3 w-3 mr-1" />
                   Delete My Data
                 </Button>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex gap-2" data-no-close>
                   <Button
                     size="sm"
                     variant="destructive"
