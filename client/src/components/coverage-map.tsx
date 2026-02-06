@@ -69,6 +69,15 @@ const MAP_LAYERS = {
   },
 } as const;
 
+const rssiItems = [
+  { color: "#22c55e", label: "Excellent", range: "> -70" },
+  { color: "#4ade80", label: "Very Good", range: "-70–-80" },
+  { color: "#84cc16", label: "Good", range: "-80–-85" },
+  { color: "#facc15", label: "Fair", range: "-85–-90" },
+  { color: "#f97316", label: "Poor", range: "-90–-100" },
+  { color: "#ef4444", label: "Very Weak", range: "< -100" },
+];
+
 interface CoverageMapProps {
   coverageZones: CoverageZone[];
   observerPosition: [number, number] | null;
@@ -182,15 +191,6 @@ export function CoverageMap({
     </div>
   );
 }
-
-const rssiItems = [
-  { color: "#22c55e", label: "Excellent", range: "> -70" },
-  { color: "#4ade80", label: "Very Good", range: "-70–-80" },
-  { color: "#84cc16", label: "Good", range: "-80–-85" },
-  { color: "#facc15", label: "Fair", range: "-85–-90" },
-  { color: "#f97316", label: "Poor", range: "-90–-100" },
-  { color: "#ef4444", label: "Very Weak", range: "< -100" },
-];
 
 function RssiLegend() {
   const [expanded, setExpanded] = useState(false);

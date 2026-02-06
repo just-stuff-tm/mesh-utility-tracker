@@ -27,6 +27,7 @@ export interface IStorage {
   getLatestScanResults(): Promise<ScanResult[]>;
   getScanResultsByZone(lat: number, lng: number, tolerance: number): Promise<ScanResult[]>;
   createScanResult(scan: InsertScanResult): Promise<ScanResult>;
+  pruneZoneScanResults(lat: number, lng: number, tolerance: number, maxPerZone: number): Promise<number>;
 
   getCoverageZones(): Promise<CoverageZone[]>;
   getDeadZones(): Promise<CoverageZone[]>;
@@ -115,12 +116,34 @@ export class DatabaseStorage implements IStorage {
         lte(scanResults.longitude, lng + tolerance),
       ))
       .orderBy(desc(scanResults.timestamp))
-      .limit(50);
+      .limit(5);
   }
 
   async createScanResult(scan: InsertScanResult): Promise<ScanResult> {
     const [result] = await db.insert(scanResults).values(scan).returning();
     return result;
+  }
+
+  async pruneZoneScanResults(lat: number, lng: number, tolerance: number, maxPerZone: number): Promise<number> {
+    const zoneScans = await db.select({ id: scanResults.id })
+      .from(scanResults)
+      .where(and(
+        gte(scanResults.latitude, lat - tolerance),
+        lte(scanResults.latitude, lat + tolerance),
+        gte(scanResults.longitude, lng - tolerance),
+        lte(scanResults.longitude, lng + tolerance),
+      ))
+      .orderBy(desc(scanResults.timestamp));
+
+    if (zoneScans.length <= maxPerZone) return 0;
+
+    const idsToDelete = zoneScans.slice(maxPerZone).map(s => s.id);
+    let deleted = 0;
+    for (const id of idsToDelete) {
+      const result = await db.delete(scanResults).where(eq(scanResults.id, id)).returning();
+      deleted += result.length;
+    }
+    return deleted;
   }
 
   async getCoverageZones(): Promise<CoverageZone[]> {

@@ -110,3 +110,6 @@ Preferred communication style: Simple, everyday language.
 - **2026-02-06**: Added remote logging system — browser console logs batched to `/api/remote-log` endpoint for server-side debugging of BLE interactions on mobile devices
 - **2026-02-06**: Added MapHud overlay on map — shows connected radio name, battery, scan countdown/status, last scan result, and scan on/off toggle button
 - **2026-02-06**: Node discovery uses flood self-advert + `getNeighbours()` binary request — sends flood advert to announce presence, collects `NewAdvert` (0x8A) push events during 20s window to discover nearby nodes, then queries each repeater via `getNeighbours()` (CMD_SEND_BINARY_REQ with GetNeighbours 0x06) for SNR data. No admin login required (status requests are admin-only).
+- **2026-02-06**: Scan history limited to 5 per hex zone — after each scan result insert, prunes oldest results beyond 5 per grid cell to save database space. Zone popup query also limited to 5.
+- **2026-02-06**: Fixed settings panel scrolling — desktop sidebar uses ScrollArea; mobile sheet uses controlled open/close state so it slides back properly.
+- **2026-02-06**: RSSI legend collapsible — starts collapsed showing just color dots, expands on tap to show full signal strength ranges.

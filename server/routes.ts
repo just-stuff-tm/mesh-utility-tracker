@@ -115,6 +115,9 @@ export async function registerRoutes(
         });
       }
 
+      const tolerance = 0.001;
+      await storage.pruneZoneScanResults(snapLat, snapLng, tolerance, 5);
+
       res.json(scan);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
