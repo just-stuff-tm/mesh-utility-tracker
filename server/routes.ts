@@ -2,15 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertScanResultSchema, insertMeshNodeSchema, insertObserverSchema, insertCoverageZoneSchema } from "@shared/schema";
-
-const GRID_SIZE_DEG = 0.0012;
-
-function snapToGrid(lat: number, lng: number): { snapLat: number; snapLng: number } {
-  return {
-    snapLat: Math.floor(lat / GRID_SIZE_DEG) * GRID_SIZE_DEG + GRID_SIZE_DEG / 2,
-    snapLng: Math.floor(lng / GRID_SIZE_DEG) * GRID_SIZE_DEG + GRID_SIZE_DEG / 2,
-  };
-}
+import { snapToHexGrid } from "@shared/grid";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -67,8 +59,8 @@ export async function registerRoutes(
         longitude: null,
       });
 
-      const { snapLat, snapLng } = snapToGrid(parsed.latitude, parsed.longitude);
-      const existingZone = await storage.findNearbyZone(snapLat, snapLng, 80);
+      const { snapLat, snapLng } = snapToHexGrid(parsed.latitude, parsed.longitude);
+      const existingZone = await storage.findNearbyZone(snapLat, snapLng, 40);
       if (existingZone) {
         const newCount = (existingZone.scanCount || 0) + 1;
         const newAvgRssi = ((existingZone.avgRssi || 0) * (existingZone.scanCount || 0) + parsed.rssi) / newCount;
@@ -124,8 +116,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "centerLat and centerLng are required" });
       }
 
-      const { snapLat: sLat, snapLng: sLng } = snapToGrid(centerLat, centerLng);
-      const existingZone = await storage.findNearbyZone(sLat, sLng, 80);
+      const { snapLat: sLat, snapLng: sLng } = snapToHexGrid(centerLat, centerLng);
+      const existingZone = await storage.findNearbyZone(sLat, sLng, 40);
       if (existingZone) {
         const updated = await storage.updateCoverageZone(existingZone.id, {
           isDeadZone: true,

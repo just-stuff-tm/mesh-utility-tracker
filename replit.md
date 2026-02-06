@@ -40,7 +40,7 @@ Preferred communication style: Simple, everyday language.
   - `GET/POST /api/coverage-zones` - Coverage zone management with grid snapping
   - `GET /api/coverage-zones/dead` - Dead zone identification
   - `GET/POST /api/observers` - Observer device management
-- **Grid system**: Coverage data snaps to a 0.0012° grid (`GRID_SIZE_DEG`) with center offset (`floor + GRID_SIZE_DEG/2`) for consistent zone aggregation. Grid snapping is performed server-side in routes.ts; frontend renders hexagons directly from stored grid-snapped coordinates.
+- **Hex grid system**: Uses proper honeycomb tiling math from `shared/grid.ts`. HEX_SIZE=0.0007° radius, ROW_SPACING=1.5*HEX_SIZE, COL_SPACING=√3*HEX_SIZE*LNG_SCALE(1.2), odd rows offset by COL_SPACING/2. Grid snapping done server-side; frontend renders hexagons from stored coordinates using shared getHexVertices(). Hexagons tile perfectly with no gaps or overlaps.
 - **Dev mode**: Vite dev server middleware with HMR; Production: static file serving from `dist/public`
 
 ### Database (PostgreSQL + Drizzle ORM)
@@ -99,3 +99,5 @@ Preferred communication style: Simple, everyday language.
 - **2026-02-06**: Fixed findNearbyZone() query — added upper bounds (lte) to bounding box query preventing incorrect zone aggregation with far-away zones
 - **2026-02-06**: Re-seeded database with grid-snapped coverage zone coordinates; reduced zone radiusMeters from 100 to 80 for tighter grid alignment
 - **2026-02-06**: Removed unused Rectangle import from coverage-map.tsx
+- **2026-02-06**: Replaced rectangular grid with proper honeycomb hex tiling — shared/grid.ts holds constants (HEX_SIZE, ROW_SPACING, COL_SPACING) and functions (snapToHexGrid, getHexVertices) used by both frontend and backend. Odd rows offset for perfect tiling with no gaps or overlaps.
+- **2026-02-06**: Added map layer switcher (Dark/Standard/Satellite) using Leaflet LayersControl with themed CSS

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import type { CoverageZone } from "@shared/schema";
+import { getHexVertices } from "@shared/grid";
 
 import "leaflet/dist/leaflet.css";
 
@@ -24,22 +25,6 @@ const observerIcon = new L.DivIcon({
   iconSize: [22, 22],
   iconAnchor: [11, 11],
 });
-
-const GRID_SIZE_DEG = 0.0012;
-const HEX_RADIUS = GRID_SIZE_DEG * 0.46;
-
-function getHexVertices(centerLat: number, centerLng: number, sizeDeg: number): [number, number][] {
-  const vertices: [number, number][] = [];
-  for (let i = 0; i < 6; i++) {
-    const angleDeg = 60 * i - 30;
-    const angleRad = (Math.PI / 180) * angleDeg;
-    vertices.push([
-      centerLat + sizeDeg * Math.sin(angleRad),
-      centerLng + sizeDeg * 1.2 * Math.cos(angleRad),
-    ]);
-  }
-  return vertices;
-}
 
 interface RssiStyle {
   fill: string;
@@ -82,8 +67,6 @@ const MAP_LAYERS = {
     label: "Satellite",
   },
 } as const;
-
-type MapLayerKey = keyof typeof MAP_LAYERS;
 
 interface CoverageMapProps {
   coverageZones: CoverageZone[];
@@ -149,8 +132,9 @@ export function CoverageMap({
         )}
 
         {coverageZones.map((zone) => {
+          const hexVerts = getHexVertices(zone.centerLat, zone.centerLng);
+
           if (zone.isDeadZone) {
-            const hexVerts = getHexVertices(zone.centerLat, zone.centerLng, HEX_RADIUS);
             return (
               <Polygon
                 key={zone.id}
@@ -159,7 +143,7 @@ export function CoverageMap({
                   fillColor: "#ef4444",
                   fillOpacity: 0.15,
                   color: "#ef4444",
-                  weight: 2,
+                  weight: 1,
                   dashArray: "6 4",
                 }}
                 eventHandlers={{ click: () => onZoneClick(zone) }}
@@ -172,7 +156,6 @@ export function CoverageMap({
           }
 
           const style = getRssiStyle(zone.avgRssi || -100);
-          const hexVerts = getHexVertices(zone.centerLat, zone.centerLng, HEX_RADIUS);
 
           return (
             <Polygon
@@ -182,7 +165,7 @@ export function CoverageMap({
                 fillColor: style.fill,
                 fillOpacity: style.fillOpacity,
                 color: style.border,
-                weight: 1.5,
+                weight: 1,
               }}
               eventHandlers={{ click: () => onZoneClick(zone) }}
             >
