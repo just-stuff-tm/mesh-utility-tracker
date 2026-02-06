@@ -448,15 +448,13 @@ function parseControlDataFrame(frame: Uint8Array): NodeDiscoverEntry | null {
   let publicKeyPrefix = "";
   let name = "";
 
-  if (pubkeyData.length < 32) {
-    if (pubkeyData.length >= 8) {
-      publicKeyPrefix = Array.from(pubkeyData.slice(0, 8)).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
-    }
-  } else {
-    publicKeyPrefix = Array.from(pubkeyData.slice(0, 6)).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
-    if (pubkeyData.length > 32) {
-      name = new TextDecoder().decode(pubkeyData.slice(32)).replace(/\0/g, "").trim();
-    }
+  if (pubkeyData.length >= 8) {
+    publicKeyPrefix = Array.from(pubkeyData.slice(0, 8)).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+  } else if (pubkeyData.length > 0) {
+    publicKeyPrefix = Array.from(pubkeyData).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+  }
+  if (pubkeyData.length > 32) {
+    name = new TextDecoder().decode(pubkeyData.slice(32)).replace(/\0/g, "").trim();
   }
 
   remoteLog("log", `NodeDiscoverResp: snr=${snr} rssi=${rssi} snrIn=${snrIn} nodeType=${nodeType} tag=${tag} prefix=${publicKeyPrefix} name="${name}"`);
@@ -468,6 +466,7 @@ export async function discoverRepeaters(
   observerLat?: number,
   observerLon?: number,
   onStatus?: (status: string) => void,
+  existingContacts?: MeshContact[],
 ): Promise<DiscoverResult | null> {
   if (!connection) {
     remoteLog("warn", "discoverRepeaters: no connection");
@@ -507,7 +506,7 @@ export async function discoverRepeaters(
     };
 
     const onNewAdvert = (data: any) => {
-      const key = pubKeyPrefixHex(data.publicKey.slice(0, 6));
+      const key = pubKeyPrefixHex(data.publicKey.slice(0, 8));
       remoteLog("log", `NewAdvert: "${data.advName}" type=${data.type} pathLen=${data.outPathLen} prefix=${key}`);
       discoveredAdverts.set(key, {
         publicKey: data.publicKey,
@@ -534,8 +533,8 @@ export async function discoverRepeaters(
     remoteLog("log", `[DISCOVER] Command sent successfully`);
 
     onStatus?.("waiting");
-    remoteLog("log", "[DISCOVER] Waiting 20s for responses...");
-    await new Promise((r) => setTimeout(r, 20000));
+    remoteLog("log", "[DISCOVER] Waiting 40s for responses...");
+    await new Promise((r) => setTimeout(r, 40000));
 
     connection.off("rx", onRawFrame);
     connection.off(Constants.PushCodes.NewAdvert, onNewAdvert);
@@ -556,22 +555,43 @@ export async function discoverRepeaters(
       }
     }
 
+    const contactsByPrefix = new Map<string, MeshContact>();
+    if (existingContacts) {
+      for (const c of existingContacts) {
+        if (c.publicKey && c.publicKey.length >= 8) {
+          const prefix8 = pubKeyPrefixHex(c.publicKey.slice(0, 8));
+          contactsByPrefix.set(prefix8, c);
+        }
+      }
+      remoteLog("log", `[DISCOVER] Built contact lookup with ${contactsByPrefix.size} entries from ${existingContacts.length} contacts`);
+    }
+
     for (const [key, nodeData] of Array.from(discoveredNodes.entries())) {
-      remoteLog("log", `node_discover response "${nodeData.name}" (${key}) RSSI=${nodeData.stats.rssi} SNR=${nodeData.stats.snr} — no matching advert`);
-      repeaters.push({
-        contact: {
-          publicKey: new Uint8Array(32),
+      const matchedContact = contactsByPrefix.get(key);
+      const resolvedName = nodeData.name || matchedContact?.advName || `Unknown (${key.substring(0, 8)})`;
+      remoteLog("log", `node_discover response "${resolvedName}" (${key}) RSSI=${nodeData.stats.rssi} SNR=${nodeData.stats.snr}${matchedContact ? " — matched contact" : " — no matching contact"}`);
+
+      if (matchedContact) {
+        contacts.push(matchedContact);
+        repeaters.push({ contact: matchedContact, stats: nodeData.stats });
+      } else {
+        const prefixBytes = new Uint8Array(32);
+        const hexPairs = key.match(/.{1,2}/g) || [];
+        hexPairs.forEach((hex, i) => { if (i < 32) prefixBytes[i] = parseInt(hex, 16); });
+
+        const placeholder: MeshContact = {
+          publicKey: prefixBytes,
           type: 0,
           flags: 0,
           outPathLen: 0,
-          advName: nodeData.name || `Unknown (${key.substring(0, 8)})`,
+          advName: resolvedName,
           lastAdvert: 0,
           advLat: 0,
           advLon: 0,
           lastMod: 0,
-        },
-        stats: nodeData.stats,
-      });
+        };
+        repeaters.push({ contact: placeholder, stats: nodeData.stats });
+      }
     }
 
     remoteLog("log", "Discovery complete:", repeaters.length, "nodes found");

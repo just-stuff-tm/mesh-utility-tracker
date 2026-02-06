@@ -93,6 +93,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const positionRef = useRef<[number, number] | null>(null);
   const selfInfoRef = useRef<SelfInfo | null>(null);
+  const contactsRef = useRef<MeshContact[]>([]);
 
   useEffect(() => {
     positionRef.current = observerPosition;
@@ -101,6 +102,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     selfInfoRef.current = selfInfo;
   }, [selfInfo]);
+
+  useEffect(() => {
+    contactsRef.current = contacts;
+  }, [contacts]);
 
   useEffect(() => {
     getCurrentPosition()
@@ -158,7 +163,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await discoverRepeaters(pos?.[0], pos?.[1], (status) => {
         setScanStatus(status as ScanStatus);
-      });
+      }, contactsRef.current);
       if (!result) {
         setScanStatus("error");
         setLastScanResult({
