@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Menu } from "lucide-react";
+import { Menu, DollarSign, Heart } from "lucide-react";
 import { CoverageMap } from "@/components/coverage-map";
 import { BluetoothPanel } from "@/components/bluetooth-panel";
 import { ScanStats } from "@/components/scan-stats";
@@ -8,7 +8,7 @@ import { SettingsPanel } from "@/components/settings-panel";
 import { NodeList } from "@/components/node-list";
 import { MapHud } from "@/components/map-hud";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
 import type { CoverageZone, MeshNode, ScanResult } from "@shared/schema";
@@ -63,6 +63,19 @@ export default function MapPage() {
           <MapHud />
         </div>
 
+        <a
+          href="https://cash.app/$yuptm"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute top-3 right-3 z-[1000] flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500/15 to-green-500/15 backdrop-blur-sm border border-emerald-500/25 px-2.5 py-1.5 transition-all duration-200 hover:from-emerald-500/25 hover:to-green-500/25 hover:border-emerald-500/40"
+          data-testid="link-support-floating"
+        >
+          <Heart className="h-3 w-3 text-emerald-500" />
+          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+            Support
+          </span>
+        </a>
+
         <div className="absolute top-3 left-3 z-[1000] lg:hidden">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
@@ -70,12 +83,26 @@ export default function MapPage() {
                 <Menu className="h-4 w-4" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[300px] p-0">
+            <SheetContent
+              side="left"
+              className="w-[300px] p-0"
+              onInteractOutside={() => setSheetOpen(false)}
+            >
               <SheetHeader className="p-3 border-b border-border">
                 <SheetTitle className="text-sm">Controls</SheetTitle>
               </SheetHeader>
               <ScrollArea className="h-[calc(100vh-60px)]">
-                <div className="p-3 pb-8">
+                <div
+                  className="p-3 pb-8"
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    const isSlider = target.closest("[role='slider']") || target.closest("[data-orientation]");
+                    const isSwitch = target.closest("[role='switch']");
+                    if (!isSlider && !isSwitch && (target.closest("button") || target.closest("a"))) {
+                      setTimeout(() => setSheetOpen(false), 300);
+                    }
+                  }}
+                >
                   {controlsContent}
                 </div>
               </ScrollArea>

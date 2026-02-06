@@ -113,3 +113,6 @@ Preferred communication style: Simple, everyday language.
 - **2026-02-06**: Scan history limited to 5 per hex zone — after each scan result insert, prunes oldest results beyond 5 per grid cell to save database space. Zone popup query also limited to 5.
 - **2026-02-06**: Fixed settings panel scrolling — desktop sidebar uses ScrollArea; mobile sheet uses controlled open/close state so it slides back properly.
 - **2026-02-06**: RSSI legend collapsible — starts collapsed showing just color dots, expands on tap to show full signal strength ranges.
+- **2026-02-06**: Recalibrated RSSI scale — Good now covers -80 to -90 dBm, Fair -90 to -100, Poor -100 to -110, Very Weak < -110. Better suited for LoRa long-range signals.
+- **2026-02-06**: Added floating "Support" tab at top-right of map view linking to CashApp ($yuptm).
+- **2026-02-06**: Mobile slide-out sheet auto-closes after tapping action buttons (Connect, Scan, etc.) but stays open for sliders and toggles.
