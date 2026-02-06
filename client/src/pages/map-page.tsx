@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Menu, Heart } from "lucide-react";
+import { Menu } from "lucide-react";
 import { CoverageMap } from "@/components/coverage-map";
 import { BluetoothPanel } from "@/components/bluetooth-panel";
 import { ScanStats } from "@/components/scan-stats";
@@ -76,19 +76,6 @@ export default function MapPage() {
         <div className="absolute top-3 left-12 lg:left-3 z-[1000] max-w-[240px]">
           <MapHud />
         </div>
-
-        <a
-          href="https://cash.app/$yuptm"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500/15 to-green-500/15 backdrop-blur-sm border border-emerald-500/25 px-2.5 py-1.5 transition-all duration-200 hover:from-emerald-500/25 hover:to-green-500/25 hover:border-emerald-500/40"
-          data-testid="link-support-floating"
-        >
-          <Heart className="h-3 w-3 text-emerald-500" />
-          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-            Support
-          </span>
-        </a>
 
         <div className="absolute top-3 left-3 z-[1000] lg:hidden">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

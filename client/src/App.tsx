@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BluetoothProvider } from "@/lib/bluetooth-context";
+import { Heart } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import MapPage from "@/pages/map-page";
 import NodesPage from "@/pages/nodes-page";
@@ -43,7 +44,21 @@ function App() {
                 <div className="flex flex-col flex-1 min-w-0">
                   <header className="flex items-center justify-between gap-2 p-2 border-b border-border sticky top-0 z-50 bg-background">
                     <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <ThemeToggle />
+                    <div className="flex items-center gap-2">
+                      <a
+                        href="https://cash.app/$yuptm"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500/15 to-green-500/15 border border-emerald-500/25 px-2.5 py-1 transition-all duration-200 hover:from-emerald-500/25 hover:to-green-500/25 hover:border-emerald-500/40"
+                        data-testid="link-support-header"
+                      >
+                        <Heart className="h-3 w-3 text-emerald-500" />
+                        <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                          Support
+                        </span>
+                      </a>
+                      <ThemeToggle />
+                    </div>
                   </header>
                   <main className="flex-1 overflow-hidden">
                     <Router />
