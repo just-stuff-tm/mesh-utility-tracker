@@ -7,13 +7,14 @@ import {
   getContacts,
   getSelfInfo,
   getBatteryVoltage,
-  nodeDiscover,
+  discoverRepeaters,
   contactLatLon,
   publicKeyHex,
   on,
   type MeshContact,
   type DeviceInfo,
   type SelfInfo,
+  type RepeaterDiscoverResult,
 } from "@/lib/bluetooth";
 import { getCurrentPosition, watchPosition, clearWatch } from "@/lib/geolocation";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -167,9 +168,9 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
-  const runNodeDiscover = useCallback(async () => {
+  const runDiscoverRepeaters = useCallback(async () => {
     const pos = positionRef.current;
-    const result = await nodeDiscover(pos?.[0], pos?.[1]);
+    const result = await discoverRepeaters(pos?.[0], pos?.[1]);
     if (!result) return;
 
     setContacts(result.contacts);
@@ -189,6 +190,48 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     }
 
+    if (pos) {
+      for (const rep of result.repeaters) {
+        const repeaterName = rep.contact.advName || publicKeyHex(rep.contact.publicKey);
+        const repeaterCoords = contactLatLon(rep.contact);
+
+        if (rep.stats) {
+          try {
+            await apiRequest("POST", "/api/scan-results", {
+              observerId: "local-observer",
+              nodeId: publicKeyHex(rep.contact.publicKey),
+              rssi: rep.stats.lastRssi,
+              snr: rep.stats.lastSnr,
+              latitude: repeaterCoords?.lat ?? pos[0],
+              longitude: repeaterCoords?.lon ?? pos[1],
+              senderName: repeaterName,
+              receiverName: "Observer",
+            });
+          } catch {}
+        }
+
+        for (const neighbour of rep.neighbours) {
+          const neighbourId = Array.from(neighbour.publicKeyPrefix.slice(0, 4))
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("")
+            .toUpperCase();
+
+          try {
+            await apiRequest("POST", "/api/scan-results", {
+              observerId: publicKeyHex(rep.contact.publicKey),
+              nodeId: neighbourId,
+              rssi: rep.stats?.noiseFloor ?? -100,
+              snr: neighbour.snr,
+              latitude: repeaterCoords?.lat ?? pos[0],
+              longitude: repeaterCoords?.lon ?? pos[1],
+              senderName: neighbourId,
+              receiverName: repeaterName,
+            });
+          } catch {}
+        }
+      }
+    }
+
     queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
     queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
     queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
@@ -197,10 +240,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!connected || !isScanning) return;
 
-    runNodeDiscover();
-    const interval = setInterval(runNodeDiscover, scanInterval * 1000);
+    runDiscoverRepeaters();
+    const interval = setInterval(runDiscoverRepeaters, scanInterval * 1000);
     return () => clearInterval(interval);
-  }, [connected, isScanning, scanInterval, runNodeDiscover]);
+  }, [connected, isScanning, scanInterval, runDiscoverRepeaters]);
 
   const acquireWakeLock = useCallback(async () => {
     try {

@@ -247,15 +247,40 @@ export function contactLatLon(contact: MeshContact): { lat: number; lon: number 
   };
 }
 
-export interface NodeDiscoverResult {
+export interface RepeaterNeighbour {
+  publicKeyPrefix: Uint8Array;
+  heardSecondsAgo: number;
+  snr: number;
+}
+
+export interface RepeaterStats {
+  battMilliVolts: number;
+  noiseFloor: number;
+  lastRssi: number;
+  lastSnr: number;
+  packetsRecv: number;
+  packetsSent: number;
+  totalAirTimeSecs: number;
+  totalUpTimeSecs: number;
+}
+
+export interface RepeaterDiscoverResult {
+  contact: MeshContact;
+  stats: RepeaterStats | null;
+  neighbours: RepeaterNeighbour[];
+  totalNeighboursCount: number;
+}
+
+export interface DiscoverResult {
   contacts: MeshContact[];
+  repeaters: RepeaterDiscoverResult[];
   timestamp: Date;
 }
 
-export async function nodeDiscover(
+export async function discoverRepeaters(
   observerLat?: number,
   observerLon?: number,
-): Promise<NodeDiscoverResult | null> {
+): Promise<DiscoverResult | null> {
   if (!connection) return null;
   try {
     if (observerLat !== undefined && observerLon !== undefined) {
@@ -265,11 +290,10 @@ export async function nodeDiscover(
     }
 
     await connection.sendSelfAdvert(Constants.SelfAdvertTypes.Flood);
-
     await new Promise((r) => setTimeout(r, 5000));
 
-    const contacts = await connection.getContacts();
-    const mapped: MeshContact[] = contacts.map((c: any) => ({
+    const rawContacts = await connection.getContacts();
+    const contacts: MeshContact[] = rawContacts.map((c: any) => ({
       publicKey: c.publicKey,
       type: c.type,
       flags: c.flags,
@@ -281,7 +305,44 @@ export async function nodeDiscover(
       lastMod: c.lastMod,
     }));
 
-    return { contacts: mapped, timestamp: new Date() };
+    const repeaterContacts = contacts.filter(
+      (c) => c.type === Constants.AdvType.Repeater,
+    );
+
+    const repeaters: RepeaterDiscoverResult[] = [];
+    for (const repeater of repeaterContacts) {
+      let stats: RepeaterStats | null = null;
+      let neighbours: RepeaterNeighbour[] = [];
+      let totalNeighboursCount = 0;
+
+      try {
+        const statusResult = await connection.getStatus(repeater.publicKey);
+        stats = {
+          battMilliVolts: statusResult.batt_milli_volts,
+          noiseFloor: statusResult.noise_floor,
+          lastRssi: statusResult.last_rssi,
+          lastSnr: statusResult.last_snr,
+          packetsRecv: statusResult.n_packets_recv,
+          packetsSent: statusResult.n_packets_sent,
+          totalAirTimeSecs: statusResult.total_air_time_secs,
+          totalUpTimeSecs: statusResult.total_up_time_secs,
+        };
+      } catch {}
+
+      try {
+        const neighbourResult = await connection.getNeighbours(repeater.publicKey);
+        neighbours = neighbourResult.neighbours.map((n: any) => ({
+          publicKeyPrefix: n.publicKeyPrefix,
+          heardSecondsAgo: n.heardSecondsAgo,
+          snr: n.snr,
+        }));
+        totalNeighboursCount = neighbourResult.totalNeighboursCount;
+      } catch {}
+
+      repeaters.push({ contact: repeater, stats, neighbours, totalNeighboursCount });
+    }
+
+    return { contacts, repeaters, timestamp: new Date() };
   } catch {
     return null;
   }
