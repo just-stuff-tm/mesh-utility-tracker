@@ -312,15 +312,15 @@ export function contactLatLon(contact: MeshContact): { lat: number; lon: number 
   };
 }
 
+export interface NeighbourInfo {
+  publicKeyPrefix: Uint8Array;
+  heardSecondsAgo: number;
+  snr: number;
+}
+
 export interface RepeaterStats {
-  battMilliVolts: number;
-  noiseFloor: number;
-  lastRssi: number;
   lastSnr: number;
-  packetsRecv: number;
-  packetsSent: number;
-  totalAirTimeSecs: number;
-  totalUpTimeSecs: number;
+  neighbours: NeighbourInfo[];
 }
 
 export interface RepeaterDiscoverResult {
@@ -332,31 +332,6 @@ export interface DiscoverResult {
   contacts: MeshContact[];
   repeaters: RepeaterDiscoverResult[];
   timestamp: Date;
-}
-
-function parseStatusData(data: Uint8Array): RepeaterStats | null {
-  try {
-    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    let off = 0;
-    const battMilliVolts = view.getUint16(off, true); off += 2;
-    off += 2;
-    const noiseFloor = view.getInt16(off, true); off += 2;
-    const lastRssi = view.getInt16(off, true); off += 2;
-    const packetsRecv = view.getUint32(off, true); off += 4;
-    const packetsSent = view.getUint32(off, true); off += 4;
-    const totalAirTimeSecs = view.getUint32(off, true); off += 4;
-    const totalUpTimeSecs = view.getUint32(off, true); off += 4;
-    off += 4; // n_sent_flood
-    off += 4; // n_sent_direct
-    off += 4; // n_recv_flood
-    off += 4; // n_recv_direct
-    off += 2; // err_events
-    const lastSnr = data.byteLength > off + 1 ? view.getInt16(off, true) : 0;
-    return { battMilliVolts, noiseFloor, lastRssi, lastSnr, packetsRecv, packetsSent, totalAirTimeSecs, totalUpTimeSecs };
-  } catch (err) {
-    remoteLog("warn", "parseStatusData failed:", err);
-    return null;
-  }
 }
 
 function pubKeyPrefixHex(prefix: Uint8Array): string {
@@ -380,16 +355,7 @@ export async function discoverRepeaters(
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
-    const collectedResponses: { pubKeyPrefix: Uint8Array; statusData: Uint8Array }[] = [];
     const discoveredAdverts = new Map<string, MeshContact>();
-
-    const onStatusResponse = (response: any) => {
-      remoteLog("log", `StatusResponse received from prefix=${pubKeyPrefixHex(response.pubKeyPrefix)}`);
-      collectedResponses.push({
-        pubKeyPrefix: response.pubKeyPrefix,
-        statusData: response.statusData,
-      });
-    };
 
     const onNewAdvert = (data: any) => {
       const key = pubKeyPrefixHex(data.publicKey.slice(0, 6));
@@ -407,46 +373,50 @@ export async function discoverRepeaters(
       });
     };
 
-    connection.on(Constants.PushCodes.StatusResponse, onStatusResponse);
     connection.on(Constants.PushCodes.NewAdvert, onNewAdvert);
 
     onStatus?.("advertising");
-    remoteLog("log", "Sending broadcast status request (SendStatusReq 0xFFFF)...");
-    const broadcastKey = new Uint8Array(32);
-    broadcastKey[0] = 0xFF;
-    broadcastKey[1] = 0xFF;
-    await connection.sendCommandSendStatusReq(broadcastKey);
+    remoteLog("log", "Sending flood self-advert to discover nearby repeaters...");
+    await connection.sendAdvert(Constants.SelfAdvertTypes.Flood);
 
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 20s for responses...");
+    remoteLog("log", "Waiting 20s for NewAdvert responses...");
     await new Promise((r) => setTimeout(r, 20000));
 
-    connection.off(Constants.PushCodes.StatusResponse, onStatusResponse);
     connection.off(Constants.PushCodes.NewAdvert, onNewAdvert);
-    remoteLog("log", `Collected ${collectedResponses.length} StatusResponses, ${discoveredAdverts.size} NewAdverts`);
+    remoteLog("log", `Discovered ${discoveredAdverts.size} nodes via NewAdvert events`);
 
     const contacts = Array.from(discoveredAdverts.values());
     const repeaters: RepeaterDiscoverResult[] = [];
 
-    for (const resp of collectedResponses) {
-      const prefixHex = pubKeyPrefixHex(resp.pubKeyPrefix);
-      const matchedContact = discoveredAdverts.get(prefixHex);
-
-      if (!matchedContact) {
-        remoteLog("warn", `StatusResponse from ${prefixHex} has no matching advert, skipping`);
+    onStatus?.("querying");
+    for (const contact of contacts) {
+      if (contact.type !== Constants.AdvType.Repeater) {
+        remoteLog("log", `Skipping non-repeater "${contact.advName}" (type=${contact.type})`);
+        repeaters.push({ contact, stats: null });
         continue;
       }
 
-      const stats = parseStatusData(resp.statusData);
-      if (stats) {
-        remoteLog("log", `Parsed stats for "${matchedContact.advName}": RSSI=${stats.lastRssi} dBm, SNR=${stats.lastSnr} dB`);
-        repeaters.push({ contact: matchedContact, stats });
-      } else {
-        remoteLog("warn", `Failed to parse status data for "${matchedContact.advName}"`);
+      try {
+        remoteLog("log", `Querying neighbours from repeater "${contact.advName}"...`);
+        const result = await connection.getNeighbours(contact.publicKey, 10, 0, 2);
+        const neighbours: NeighbourInfo[] = (result.neighbours || []).map((n: any) => ({
+          publicKeyPrefix: n.publicKeyPrefix,
+          heardSecondsAgo: n.heardSecondsAgo,
+          snr: n.snr,
+        }));
+        const bestSnr = neighbours.length > 0
+          ? Math.max(...neighbours.map((n: NeighbourInfo) => n.snr))
+          : 0;
+        remoteLog("log", `Repeater "${contact.advName}": ${neighbours.length} neighbours, best SNR=${bestSnr} dB`);
+        repeaters.push({ contact, stats: { lastSnr: bestSnr, neighbours } });
+      } catch (err: any) {
+        remoteLog("warn", `getNeighbours failed for "${contact.advName}": ${err?.message || err}`);
+        repeaters.push({ contact, stats: null });
       }
     }
 
-    remoteLog("log", "Discovery complete:", repeaters.length, "repeaters with stats,", contacts.length, "total discovered");
+    remoteLog("log", "Discovery complete:", repeaters.length, "nodes found,", contacts.length, "total discovered");
     return { contacts, repeaters, timestamp: new Date() };
   } catch (err: any) {
     remoteLog("error", "discoverRepeaters error:", err?.message || err);

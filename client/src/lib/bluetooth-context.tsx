@@ -198,7 +198,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
             await apiRequest("POST", "/api/scan-results", {
               observerId: "local-observer",
               nodeId,
-              rssi: rep.stats.lastRssi,
+              rssi: 0,
               snr: rep.stats.lastSnr,
               latitude: pos[0],
               longitude: pos[1],
