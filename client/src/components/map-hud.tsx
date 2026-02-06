@@ -1,4 +1,5 @@
-import { Bluetooth, BluetoothOff, Play, Pause, Radio, Signal, Clock, AlertTriangle, Zap, Cpu } from "lucide-react";
+import { useState } from "react";
+import { Play, Pause, Radio, Signal, Clock, AlertTriangle, Zap, Cpu, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useBluetoothContext, type ScanStatus } from "@/lib/bluetooth-context";
@@ -51,11 +52,56 @@ export function MapHud() {
     toggleScan,
     forceScan,
     batteryMilliVolts,
+    smartScanEnabled,
   } = useBluetoothContext();
+
+  const [expanded, setExpanded] = useState(true);
 
   const radioName = selfInfo?.name || deviceName || "Unknown";
   const batteryV = batteryMilliVolts ? (batteryMilliVolts / 1000).toFixed(2) : null;
   const isActive = scanStatus !== "idle" && scanStatus !== "done" && scanStatus !== "error";
+  const wasSmartSkipped = lastScanResult?.errorMessage?.includes("skipped");
+
+  if (!expanded) {
+    return (
+      <div
+        onClick={() => setExpanded(true)}
+        className="backdrop-blur-md bg-background/85 dark:bg-card/85 rounded-md border border-border px-2.5 py-1.5 flex items-center gap-2 text-xs cursor-pointer hover-elevate"
+        data-testid="button-hud-expand"
+      >
+        <div
+          className={`w-2 h-2 rounded-full shrink-0 ${connected ? "bg-emerald-400" : "bg-muted-foreground"}`}
+          data-testid="indicator-connection-status"
+        />
+        {connected && isScanning && (
+          <>
+            {isActive ? (
+              <span className={`${scanStatusColor(scanStatus)} font-medium text-xs`} data-testid="text-collapsed-status">
+                {scanStatusLabel(scanStatus)}
+              </span>
+            ) : (
+              <span className="text-muted-foreground font-medium text-xs" data-testid="text-collapsed-countdown">
+                {formatCountdown(nextScanCountdown)}
+              </span>
+            )}
+          </>
+        )}
+        {connected && !isScanning && (
+          <span className="text-muted-foreground text-xs">Paused</span>
+        )}
+        {!connected && (
+          <span className="text-muted-foreground text-xs">Off</span>
+        )}
+        {wasSmartSkipped && (
+          <AlertTriangle className="h-3 w-3 text-yellow-400 shrink-0" data-testid="indicator-smart-skip" />
+        )}
+        {smartScanEnabled && !wasSmartSkipped && (
+          <AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0" data-testid="indicator-smart-enabled" />
+        )}
+        <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -63,19 +109,31 @@ export function MapHud() {
       data-testid="map-hud"
     >
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-        {connected ? (
-          <Bluetooth className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-        ) : (
-          <BluetoothOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        )}
-        <span className="font-semibold truncate" data-testid="text-radio-name">
-          {connected ? radioName : "Disconnected"}
-        </span>
-        {connected && batteryV && (
-          <Badge variant="secondary" className="ml-auto text-[10px] shrink-0" data-testid="text-battery">
-            {batteryV}V
-          </Badge>
-        )}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {connected ? (
+            <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" data-testid="indicator-connection-status" />
+          ) : (
+            <div className="w-2 h-2 rounded-full bg-muted-foreground shrink-0" data-testid="indicator-connection-status" />
+          )}
+          <span className="font-semibold truncate" data-testid="text-radio-name">
+            {connected ? radioName : "Disconnected"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {connected && batteryV && (
+            <Badge variant="secondary" className="text-[10px]" data-testid="text-battery">
+              {batteryV}V
+            </Badge>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setExpanded(false)}
+            data-testid="button-hud-collapse"
+          >
+            <ChevronUp className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
 
       {connected && deviceInfo && (

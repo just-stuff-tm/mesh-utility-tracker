@@ -183,11 +183,12 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       for (const z of cachedZones) {
         if (
           Math.abs(z.centerLat - snapLat) < tolerance &&
-          Math.abs(z.centerLng - snapLng) < tolerance &&
-          z.lastScanned &&
-          now - new Date(z.lastScanned).getTime() < freshnessMs
+          Math.abs(z.centerLng - snapLng) < tolerance
         ) {
-          return true;
+          if (z.isDeadZone) return false;
+          if (z.lastScanned && now - new Date(z.lastScanned).getTime() < freshnessMs) {
+            return true;
+          }
         }
       }
     } catch {}
