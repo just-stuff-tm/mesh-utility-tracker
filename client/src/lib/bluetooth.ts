@@ -444,15 +444,24 @@ export async function discoverRepeaters(
     const discoveredNodes = new Map<string, { stats: RepeaterStats; name: string }>();
     const discoveredAdverts = new Map<string, MeshContact>();
 
+    let rxFrameCount = 0;
     const onRawFrame = (frame: Uint8Array) => {
-      if (frame.length > 0 && frame[0] === PUSH_CODE_CONTROL_DATA) {
+      rxFrameCount++;
+      const code = frame.length > 0 ? frame[0] : -1;
+      const hex = Array.from(frame).map(b => b.toString(16).padStart(2, "0")).join(" ");
+      remoteLog("log", `[DISCOVER RX #${rxFrameCount}] code=0x${code.toString(16).padStart(2, "0")} len=${frame.length} hex=${hex}`);
+
+      if (code === PUSH_CODE_CONTROL_DATA) {
+        remoteLog("log", `[DISCOVER] Got CONTROL_DATA frame, parsing...`);
         const entry = parseControlDataFrame(frame);
         if (entry) {
-          remoteLog("log", `Discovered node "${entry.name}": RSSI=${entry.rssi} SNR=${entry.snr} prefix=${entry.publicKeyPrefix}`);
+          remoteLog("log", `[DISCOVER] Node "${entry.name}": RSSI=${entry.rssi} SNR=${entry.snr} SNR_in=${entry.snrIn} prefix=${entry.publicKeyPrefix}`);
           discoveredNodes.set(entry.publicKeyPrefix, {
             stats: { rssi: entry.rssi, snr: entry.snr },
             name: entry.name,
           });
+        } else {
+          remoteLog("warn", `[DISCOVER] Failed to parse CONTROL_DATA frame`);
         }
       }
     };
@@ -473,21 +482,24 @@ export async function discoverRepeaters(
       });
     };
 
+    remoteLog("log", `[DISCOVER] Registering rx listener and NewAdvert listener...`);
     connection.on("rx", onRawFrame);
     connection.on(Constants.PushCodes.NewAdvert, onNewAdvert);
 
     onStatus?.("broadcasting");
-    remoteLog("log", "Sending node_discover request (SEND_CONTROL_DATA with NODE_DISCOVER_REQ)...");
+    remoteLog("log", `[DISCOVER] Sending node_discover request (CMD=${CMD_SEND_CONTROL_DATA}, CTRL=0x${(CONTROL_NODE_DISCOVER_REQ | 0x01).toString(16)})...`);
     const nodeDiscoverCmd = buildNodeDiscoverReq(0);
+    remoteLog("log", `[DISCOVER] sendToRadioFrame(${nodeDiscoverCmd.length} bytes): ${Array.from(nodeDiscoverCmd).map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
     await connection.sendToRadioFrame(nodeDiscoverCmd);
+    remoteLog("log", `[DISCOVER] Command sent successfully`);
 
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 20s for node_discover responses...");
+    remoteLog("log", "[DISCOVER] Waiting 20s for responses...");
     await new Promise((r) => setTimeout(r, 20000));
 
     connection.off("rx", onRawFrame);
     connection.off(Constants.PushCodes.NewAdvert, onNewAdvert);
-    remoteLog("log", `Collected ${discoveredNodes.size} node_discover responses, ${discoveredAdverts.size} NewAdverts`);
+    remoteLog("log", `[DISCOVER] Done. rxFrames=${rxFrameCount}, nodeDiscoverResponses=${discoveredNodes.size}, newAdverts=${discoveredAdverts.size}`);
 
     const contacts: MeshContact[] = [];
     const repeaters: RepeaterDiscoverResult[] = [];
