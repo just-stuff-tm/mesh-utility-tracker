@@ -186,6 +186,12 @@ export async function connectToRadio(): Promise<{
       } as RxLogEntry);
     });
 
+    bleConnection.on("rx", (frame: Uint8Array) => {
+      const hex = Array.from(frame).map(b => b.toString(16).padStart(2, "0")).join(" ");
+      const pushCode = frame.length > 0 ? `0x${frame[0].toString(16).padStart(2, "0")}` : "?";
+      remoteLog("log", `[BLE RX] code=${pushCode} len=${frame.length} data=${hex}`);
+    });
+
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error("BLE connection timed out waiting for radio handshake"));
