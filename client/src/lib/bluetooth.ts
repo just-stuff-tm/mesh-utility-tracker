@@ -351,19 +351,16 @@ export async function discoverRepeaters(
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
-    const broadcastKey = new Uint8Array(32);
-    broadcastKey.fill(0xFF);
-
     onStatus?.("advertising");
-    remoteLog("log", "Sending broadcast telemetry request (0xFFFF)...");
-    await connection.sendCommandSendTelemetryReq(broadcastKey);
+    remoteLog("log", "Sending zero-hop advert on public channel...");
+    await connection.sendAdvert(Constants.SelfAdvertTypes.ZeroHop);
 
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 20s for telemetry responses...");
+    remoteLog("log", "Waiting 20s for responses...");
     await new Promise((r) => setTimeout(r, 20000));
 
     onStatus?.("querying");
-    remoteLog("log", "Fetching contacts list after telemetry broadcast...");
+    remoteLog("log", "Fetching contacts list...");
     const rawContacts = await connection.getContacts();
     remoteLog("log", "getContacts returned", rawContacts.length, "contacts");
 

@@ -12,7 +12,7 @@ function formatCountdown(seconds: number | null): string {
 
 function scanStatusLabel(status: ScanStatus): string {
   switch (status) {
-    case "advertising": return "Broadcasting";
+    case "advertising": return "Advertising";
     case "waiting": return "Listening";
     case "querying": return "Querying";
     case "submitting": return "Saving";

@@ -109,4 +109,4 @@ Preferred communication style: Simple, everyday language.
 - **2026-02-06**: Coverage mapping uses observer position only — scan results record where the observer is standing, not repeater advertised coordinates. Node records no longer store repeater lat/lon.
 - **2026-02-06**: Added remote logging system — browser console logs batched to `/api/remote-log` endpoint for server-side debugging of BLE interactions on mobile devices
 - **2026-02-06**: Added MapHud overlay on map — shows connected radio name, battery, scan countdown/status, last scan result, and scan on/off toggle button
-- **2026-02-06**: Changed node discovery from zero-hop advert + NewAdvert listening to broadcast telemetry request (`sendCommandSendTelemetryReq(0xFF*32)`) followed by `getContacts()` to retrieve discovered nodes. Still filters to zero-hop repeaters for status queries.
+- **2026-02-06**: Changed node discovery to zero-hop advert on public channel followed by `getContacts()` to retrieve discovered nodes. Still filters to zero-hop repeaters for status queries.
