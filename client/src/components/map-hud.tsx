@@ -147,7 +147,7 @@ export function MapHud() {
                 </div>
               </div>
               {lastScanResult.errorMessage && (
-                <div className="flex items-center gap-1 text-red-400">
+                <div className={`flex items-center gap-1 ${lastScanResult.errorMessage.includes("skipped") ? "text-yellow-400" : "text-red-400"}`}>
                   <AlertTriangle className="h-3 w-3" />
                   <span className="truncate">{lastScanResult.errorMessage}</span>
                 </div>

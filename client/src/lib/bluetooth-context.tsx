@@ -16,6 +16,7 @@ import {
 } from "@/lib/bluetooth";
 import { getCurrentPosition, watchPosition, clearWatch } from "@/lib/geolocation";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { snapToHexGrid } from "@shared/grid";
 
 export type ScanStatus = "idle" | "advertising" | "waiting" | "querying" | "submitting" | "done" | "error";
 
@@ -94,6 +95,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   const positionRef = useRef<[number, number] | null>(null);
   const selfInfoRef = useRef<SelfInfo | null>(null);
   const contactsRef = useRef<MeshContact[]>([]);
+  const smartScanEnabledRef = useRef(smartScanEnabled);
+  const smartScanDaysRef = useRef(smartScanDays);
 
   useEffect(() => {
     positionRef.current = observerPosition;
@@ -106,6 +109,14 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     contactsRef.current = contacts;
   }, [contacts]);
+
+  useEffect(() => {
+    smartScanEnabledRef.current = smartScanEnabled;
+  }, [smartScanEnabled]);
+
+  useEffect(() => {
+    smartScanDaysRef.current = smartScanDays;
+  }, [smartScanDays]);
 
   useEffect(() => {
     getCurrentPosition()
@@ -155,6 +166,34 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     return () => unsubs.forEach((fn) => fn());
   }, []);
 
+
+  const checkSmartScanSkip = useCallback(async (): Promise<boolean> => {
+    if (!smartScanEnabledRef.current) return false;
+    const pos = positionRef.current;
+    if (!pos) return false;
+
+    try {
+      const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
+      const res = await fetch("/api/coverage-zones");
+      if (!res.ok) return false;
+      const zones = await res.json();
+      const freshnessMs = smartScanDaysRef.current * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const tolerance = 0.00005;
+
+      for (const z of zones) {
+        if (
+          Math.abs(z.centerLat - snapLat) < tolerance &&
+          Math.abs(z.centerLng - snapLng) < tolerance &&
+          z.lastScanned &&
+          now - new Date(z.lastScanned).getTime() < freshnessMs
+        ) {
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  }, []);
 
   const runDiscoverRepeaters = useCallback(async () => {
     const pos = positionRef.current;
@@ -257,12 +296,23 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    runDiscoverRepeaters();
-    setNextScanCountdown(scanInterval);
-    const scanTimer = setInterval(() => {
-      runDiscoverRepeaters();
+    const runAutoScan = async () => {
+      const skip = await checkSmartScanSkip();
+      if (skip) {
+        setScanStatus("done");
+        setLastScanResult((prev) => prev ? { ...prev, errorMessage: "Smart scan: area recently covered, skipped" } : {
+          contactsFound: 0, repeatersFound: 0, repeatersWithStats: 0,
+          scanResultsSubmitted: 0, timestamp: new Date(),
+          errorMessage: "Smart scan: area recently covered, skipped",
+        });
+      } else {
+        runDiscoverRepeaters();
+      }
       setNextScanCountdown(scanInterval);
-    }, scanInterval * 1000);
+    };
+
+    runAutoScan();
+    const scanTimer = setInterval(runAutoScan, scanInterval * 1000);
     const tickTimer = setInterval(() => {
       setNextScanCountdown((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
     }, 1000);
@@ -270,7 +320,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       clearInterval(scanTimer);
       clearInterval(tickTimer);
     };
-  }, [connected, isScanning, scanInterval, runDiscoverRepeaters]);
+  }, [connected, isScanning, scanInterval, runDiscoverRepeaters, checkSmartScanSkip]);
 
   const acquireWakeLock = useCallback(async () => {
     try {
