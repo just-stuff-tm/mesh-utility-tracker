@@ -334,6 +334,35 @@ export interface DiscoverResult {
   timestamp: Date;
 }
 
+function parseStatusData(data: Uint8Array): RepeaterStats | null {
+  try {
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    let off = 0;
+    const battMilliVolts = view.getUint16(off, true); off += 2;
+    off += 2;
+    const noiseFloor = view.getInt16(off, true); off += 2;
+    const lastRssi = view.getInt16(off, true); off += 2;
+    const packetsRecv = view.getUint32(off, true); off += 4;
+    const packetsSent = view.getUint32(off, true); off += 4;
+    const totalAirTimeSecs = view.getUint32(off, true); off += 4;
+    const totalUpTimeSecs = view.getUint32(off, true); off += 4;
+    off += 4; // n_sent_flood
+    off += 4; // n_sent_direct
+    off += 4; // n_recv_flood
+    off += 4; // n_recv_direct
+    off += 2; // err_events
+    const lastSnr = data.byteLength > off + 1 ? view.getInt16(off, true) : 0;
+    return { battMilliVolts, noiseFloor, lastRssi, lastSnr, packetsRecv, packetsSent, totalAirTimeSecs, totalUpTimeSecs };
+  } catch (err) {
+    remoteLog("warn", "parseStatusData failed:", err);
+    return null;
+  }
+}
+
+function pubKeyPrefixHex(prefix: Uint8Array): string {
+  return Array.from(prefix).map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
 export async function discoverRepeaters(
   observerLat?: number,
   observerLon?: number,
@@ -351,16 +380,33 @@ export async function discoverRepeaters(
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
+    const collectedResponses: { pubKeyPrefix: Uint8Array; statusData: Uint8Array }[] = [];
+    const onStatusResponse = (response: any) => {
+      remoteLog("log", `StatusResponse received from prefix=${pubKeyPrefixHex(response.pubKeyPrefix)}`);
+      collectedResponses.push({
+        pubKeyPrefix: response.pubKeyPrefix,
+        statusData: response.statusData,
+      });
+    };
+
+    connection.on(Constants.PushCodes.StatusResponse, onStatusResponse);
+
     onStatus?.("advertising");
-    remoteLog("log", "Sending zero-hop advert on public channel...");
-    await connection.sendAdvert(Constants.SelfAdvertTypes.ZeroHop);
+    remoteLog("log", "Sending broadcast telemetry request (CMD_SEND_TELEMETRY_REQ 0xFFFF)...");
+    const broadcastKey = new Uint8Array(32);
+    broadcastKey[0] = 0xFF;
+    broadcastKey[1] = 0xFF;
+    await connection.sendCommandSendTelemetryReq(broadcastKey);
 
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 20s for responses...");
+    remoteLog("log", "Waiting 20s for status responses...");
     await new Promise((r) => setTimeout(r, 20000));
 
+    connection.off(Constants.PushCodes.StatusResponse, onStatusResponse);
+    remoteLog("log", `Collected ${collectedResponses.length} StatusResponse events during discovery window`);
+
     onStatus?.("querying");
-    remoteLog("log", "Fetching contacts list...");
+    remoteLog("log", "Fetching contacts list to match responses...");
     const rawContacts = await connection.getContacts();
     remoteLog("log", "getContacts returned", rawContacts.length, "contacts");
 
@@ -380,34 +426,26 @@ export async function discoverRepeaters(
       remoteLog("log", `Contact: "${c.advName}" type=${c.type} flags=${c.flags} pathLen=${c.outPathLen}`);
     }
 
-    const repeaterContacts = contacts.filter(
-      (c) => c.type === Constants.AdvType.Repeater,
-    );
-    remoteLog("log", "Found", repeaterContacts.length, "repeaters out of", contacts.length, "total contacts");
-
     const repeaters: RepeaterDiscoverResult[] = [];
-    const zeroHop = repeaterContacts.filter((c) => c.outPathLen === 0);
-    const skipped = repeaterContacts.filter((c) => c.outPathLen !== 0);
-    remoteLog("log", `Repeaters: ${zeroHop.length} zero-hop (direct), ${skipped.length} multi-hop/unreachable (skipped)`);
 
-    for (const repeater of zeroHop) {
-      try {
-        remoteLog("log", "Querying status for zero-hop repeater:", repeater.advName || publicKeyHex(repeater.publicKey));
-        const statusResult = await connection.getStatus(repeater.publicKey);
-        remoteLog("log", "Status result:", statusResult.last_rssi, "dBm,", statusResult.last_snr, "dB SNR");
-        const stats: RepeaterStats = {
-          battMilliVolts: statusResult.batt_milli_volts,
-          noiseFloor: statusResult.noise_floor,
-          lastRssi: statusResult.last_rssi,
-          lastSnr: statusResult.last_snr,
-          packetsRecv: statusResult.n_packets_recv,
-          packetsSent: statusResult.n_packets_sent,
-          totalAirTimeSecs: statusResult.total_air_time_secs,
-          totalUpTimeSecs: statusResult.total_up_time_secs,
-        };
-        repeaters.push({ contact: repeater, stats });
-      } catch (err) {
-        remoteLog("warn", "getStatus failed for", repeater.advName || publicKeyHex(repeater.publicKey), err);
+    for (const resp of collectedResponses) {
+      const prefixHex = pubKeyPrefixHex(resp.pubKeyPrefix);
+      const matchedContact = contacts.find((c) => {
+        const contactPrefix = pubKeyPrefixHex(c.publicKey.slice(0, 6));
+        return contactPrefix === prefixHex;
+      });
+
+      if (!matchedContact) {
+        remoteLog("warn", `StatusResponse from ${prefixHex} has no matching contact, skipping`);
+        continue;
+      }
+
+      const stats = parseStatusData(resp.statusData);
+      if (stats) {
+        remoteLog("log", `Parsed stats for "${matchedContact.advName}": RSSI=${stats.lastRssi} dBm, SNR=${stats.lastSnr} dB`);
+        repeaters.push({ contact: matchedContact, stats });
+      } else {
+        remoteLog("warn", `Failed to parse status data for "${matchedContact.advName}"`);
       }
     }
 
