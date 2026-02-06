@@ -1,0 +1,89 @@
+PS C:\Users\relio> py -m meshcore_cli
+INFO:meshcore:Searching first MC BLE device
+INFO:meshcore:Found device MeshCore-KD3CGK F0:9E:9E:76:A5:D5
+INFO:meshcore:BLE Connection started
+INFO:meshcore:Connected to KD3CGK running on a v1.12.0-e738a74 fw.
+Interactive mode, most commands from terminal chat should work.
+Use "to" to select recipient, use Tab to complete name ...
+Some cmds have an help accessible with ?<cmd>. Do ?[Tab] to get a list.
+"quit", "q", CTRL+D will end interactive mode
+Fetching contacts .................................... Done
+Fetching channels ........................................ Done
+ERROR:meshcore:Error retrieving messages: {'reason': 'no_event_received'}
+KD3CGK|*>
+KD3CGK|*> help
+    ?<cmd> may give you some more help about cmd
+  General commands
+    chat                   : enter the chat (interactive) mode
+    chat_to <ct>           : enter chat with contact                to
+    script <filename>      : execute commands in filename
+    infos                  : print informations about the node      i
+    self_telemetry         : print own telemtry                     t
+    card                   : export this node URI                   e
+    ver                    : firmware version                       v
+    reboot                 : reboots node
+    sleep <secs>           : sleeps for a given amount of secs      s
+    wait_key               : wait until user presses <Enter>        wk
+    apply_to <f> <cmds>    : sends cmds to contacts matching f      at
+  Messaging
+    msg <name> <msg>       : send message to node by name           m  {
+    wait_ack               : wait an ack                            wa }
+    chan <nb> <msg>        : send message to channel number <nb>    ch
+    public <msg>           : send message to public channel (0)     dch
+    recv                   : reads next msg                         r
+    wait_msg               : wait for a message and read it         wm
+    sync_msgs              : gets all unread msgs from the node     sm
+    msgs_subscribe         : display msgs as they arrive            ms
+    get_channels           : prints all channel info
+    get_channel <n>        : get info for channel (by number or name)
+    set_channel n nm [k]   : set channel info (nb, name, key)
+    add_channel name [key] : add new channel with optional key
+    remove_channel <n>     : remove channel (by number or name)
+    scope <s>              : sets scope for flood messages
+  Management
+    advert                 : sends advert                           a
+    floodadv               : flood advert
+    get <param>            : gets a param, "get help" for more
+    set <param> <value>    : sets a param, "set help" for more
+    time <epoch>           : sets time to given epoch
+    clock                  : get current time
+    clock sync             : sync device clock                      st
+    node_discover <filter> : discovers nodes based on their type    nd
+  Contacts
+    contacts / list        : gets contact list                      lc
+    reload_contacts        : force reloading all contacts           rc
+    contact_info <ct>      : prints information for contact ct      ci
+    contact_timeout <ct> v : sets temp default timeout for contact
+    share_contact <ct>     : share a contact with others            sc
+    export_contact <ct>    : get a contact's URI                    ec
+    import_contact <URI>   : import a contact from its URI          ic
+    remove_contact <ct>    : removes a contact from this node
+    path <ct>              : diplays path for a contact
+    disc_path <ct>         : discover new path and display          dp
+    reset_path <ct>        : resets path to a contact to flood      rp
+    change_path <ct> <pth> : change the path to a contact           cp
+    change_flags <ct> <f>  : change contact flags (tel_l|tel_a|star)cf
+    req_acl <ct>           : requests access control list for node  ra
+    req_telemetry <ct>     : prints telemetry data as json          rt
+    req_regions <ct>       : prints regions from repeater           rr
+    req_owner <ct>         : prints owner for a repeater            ro
+    req_clock <ct>         : prints repeater timestamp (for sync)
+    req_mma <ct>           : requests min/max/avg for a sensor      rm
+    pending_contacts       : show pending contacts
+    add_pending <pending>  : manually add pending contact
+    flush_pending          : flush pending contact list
+  Repeaters
+    login <name> <pwd>     : log into a node (rep) with given pwd   l
+    logout <name>          : log out of a repeater
+    cmd <name> <cmd>       : sends a command to a repeater (no ack) c  [
+    wmt8                   : wait for a msg (reply) with a timeout     ]
+    req_status <name>      : requests status from a node            rs
+    req_neighbours <name>  : requests for neighbours in binary form rn
+    trace <path>           : run a trace, path is comma separated
+KD3CGK|*> node_discover
+Discovered 0 nodes:
+KD3CGK|*> node_discover
+Discovered 2 nodes:
+ 8b CCLRN-Nittany        REP SNR:   4.25->  8.50 RSSI: ->-106
+ a3 Pine Gove Repeater   REP SNR:   9.50-> 11.25 RSSI: -> -96
+KD3CGK|*>

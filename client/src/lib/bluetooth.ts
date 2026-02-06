@@ -346,6 +346,7 @@ const CONTROL_NODE_DISCOVER_REQ = 0x80;
 interface NodeDiscoverEntry {
   snr: number;
   rssi: number;
+  snrIn: number;
   name: string;
   publicKeyPrefix: string;
 }
@@ -372,33 +373,55 @@ function parseControlDataFrame(frame: Uint8Array): NodeDiscoverEntry | null {
   const snr = snrRaw / 4;
   const rssi = view.getInt8(2);
   const pathLen = frame[3];
-  let off = 4 + pathLen;
 
-  if (off >= frame.length) {
-    remoteLog("log", `ControlData: no payload after path (pathLen=${pathLen})`);
+  const payload = frame.slice(4);
+  remoteLog("log", `ControlData raw: snr=${snr} rssi=${rssi} pathLen=${pathLen} payload(${payload.length}b)=${Array.from(payload).map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
+
+  if (payload.length < 1) {
+    remoteLog("log", `ControlData: empty payload`);
     return null;
   }
 
-  const controlType = frame[off];
-  if ((controlType & 0xF0) !== CONTROL_NODE_DISCOVER_RESP) {
-    remoteLog("log", `ControlData: controlType=0x${controlType.toString(16)}, not NODE_DISCOVER_RESP`);
+  const payloadType = payload[0];
+  if ((payloadType & 0xF0) !== CONTROL_NODE_DISCOVER_RESP) {
+    remoteLog("log", `ControlData: payloadType=0x${payloadType.toString(16)}, not NODE_DISCOVER_RESP (0x9x)`);
     return null;
   }
+
+  const nodeType = payloadType & 0x0F;
+  let off = 1;
+
+  if (payload.length < off + 5) {
+    remoteLog("log", `ControlData: payload too short for SNR_in + tag`);
+    return null;
+  }
+
+  const snrInView = new DataView(payload.buffer, payload.byteOffset + off, 1);
+  const snrIn = snrInView.getInt8(0) / 4;
   off += 1;
 
-  const remaining = frame.slice(off);
-  remoteLog("log", `NodeDiscoverResp: snr=${snr} rssi=${rssi} pathLen=${pathLen} payload=${Array.from(remaining).map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
+  const tagBytes = payload.slice(off, off + 4);
+  const tag = Array.from(tagBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+  off += 4;
 
-  let name = "";
+  const pubkeyData = payload.slice(off);
   let publicKeyPrefix = "";
-  if (remaining.length >= 6) {
-    publicKeyPrefix = Array.from(remaining.slice(0, 6)).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
-    if (remaining.length > 6) {
-      name = new TextDecoder().decode(remaining.slice(6)).replace(/\0/g, "").trim();
+  let name = "";
+
+  if (pubkeyData.length < 32) {
+    if (pubkeyData.length >= 8) {
+      publicKeyPrefix = Array.from(pubkeyData.slice(0, 8)).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+    }
+  } else {
+    publicKeyPrefix = Array.from(pubkeyData.slice(0, 6)).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+    if (pubkeyData.length > 32) {
+      name = new TextDecoder().decode(pubkeyData.slice(32)).replace(/\0/g, "").trim();
     }
   }
 
-  return { snr, rssi, name, publicKeyPrefix };
+  remoteLog("log", `NodeDiscoverResp: snr=${snr} rssi=${rssi} snrIn=${snrIn} nodeType=${nodeType} tag=${tag} prefix=${publicKeyPrefix} name="${name}"`);
+
+  return { snr, rssi, snrIn, name, publicKeyPrefix };
 }
 
 export async function discoverRepeaters(
