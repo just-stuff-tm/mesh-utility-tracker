@@ -411,11 +411,11 @@ export async function discoverRepeaters(
     connection.on(Constants.PushCodes.NewAdvert, onNewAdvert);
 
     onStatus?.("advertising");
-    remoteLog("log", "Sending broadcast telemetry request (CMD_SEND_TELEMETRY_REQ 0xFFFF)...");
+    remoteLog("log", "Sending broadcast status request (SendStatusReq 0xFFFF)...");
     const broadcastKey = new Uint8Array(32);
     broadcastKey[0] = 0xFF;
     broadcastKey[1] = 0xFF;
-    await connection.sendCommandSendTelemetryReq(broadcastKey);
+    await connection.sendCommandSendStatusReq(broadcastKey);
 
     onStatus?.("waiting");
     remoteLog("log", "Waiting 20s for responses...");
