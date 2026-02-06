@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { CoverageZone, ScanResult } from "@shared/schema";
 import { getHexVertices } from "@shared/grid";
 
@@ -177,36 +178,68 @@ export function CoverageMap({
         })}
       </MapContainer>
 
-      <div className="absolute bottom-14 right-3 z-[1000]">
-        <div className="bg-background/90 dark:bg-card/90 backdrop-blur-sm rounded-md p-2.5 text-xs space-y-1.5 border border-border">
-          <p className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-            RSSI Signal Strength
-          </p>
-          {[
-            { color: "#22c55e", label: "Excellent", range: "> -70 dBm" },
-            { color: "#4ade80", label: "Very Good", range: "-70 to -80" },
-            { color: "#84cc16", label: "Good", range: "-80 to -85" },
-            { color: "#facc15", label: "Fair", range: "-85 to -90" },
-            { color: "#f97316", label: "Poor", range: "-90 to -100" },
-            { color: "#ef4444", label: "Very Weak", range: "< -100 dBm" },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-2">
-              <div
-                className="w-4 h-3 rounded-sm"
-                style={{ background: item.color, opacity: 0.7 }}
-              />
-              <span className="flex-1">{item.label}</span>
-              <span className="text-muted-foreground text-[10px]">{item.range}</span>
-            </div>
-          ))}
-          <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-border">
-            <div
-              className="w-4 h-3 rounded-sm border border-dashed"
-              style={{ borderColor: "#ef4444", background: "rgba(239,68,68,0.15)" }}
-            />
-            <span>Dead Zone</span>
+      <RssiLegend />
+    </div>
+  );
+}
+
+const rssiItems = [
+  { color: "#22c55e", label: "Excellent", range: "> -70" },
+  { color: "#4ade80", label: "Very Good", range: "-70–-80" },
+  { color: "#84cc16", label: "Good", range: "-80–-85" },
+  { color: "#facc15", label: "Fair", range: "-85–-90" },
+  { color: "#f97316", label: "Poor", range: "-90–-100" },
+  { color: "#ef4444", label: "Very Weak", range: "< -100" },
+];
+
+function RssiLegend() {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="absolute bottom-14 right-3 z-[1000]">
+      <div className="bg-background/90 dark:bg-card/90 backdrop-blur-sm rounded-md border border-border">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center justify-between gap-2 w-full px-2 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold"
+          data-testid="button-rssi-legend-toggle"
+        >
+          <span>RSSI</span>
+          <div className="flex items-center gap-1">
+            {!expanded && (
+              <div className="flex gap-0.5">
+                {rssiItems.map((item) => (
+                  <div
+                    key={item.label}
+                    className="w-2 h-2 rounded-sm"
+                    style={{ background: item.color, opacity: 0.7 }}
+                  />
+                ))}
+              </div>
+            )}
+            {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
           </div>
-        </div>
+        </button>
+        {expanded && (
+          <div className="px-2 pb-2 space-y-1 text-[11px]">
+            {rssiItems.map((item) => (
+              <div key={item.label} className="flex items-center gap-1.5">
+                <div
+                  className="w-3 h-2.5 rounded-sm"
+                  style={{ background: item.color, opacity: 0.7 }}
+                />
+                <span className="flex-1">{item.label}</span>
+                <span className="text-muted-foreground text-[9px]">{item.range}</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-1.5 pt-1 border-t border-border">
+              <div
+                className="w-3 h-2.5 rounded-sm border border-dashed"
+                style={{ borderColor: "#ef4444", background: "rgba(239,68,68,0.15)" }}
+              />
+              <span>Dead Zone</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import type { CoverageZone, MeshNode, ScanResult } from "@shared/schema";
 export default function MapPage() {
   const { observerPosition, autoCenter, connected } = useBluetoothContext();
   const [selectedZone, setSelectedZone] = useState<CoverageZone | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const { data: coverageZones = [] } = useQuery<CoverageZone[]>({
     queryKey: ["/api/coverage-zones"],
@@ -52,7 +53,10 @@ export default function MapPage() {
           observerPosition={observerPosition}
           autoCenter={autoCenter}
           selectedZone={selectedZone}
-          onZoneClick={setSelectedZone}
+          onZoneClick={(zone) => {
+            setSelectedZone(zone);
+            setSheetOpen(false);
+          }}
         />
 
         <div className="absolute top-3 left-12 lg:left-3 z-[1000] max-w-[240px]">
@@ -60,7 +64,7 @@ export default function MapPage() {
         </div>
 
         <div className="absolute top-3 left-3 z-[1000] lg:hidden">
-          <Sheet>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <Button size="icon" variant="secondary" data-testid="button-mobile-controls">
                 <Menu className="h-4 w-4" />
@@ -71,7 +75,7 @@ export default function MapPage() {
                 <SheetTitle className="text-sm">Controls</SheetTitle>
               </SheetHeader>
               <ScrollArea className="h-[calc(100vh-60px)]">
-                <div className="p-3">
+                <div className="p-3 pb-8">
                   {controlsContent}
                 </div>
               </ScrollArea>
@@ -89,8 +93,12 @@ export default function MapPage() {
         </div>
       </div>
 
-      <div className="w-[300px] border-l border-border bg-background overflow-y-auto p-3 hidden lg:block">
-        {controlsContent}
+      <div className="w-[300px] border-l border-border bg-background hidden lg:flex flex-col">
+        <ScrollArea className="flex-1">
+          <div className="p-3 pb-8">
+            {controlsContent}
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );
