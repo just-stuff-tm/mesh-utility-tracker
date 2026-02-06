@@ -515,7 +515,7 @@ export async function discoverRepeaters(
 
     onStatus?.("broadcasting");
     remoteLog("log", `[DISCOVER] Sending node_discover request (CMD=${CMD_SEND_CONTROL_DATA}, CTRL=0x${(CONTROL_NODE_DISCOVER_REQ | 0x01).toString(16)})...`);
-    const nodeDiscoverCmd = buildNodeDiscoverReq(0);
+    const nodeDiscoverCmd = buildNodeDiscoverReq(0xFF);
     remoteLog("log", `[DISCOVER] sendToRadioFrame(${nodeDiscoverCmd.length} bytes): ${Array.from(nodeDiscoverCmd).map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
     await connection.sendToRadioFrame(nodeDiscoverCmd);
     remoteLog("log", `[DISCOVER] Command sent successfully`);
