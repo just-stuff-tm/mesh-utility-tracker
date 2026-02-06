@@ -351,52 +351,43 @@ export async function discoverRepeaters(
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
-    const discoveredAdverts: MeshContact[] = [];
-    const onNewAdvert = (data: any) => {
-      remoteLog("log", `NewAdvert received during scan: "${data.advName}" type=${data.type} pathLen=${data.outPathLen}`);
-      discoveredAdverts.push({
-        publicKey: data.publicKey,
-        type: data.type,
-        flags: data.flags,
-        outPathLen: data.outPathLen,
-        advName: data.advName,
-        lastAdvert: data.lastAdvert,
-        advLat: data.advLat,
-        advLon: data.advLon,
-        lastMod: data.lastMod,
-      });
-    };
-
-    connection.on(Constants.PushCodes.NewAdvert, onNewAdvert);
+    const broadcastKey = new Uint8Array(32);
+    broadcastKey.fill(0xFF);
 
     onStatus?.("advertising");
-    remoteLog("log", "Sending zero-hop advert...");
-    await connection.sendAdvert(Constants.SelfAdvertTypes.ZeroHop);
+    remoteLog("log", "Sending broadcast telemetry request (0xFFFF)...");
+    await connection.sendCommandSendTelemetryReq(broadcastKey);
+
     onStatus?.("waiting");
-    remoteLog("log", "Waiting 20s for responses...");
+    remoteLog("log", "Waiting 20s for telemetry responses...");
     await new Promise((r) => setTimeout(r, 20000));
 
-    connection.off(Constants.PushCodes.NewAdvert, onNewAdvert);
+    onStatus?.("querying");
+    remoteLog("log", "Fetching contacts list after telemetry broadcast...");
+    const rawContacts = await connection.getContacts();
+    remoteLog("log", "getContacts returned", rawContacts.length, "contacts");
 
-    remoteLog("log", `Collected ${discoveredAdverts.length} NewAdvert events during scan window`);
-
-    const contactMap = new Map<string, MeshContact>();
-    for (const adv of discoveredAdverts) {
-      const key = publicKeyHex(adv.publicKey);
-      contactMap.set(key, adv);
-    }
-    const contacts = Array.from(contactMap.values());
+    const contacts: MeshContact[] = rawContacts.map((c: any) => ({
+      publicKey: c.publicKey,
+      type: c.type,
+      flags: c.flags,
+      outPathLen: c.outPathLen,
+      advName: c.advName,
+      lastAdvert: c.lastAdvert,
+      advLat: c.advLat,
+      advLon: c.advLon,
+      lastMod: c.lastMod,
+    }));
 
     for (const c of contacts) {
-      remoteLog("log", `Discovered: "${c.advName}" type=${c.type} flags=${c.flags} pathLen=${c.outPathLen}`);
+      remoteLog("log", `Contact: "${c.advName}" type=${c.type} flags=${c.flags} pathLen=${c.outPathLen}`);
     }
 
     const repeaterContacts = contacts.filter(
       (c) => c.type === Constants.AdvType.Repeater,
     );
-    remoteLog("log", "Found", repeaterContacts.length, "repeaters out of", contacts.length, "discovered contacts");
+    remoteLog("log", "Found", repeaterContacts.length, "repeaters out of", contacts.length, "total contacts");
 
-    onStatus?.("querying");
     const repeaters: RepeaterDiscoverResult[] = [];
     const zeroHop = repeaterContacts.filter((c) => c.outPathLen === 0);
     const skipped = repeaterContacts.filter((c) => c.outPathLen !== 0);
