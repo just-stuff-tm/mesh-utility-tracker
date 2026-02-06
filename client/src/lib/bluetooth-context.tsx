@@ -8,7 +8,6 @@ import {
   getSelfInfo,
   getBatteryVoltage,
   discoverRepeaters,
-  contactLatLon,
   publicKeyHex,
   on,
   type MeshContact,
@@ -149,14 +148,12 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     try {
       const name = advert.advName || "Unknown";
       const nodeId = publicKeyHex(advert.publicKey);
-      const lat = advert.advLat !== 0 ? advert.advLat / 1e6 : null;
-      const lon = advert.advLon !== 0 ? advert.advLon / 1e6 : null;
 
       await apiRequest("POST", "/api/nodes", {
         nodeId,
         name,
-        latitude: lat,
-        longitude: lon,
+        latitude: null,
+        longitude: null,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
     } catch {}
@@ -210,14 +207,13 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
       for (const contact of result.contacts) {
         const nodeId = publicKeyHex(contact.publicKey);
-        const coords = contactLatLon(contact);
 
         try {
           await apiRequest("POST", "/api/nodes", {
             nodeId,
             name: contact.advName || nodeId,
-            latitude: coords?.lat ?? null,
-            longitude: coords?.lon ?? null,
+            latitude: null,
+            longitude: null,
           });
         } catch {}
       }
@@ -226,24 +222,23 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
       if (pos) {
         for (const rep of result.repeaters) {
-          const repeaterName = rep.contact.advName || publicKeyHex(rep.contact.publicKey);
-          const repeaterCoords = contactLatLon(rep.contact);
+          if (!rep.stats) continue;
 
-          if (rep.stats) {
-            try {
-              await apiRequest("POST", "/api/scan-results", {
-                observerId: "local-observer",
-                nodeId: publicKeyHex(rep.contact.publicKey),
-                rssi: rep.stats.lastRssi,
-                snr: rep.stats.lastSnr,
-                latitude: repeaterCoords?.lat ?? pos[0],
-                longitude: repeaterCoords?.lon ?? pos[1],
-                senderName: repeaterName,
-                receiverName: "Observer",
-              });
-              scanResultsSubmitted++;
-            } catch {}
-          }
+          const repeaterName = rep.contact.advName || publicKeyHex(rep.contact.publicKey);
+
+          try {
+            await apiRequest("POST", "/api/scan-results", {
+              observerId: "local-observer",
+              nodeId: publicKeyHex(rep.contact.publicKey),
+              rssi: rep.stats.lastRssi,
+              snr: rep.stats.lastSnr,
+              latitude: pos[0],
+              longitude: pos[1],
+              senderName: repeaterName,
+              receiverName: "Observer",
+            });
+            scanResultsSubmitted++;
+          } catch {}
         }
       }
 

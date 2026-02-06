@@ -280,7 +280,7 @@ export async function sendSelfAdvert(type: "zero_hop" | "flood" = "zero_hop"): P
     const advertType = type === "flood"
       ? Constants.SelfAdvertTypes.Flood
       : Constants.SelfAdvertTypes.ZeroHop;
-    await connection.sendSelfAdvert(advertType);
+    await connection.sendAdvert(advertType);
     return true;
   } catch {
     return false;
@@ -299,11 +299,16 @@ export async function setAdvertLatLon(lat: number, lon: number): Promise<boolean
   }
 }
 
+function toSigned32(val: number): number {
+  if (val >= 0x80000000) return val - 0x100000000;
+  return val;
+}
+
 export function contactLatLon(contact: MeshContact): { lat: number; lon: number } | null {
   if (contact.advLat === 0 && contact.advLon === 0) return null;
   return {
-    lat: contact.advLat / 1e6,
-    lon: contact.advLon / 1e6,
+    lat: toSigned32(contact.advLat) / 1e6,
+    lon: toSigned32(contact.advLon) / 1e6,
   };
 }
 
@@ -379,11 +384,19 @@ export async function discoverRepeaters(
 
     onStatus?.("querying");
     const repeaters: RepeaterDiscoverResult[] = [];
-    for (const repeater of repeaterContacts) {
+    const zeroHop = repeaterContacts.filter((c) => c.outPathLen === 0);
+    const notZeroHop = repeaterContacts.filter((c) => c.outPathLen !== 0);
+    remoteLog("log", `Repeaters: ${zeroHop.length} zero-hop (direct), ${notZeroHop.length} multi-hop/unreachable`);
+
+    for (const repeater of notZeroHop) {
+      repeaters.push({ contact: repeater, stats: null });
+    }
+
+    for (const repeater of zeroHop) {
       let stats: RepeaterStats | null = null;
 
       try {
-        remoteLog("log", "Querying status for repeater:", repeater.advName || publicKeyHex(repeater.publicKey));
+        remoteLog("log", "Querying status for zero-hop repeater:", repeater.advName || publicKeyHex(repeater.publicKey));
         const statusResult = await connection.getStatus(repeater.publicKey);
         remoteLog("log", "Status result:", statusResult.last_rssi, "dBm,", statusResult.last_snr, "dB SNR");
         stats = {

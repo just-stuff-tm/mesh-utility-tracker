@@ -103,3 +103,8 @@ Preferred communication style: Simple, everyday language.
 - **2026-02-06**: Added map layer switcher (Dark/Standard/Satellite) using Leaflet LayersControl with themed CSS
 - **2026-02-06**: Fixed mobile z-index: Sheet z-[2000] above Leaflet map (z-1000); moved LayersControl to topright; RSSI legend at top-14
 - **2026-02-06**: Lifted Bluetooth state to global BluetoothContext provider — BLE connection, scanning, geolocation, and settings persist across all page navigations. Added Wake Lock API to prevent screen sleep during active scanning.
+- **2026-02-06**: Fixed BLE method call: `sendSelfAdvert()` → `sendAdvert()` (correct meshcore.js API)
+- **2026-02-06**: Fixed unsigned 32-bit longitude conversion with `toSigned32()` — MeshCore reads advLon as UInt32LE, negative longitudes wrap around and need conversion
+- **2026-02-06**: Only zero-hop repeaters (pathLen===0, directly connected) are queried for status; multi-hop and unreachable repeaters are skipped to avoid timeout delays
+- **2026-02-06**: Coverage mapping uses observer position only — scan results record where the observer is standing, not repeater advertised coordinates. Node records no longer store repeater lat/lon.
+- **2026-02-06**: Added remote logging system — browser console logs batched to `/api/remote-log` endpoint for server-side debugging of BLE interactions on mobile devices
