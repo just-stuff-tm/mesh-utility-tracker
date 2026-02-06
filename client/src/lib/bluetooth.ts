@@ -247,12 +247,6 @@ export function contactLatLon(contact: MeshContact): { lat: number; lon: number 
   };
 }
 
-export interface RepeaterNeighbour {
-  publicKeyPrefix: Uint8Array;
-  heardSecondsAgo: number;
-  snr: number;
-}
-
 export interface RepeaterStats {
   battMilliVolts: number;
   noiseFloor: number;
@@ -267,8 +261,6 @@ export interface RepeaterStats {
 export interface RepeaterDiscoverResult {
   contact: MeshContact;
   stats: RepeaterStats | null;
-  neighbours: RepeaterNeighbour[];
-  totalNeighboursCount: number;
 }
 
 export interface DiscoverResult {
@@ -312,8 +304,6 @@ export async function discoverRepeaters(
     const repeaters: RepeaterDiscoverResult[] = [];
     for (const repeater of repeaterContacts) {
       let stats: RepeaterStats | null = null;
-      let neighbours: RepeaterNeighbour[] = [];
-      let totalNeighboursCount = 0;
 
       try {
         const statusResult = await connection.getStatus(repeater.publicKey);
@@ -329,17 +319,7 @@ export async function discoverRepeaters(
         };
       } catch {}
 
-      try {
-        const neighbourResult = await connection.getNeighbours(repeater.publicKey);
-        neighbours = neighbourResult.neighbours.map((n: any) => ({
-          publicKeyPrefix: n.publicKeyPrefix,
-          heardSecondsAgo: n.heardSecondsAgo,
-          snr: n.snr,
-        }));
-        totalNeighboursCount = neighbourResult.totalNeighboursCount;
-      } catch {}
-
-      repeaters.push({ contact: repeater, stats, neighbours, totalNeighboursCount });
+      repeaters.push({ contact: repeater, stats });
     }
 
     return { contacts, repeaters, timestamp: new Date() };

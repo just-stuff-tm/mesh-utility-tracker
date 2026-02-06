@@ -14,7 +14,6 @@ import {
   type MeshContact,
   type DeviceInfo,
   type SelfInfo,
-  type RepeaterDiscoverResult,
 } from "@/lib/bluetooth";
 import { getCurrentPosition, watchPosition, clearWatch } from "@/lib/geolocation";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -206,26 +205,6 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
               longitude: repeaterCoords?.lon ?? pos[1],
               senderName: repeaterName,
               receiverName: "Observer",
-            });
-          } catch {}
-        }
-
-        for (const neighbour of rep.neighbours) {
-          const neighbourId = Array.from(neighbour.publicKeyPrefix.slice(0, 4))
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join("")
-            .toUpperCase();
-
-          try {
-            await apiRequest("POST", "/api/scan-results", {
-              observerId: publicKeyHex(rep.contact.publicKey),
-              nodeId: neighbourId,
-              rssi: rep.stats?.noiseFloor ?? -100,
-              snr: neighbour.snr,
-              latitude: repeaterCoords?.lat ?? pos[0],
-              longitude: repeaterCoords?.lon ?? pos[1],
-              senderName: neighbourId,
-              receiverName: repeaterName,
             });
           } catch {}
         }
