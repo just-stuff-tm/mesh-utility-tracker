@@ -1,5 +1,38 @@
 import { WebBleConnection, Constants } from "@liamcottle/meshcore.js";
 
+const remoteLogBuffer: { level: string; message: string }[] = [];
+let remoteLogTimer: ReturnType<typeof setTimeout> | null = null;
+
+function remoteLog(level: string, ...args: any[]) {
+  const message = args.map(a => {
+    if (a instanceof Uint8Array) return Array.from(a.slice(0, 8)).map(b => b.toString(16).padStart(2, "0")).join("");
+    if (typeof a === "object" && a !== null) {
+      try { return JSON.stringify(a); } catch { return String(a); }
+    }
+    return String(a);
+  }).join(" ");
+
+  if (level === "error" || level === "warn") {
+    console.error(`[mesh] ${message}`);
+  } else {
+    console.log(`[mesh] ${message}`);
+  }
+
+  remoteLogBuffer.push({ level, message: `[mesh] ${message}` });
+
+  if (!remoteLogTimer) {
+    remoteLogTimer = setTimeout(() => {
+      const entries = remoteLogBuffer.splice(0);
+      remoteLogTimer = null;
+      fetch("/api/remote-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entries),
+      }).catch(() => {});
+    }, 500);
+  }
+}
+
 export interface MeshContact {
   publicKey: Uint8Array;
   type: number;
@@ -97,7 +130,7 @@ export async function connectToRadio(): Promise<{
     const name = bleConnection.bleDevice?.name || "MeshCore Radio";
 
     bleConnection.on("disconnected", () => {
-      console.log("[mesh] BLE disconnected");
+      remoteLog("log", "BLE disconnected");
       connection = null;
       emit("disconnected");
     });
@@ -111,12 +144,12 @@ export async function connectToRadio(): Promise<{
     });
 
     bleConnection.on(Constants.PushCodes.NewAdvert, (data: any) => {
-      console.log("[mesh] NewAdvert received:", data?.advName);
+      remoteLog("log", "NewAdvert received:", data?.advName);
       emit("new_advert", data);
     });
 
     bleConnection.on(Constants.ResponseCodes.DeviceInfo, (info: any) => {
-      console.log("[mesh] DeviceInfo:", info?.manufacturerModel, "fw:", info?.firmwareVer);
+      remoteLog("log", "DeviceInfo:", info?.manufacturerModel, "fw:", info?.firmwareVer);
       emit("device_info", {
         firmwareVer: info.firmwareVer,
         firmwareBuildDate: info.firmware_build_date,
@@ -125,7 +158,7 @@ export async function connectToRadio(): Promise<{
     });
 
     bleConnection.on(Constants.ResponseCodes.SelfInfo, (info: any) => {
-      console.log("[mesh] SelfInfo:", info?.name, "type:", info?.type);
+      remoteLog("log", "SelfInfo:", info?.name, "type:", info?.type);
       emit("self_info", {
         name: info.name,
         type: info.type,
@@ -160,7 +193,7 @@ export async function connectToRadio(): Promise<{
 
       bleConnection.on("connected", () => {
         clearTimeout(timeout);
-        console.log("[mesh] Radio handshake complete, connection ready");
+        remoteLog("log", "Radio handshake complete, connection ready");
         resolve();
       });
     });
@@ -169,7 +202,7 @@ export async function connectToRadio(): Promise<{
     emit("connected");
     return { success: true, deviceName: name };
   } catch (err: any) {
-    console.error("[mesh] connectToRadio error:", err);
+    remoteLog("error", "connectToRadio error:", err?.message || err);
     return { success: false, deviceName: null, error: err.message || "Connection failed" };
   }
 }
@@ -187,7 +220,7 @@ export async function getContacts(): Promise<MeshContact[]> {
   if (!connection) return [];
   try {
     const contacts = await connection.getContacts();
-    console.log("[mesh] getContacts returned", contacts.length, "contacts");
+    remoteLog("log", "getContacts returned", contacts.length, "contacts");
     return contacts.map((c: any) => ({
       publicKey: c.publicKey,
       type: c.type,
@@ -200,7 +233,7 @@ export async function getContacts(): Promise<MeshContact[]> {
       lastMod: c.lastMod,
     }));
   } catch (err) {
-    console.error("[mesh] getContacts error:", err);
+    remoteLog("error", "getContacts error:", err);
     return [];
   }
 }
@@ -209,10 +242,10 @@ export async function getSelfInfo(): Promise<SelfInfo | null> {
   if (!connection) return null;
   try {
     const info = await connection.getSelfInfo();
-    console.log("[mesh] getSelfInfo:", info?.name);
+    remoteLog("log", "getSelfInfo:", info?.name);
     return info;
   } catch (err) {
-    console.error("[mesh] getSelfInfo error:", err);
+    remoteLog("error", "getSelfInfo error:", err);
     return null;
   }
 }
@@ -221,10 +254,10 @@ export async function getDeviceInfo(): Promise<DeviceInfo | null> {
   if (!connection) return null;
   try {
     const info = await connection.deviceQuery(Constants.SupportedCompanionProtocolVersion);
-    console.log("[mesh] getDeviceInfo:", info?.manufacturerModel);
+    remoteLog("log", "getDeviceInfo:", info?.manufacturerModel);
     return info;
   } catch (err) {
-    console.error("[mesh] getDeviceInfo error:", err);
+    remoteLog("error", "getDeviceInfo error:", err);
     return null;
   }
 }
@@ -233,10 +266,10 @@ export async function getBatteryVoltage(): Promise<number | null> {
   if (!connection) return null;
   try {
     const result = await connection.getBatteryVoltage();
-    console.log("[mesh] getBatteryVoltage:", result?.batteryMilliVolts, "mV");
+    remoteLog("log", "getBatteryVoltage:", result?.batteryMilliVolts, "mV");
     return result?.batteryMilliVolts ?? null;
   } catch (err) {
-    console.error("[mesh] getBatteryVoltage error:", err);
+    remoteLog("error", "getBatteryVoltage error:", err);
     return null;
   }
 }
@@ -302,26 +335,26 @@ export async function discoverRepeaters(
   onStatus?: (status: string) => void,
 ): Promise<DiscoverResult | null> {
   if (!connection) {
-    console.warn("[mesh] discoverRepeaters: no connection");
+    remoteLog("warn", "discoverRepeaters: no connection");
     return null;
   }
   try {
     if (observerLat !== undefined && observerLon !== undefined) {
       const latInt = Math.round(observerLat * 1e6);
       const lonInt = Math.round(observerLon * 1e6);
-      console.log("[mesh] Setting advert position:", observerLat, observerLon);
+      remoteLog("log", "Setting advert position:", observerLat, observerLon);
       await connection.setAdvertLatLong(latInt, lonInt);
     }
 
     onStatus?.("advertising");
-    console.log("[mesh] Sending flood advert...");
+    remoteLog("log", "Sending flood advert...");
     await connection.sendSelfAdvert(Constants.SelfAdvertTypes.Flood);
     onStatus?.("waiting");
-    console.log("[mesh] Waiting 5s for responses...");
+    remoteLog("log", "Waiting 5s for responses...");
     await new Promise((r) => setTimeout(r, 5000));
 
     const rawContacts = await connection.getContacts();
-    console.log("[mesh] Got", rawContacts.length, "contacts after advert");
+    remoteLog("log", "Got", rawContacts.length, "contacts after advert");
     const contacts: MeshContact[] = rawContacts.map((c: any) => ({
       publicKey: c.publicKey,
       type: c.type,
@@ -334,10 +367,15 @@ export async function discoverRepeaters(
       lastMod: c.lastMod,
     }));
 
+    for (const c of contacts) {
+      remoteLog("log", `Contact: "${c.advName}" type=${c.type} flags=${c.flags} pathLen=${c.outPathLen} lat=${c.advLat} lon=${c.advLon}`);
+    }
+
+    remoteLog("log", "AdvType.Repeater =", Constants.AdvType.Repeater);
     const repeaterContacts = contacts.filter(
       (c) => c.type === Constants.AdvType.Repeater,
     );
-    console.log("[mesh] Found", repeaterContacts.length, "repeaters out of", contacts.length, "contacts");
+    remoteLog("log", "Found", repeaterContacts.length, "repeaters out of", contacts.length, "contacts");
 
     onStatus?.("querying");
     const repeaters: RepeaterDiscoverResult[] = [];
@@ -345,9 +383,9 @@ export async function discoverRepeaters(
       let stats: RepeaterStats | null = null;
 
       try {
-        console.log("[mesh] Querying status for repeater:", repeater.advName || publicKeyHex(repeater.publicKey));
+        remoteLog("log", "Querying status for repeater:", repeater.advName || publicKeyHex(repeater.publicKey));
         const statusResult = await connection.getStatus(repeater.publicKey);
-        console.log("[mesh] Status result:", statusResult.last_rssi, "dBm,", statusResult.last_snr, "dB SNR");
+        remoteLog("log", "Status result:", statusResult.last_rssi, "dBm,", statusResult.last_snr, "dB SNR");
         stats = {
           battMilliVolts: statusResult.batt_milli_volts,
           noiseFloor: statusResult.noise_floor,
@@ -359,16 +397,16 @@ export async function discoverRepeaters(
           totalUpTimeSecs: statusResult.total_up_time_secs,
         };
       } catch (err) {
-        console.warn("[mesh] getStatus failed for", repeater.advName || publicKeyHex(repeater.publicKey), err);
+        remoteLog("warn", "getStatus failed for", repeater.advName || publicKeyHex(repeater.publicKey), err);
       }
 
       repeaters.push({ contact: repeater, stats });
     }
 
-    console.log("[mesh] Discovery complete:", repeaters.length, "repeaters,", repeaters.filter(r => r.stats).length, "with stats");
+    remoteLog("log", "Discovery complete:", repeaters.length, "repeaters,", repeaters.filter(r => r.stats).length, "with stats");
     return { contacts, repeaters, timestamp: new Date() };
-  } catch (err) {
-    console.error("[mesh] discoverRepeaters error:", err);
+  } catch (err: any) {
+    remoteLog("error", "discoverRepeaters error:", err?.message || err);
     return null;
   }
 }

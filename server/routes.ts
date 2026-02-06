@@ -9,6 +9,18 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  app.post("/api/remote-log", (req, res) => {
+    const entries = req.body;
+    if (Array.isArray(entries)) {
+      for (const entry of entries) {
+        const level = entry.level || "log";
+        const msg = typeof entry.message === "string" ? entry.message : JSON.stringify(entry.message);
+        console.log(`[remote-${level}] ${msg}`);
+      }
+    }
+    res.json({ ok: true });
+  });
+
   app.get("/api/nodes", async (_req, res) => {
     try {
       const nodes = await storage.getNodes();
