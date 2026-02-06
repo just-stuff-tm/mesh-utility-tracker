@@ -1,4 +1,4 @@
-import { Bluetooth, BluetoothOff, Play, Pause, Radio, Signal, Clock, AlertTriangle } from "lucide-react";
+import { Bluetooth, BluetoothOff, Play, Pause, Radio, Signal, Clock, AlertTriangle, Zap, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useBluetoothContext, type ScanStatus } from "@/lib/bluetooth-context";
@@ -43,11 +43,13 @@ export function MapHud() {
     connected,
     deviceName,
     selfInfo,
+    deviceInfo,
     isScanning,
     scanStatus,
     nextScanCountdown,
     lastScanResult,
     toggleScan,
+    forceScan,
     batteryMilliVolts,
   } = useBluetoothContext();
 
@@ -76,6 +78,16 @@ export function MapHud() {
         )}
       </div>
 
+      {connected && deviceInfo && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border text-[10px] text-muted-foreground">
+          <Cpu className="h-3 w-3 shrink-0" />
+          <span className="truncate" data-testid="text-device-model">{deviceInfo.manufacturerModel}</span>
+          {deviceInfo.firmwareVersion && (
+            <span className="ml-auto shrink-0" data-testid="text-firmware-version">{deviceInfo.firmwareVersion}</span>
+          )}
+        </div>
+      )}
+
       {connected && (
         <div className="px-3 py-2 space-y-2">
           <div className="flex items-center justify-between gap-2">
@@ -95,15 +107,28 @@ export function MapHud() {
                 <span className="text-muted-foreground">Scanning paused</span>
               )}
             </div>
-            <Button
-              size="icon"
-              variant={isScanning ? "default" : "secondary"}
-              className="h-7 w-7"
-              onClick={toggleScan}
-              data-testid="button-toggle-scan"
-            >
-              {isScanning ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={forceScan}
+                disabled={isActive || !connected}
+                title="Force scan now"
+                data-testid="button-force-scan"
+              >
+                <Zap className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                size="icon"
+                variant={isScanning ? "default" : "secondary"}
+                className="h-7 w-7"
+                onClick={toggleScan}
+                data-testid="button-toggle-scan"
+              >
+                {isScanning ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
           </div>
 
           {lastScanResult && (

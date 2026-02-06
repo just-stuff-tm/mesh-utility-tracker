@@ -49,6 +49,7 @@ export interface DeviceInfo {
   firmwareVer: number;
   firmwareBuildDate: string;
   manufacturerModel: string;
+  firmwareVersion: string;
 }
 
 export interface SelfInfo {
@@ -149,11 +150,23 @@ export async function connectToRadio(): Promise<{
     });
 
     bleConnection.on(Constants.ResponseCodes.DeviceInfo, (info: any) => {
-      remoteLog("log", "DeviceInfo:", info?.manufacturerModel, "fw:", info?.firmwareVer);
+      remoteLog("log", "DeviceInfo raw keys:", Object.keys(info).join(", "));
+      remoteLog("log", "DeviceInfo:", JSON.stringify(info));
+
+      let model = info.manufacturerModel || "";
+      let fwVersion = "";
+      if (model.includes("\0")) {
+        const parts = model.split("\0").filter((s: string) => s.length > 0);
+        model = parts[0] || "";
+        fwVersion = parts.length > 1 ? parts[parts.length - 1] : "";
+      }
+
+      remoteLog("log", `DeviceInfo parsed: model="${model}" fwVer="${fwVersion}" build="${info.firmware_build_date}"`);
       emit("device_info", {
         firmwareVer: info.firmwareVer,
         firmwareBuildDate: info.firmware_build_date,
-        manufacturerModel: info.manufacturerModel,
+        manufacturerModel: model,
+        firmwareVersion: fwVersion,
       } as DeviceInfo);
     });
 

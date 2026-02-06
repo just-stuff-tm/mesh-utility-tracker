@@ -193,14 +193,14 @@ export function BluetoothPanel() {
                 )}
                 {deviceInfo && (
                   <div>
-                    <span className="text-muted-foreground">Firmware</span>
-                    <p className="font-medium">{deviceInfo.firmwareBuildDate}</p>
+                    <span className="text-muted-foreground">Model</span>
+                    <p className="font-medium truncate">{deviceInfo.manufacturerModel}</p>
                   </div>
                 )}
                 {deviceInfo && (
                   <div>
-                    <span className="text-muted-foreground">Model</span>
-                    <p className="font-medium truncate">{deviceInfo.manufacturerModel}</p>
+                    <span className="text-muted-foreground">Firmware</span>
+                    <p className="font-medium">{deviceInfo.firmwareVersion || deviceInfo.firmwareBuildDate}</p>
                   </div>
                 )}
                 {batteryPercent !== null && (

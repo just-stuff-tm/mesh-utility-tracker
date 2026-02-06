@@ -53,6 +53,7 @@ interface BluetoothContextValue {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   toggleScan: () => void;
+  forceScan: () => void;
   setScanInterval: (interval: number) => void;
   setAutoCenter: (v: boolean) => void;
   setSmartScanEnabled: (v: boolean) => void;
@@ -358,6 +359,14 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const forceScan = useCallback(() => {
+    if (!connected) return;
+    const isActive = scanStatus !== "idle" && scanStatus !== "done" && scanStatus !== "error";
+    if (isActive) return;
+    runDiscoverRepeaters();
+    setNextScanCountdown(scanInterval);
+  }, [connected, scanStatus, scanInterval, runDiscoverRepeaters]);
+
   return (
     <BluetoothContext.Provider
       value={{
@@ -385,6 +394,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         connect: connectHandler,
         disconnect,
         toggleScan,
+        forceScan,
         setScanInterval,
         setAutoCenter,
         setSmartScanEnabled,
