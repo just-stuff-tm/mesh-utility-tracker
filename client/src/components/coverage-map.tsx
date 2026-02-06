@@ -94,7 +94,7 @@ export function CoverageMap({
         style={{ background: "hsl(210, 5%, 10%)" }}
         zoomControl={false}
       >
-        <LayersControl position="bottomright">
+        <LayersControl position="topright">
           <LayersControl.BaseLayer checked name={MAP_LAYERS.dark.label}>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
@@ -177,7 +177,7 @@ export function CoverageMap({
         })}
       </MapContainer>
 
-      <div className="absolute top-3 right-3 z-[1000]">
+      <div className="absolute top-14 right-3 z-[1000]">
         <div className="bg-background/90 dark:bg-card/90 backdrop-blur-sm rounded-md p-2.5 text-xs space-y-1.5 border border-border">
           <p className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
             RSSI Signal Strength
