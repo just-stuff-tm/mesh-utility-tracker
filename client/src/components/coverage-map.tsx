@@ -177,7 +177,7 @@ export function CoverageMap({
         })}
       </MapContainer>
 
-      <div className="absolute top-14 right-3 z-[1000]">
+      <div className="absolute bottom-14 right-3 z-[1000]">
         <div className="bg-background/90 dark:bg-card/90 backdrop-blur-sm rounded-md p-2.5 text-xs space-y-1.5 border border-border">
           <p className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
             RSSI Signal Strength

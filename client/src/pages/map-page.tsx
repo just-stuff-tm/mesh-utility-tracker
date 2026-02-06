@@ -74,7 +74,7 @@ export default function MapPage() {
           </Sheet>
         </div>
 
-        <div className="absolute bottom-3 left-3 right-3 z-[1000]">
+        <div className="absolute bottom-3 left-3 z-[1001] max-w-[400px]">
           <ScanStats
             coverageZones={coverageZones}
             totalScans={latestScans.length}

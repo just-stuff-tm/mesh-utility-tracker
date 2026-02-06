@@ -284,6 +284,10 @@
     border-radius: 6px !important;
     color: hsl(var(--foreground)) !important;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+    z-index: 1100 !important;
+  }
+  .leaflet-control-layers-expanded {
+    z-index: 1100 !important;
   }
   .leaflet-control-layers-toggle {
     width: 32px !important;
@@ -295,6 +299,9 @@
   .leaflet-control-layers label {
     color: hsl(var(--foreground)) !important;
     font-size: 12px;
+  }
+  .leaflet-top.leaflet-right {
+    z-index: 1100 !important;
   }
 
   /* If there's a 1px border, adjust the inset so that it covers that parent's border */
