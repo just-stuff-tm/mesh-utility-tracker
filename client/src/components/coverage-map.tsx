@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap } from "react-leaflet";
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import type { CoverageZone } from "@shared/schema";
 
@@ -26,6 +26,7 @@ const observerIcon = new L.DivIcon({
 });
 
 const GRID_SIZE_DEG = 0.0012;
+const HEX_RADIUS = GRID_SIZE_DEG * 0.46;
 
 function getHexVertices(centerLat: number, centerLng: number, sizeDeg: number): [number, number][] {
   const vertices: [number, number][] = [];
@@ -67,6 +68,23 @@ function MapAutoUpdater({ center, autoCenter }: { center: [number, number] | nul
   return null;
 }
 
+const MAP_LAYERS = {
+  dark: {
+    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    label: "Dark",
+  },
+  standard: {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    label: "Standard",
+  },
+  satellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    label: "Satellite",
+  },
+} as const;
+
+type MapLayerKey = keyof typeof MAP_LAYERS;
+
 interface CoverageMapProps {
   coverageZones: CoverageZone[];
   observerPosition: [number, number] | null;
@@ -93,10 +111,27 @@ export function CoverageMap({
         style={{ background: "hsl(210, 5%, 10%)" }}
         zoomControl={false}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        />
+        <LayersControl position="bottomright">
+          <LayersControl.BaseLayer checked name={MAP_LAYERS.dark.label}>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+              url={MAP_LAYERS.dark.url}
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name={MAP_LAYERS.standard.label}>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url={MAP_LAYERS.standard.url}
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name={MAP_LAYERS.satellite.label}>
+            <TileLayer
+              attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+              url={MAP_LAYERS.satellite.url}
+              maxZoom={19}
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
 
         <MapAutoUpdater center={observerPosition} autoCenter={autoCenter} />
 
@@ -115,7 +150,7 @@ export function CoverageMap({
 
         {coverageZones.map((zone) => {
           if (zone.isDeadZone) {
-            const hexVerts = getHexVertices(zone.centerLat, zone.centerLng, GRID_SIZE_DEG * 0.6);
+            const hexVerts = getHexVertices(zone.centerLat, zone.centerLng, HEX_RADIUS);
             return (
               <Polygon
                 key={zone.id}
@@ -137,7 +172,7 @@ export function CoverageMap({
           }
 
           const style = getRssiStyle(zone.avgRssi || -100);
-          const hexVerts = getHexVertices(zone.centerLat, zone.centerLng, GRID_SIZE_DEG * 0.58);
+          const hexVerts = getHexVertices(zone.centerLat, zone.centerLng, HEX_RADIUS);
 
           return (
             <Polygon
