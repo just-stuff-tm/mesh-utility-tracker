@@ -58,6 +58,21 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/scan-results/zone", async (req, res) => {
+    try {
+      const lat = parseFloat(req.query.lat as string);
+      const lng = parseFloat(req.query.lng as string);
+      if (isNaN(lat) || isNaN(lng)) {
+        return res.status(400).json({ message: "lat and lng query params required" });
+      }
+      const tolerance = 0.001;
+      const scans = await storage.getScanResultsByZone(lat, lng, tolerance);
+      res.json(scans);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/scan-results", async (req, res) => {
     try {
       const parsed = insertScanResultSchema.parse(req.body);

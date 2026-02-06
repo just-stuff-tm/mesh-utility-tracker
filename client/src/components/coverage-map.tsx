@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
-import type { CoverageZone } from "@shared/schema";
+import type { CoverageZone, ScanResult } from "@shared/schema";
 import { getHexVertices } from "@shared/grid";
 
 import "leaflet/dist/leaflet.css";
@@ -214,8 +214,23 @@ export function CoverageMap({
 
 function ZonePopup({ zone }: { zone: CoverageZone }) {
   const style = zone.isDeadZone ? null : getRssiStyle(zone.avgRssi || -100);
+  const [scans, setScans] = useState<ScanResult[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/scan-results/zone?lat=${zone.centerLat}&lng=${zone.centerLng}`)
+      .then((r) => r.json())
+      .then((data) => { setScans(data); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, [zone.centerLat, zone.centerLng]);
+
+  const observers = Array.from(new Set(scans.map((s) => s.receiverName).filter(Boolean)));
+  const repeaterMap = new Map<string, string>();
+  scans.forEach((s) => { if (!repeaterMap.has(s.nodeId)) repeaterMap.set(s.nodeId, s.senderName || s.nodeId); });
+  const repeaters = Array.from(repeaterMap.entries());
+
   return (
-    <div className="min-w-[200px] text-sm space-y-2.5">
+    <div className="min-w-[220px] text-sm space-y-2.5">
       <div className="flex items-center gap-2">
         {style && (
           <div
@@ -243,6 +258,34 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
           {zone.centerLat.toFixed(4)}, {zone.centerLng.toFixed(4)}
         </span>
       </div>
+      {loaded && scans.length > 0 && (
+        <div className="border-t border-gray-200 pt-2 space-y-1.5">
+          {observers.length > 0 && (
+            <div className="text-xs">
+              <span className="text-gray-500 font-medium">Observer</span>
+              <p className="font-semibold">{observers.join(", ")}</p>
+            </div>
+          )}
+          {repeaters.length > 0 && (
+            <div className="text-xs">
+              <span className="text-gray-500 font-medium">Repeaters Observed</span>
+              {repeaters.map(([nodeId, name]) => {
+                const latest = scans.find((s) => s.nodeId === nodeId);
+                return (
+                  <div key={nodeId} className="flex items-center justify-between gap-2 mt-0.5">
+                    <span className="font-semibold truncate">{name}</span>
+                    {latest && (
+                      <span className="text-gray-400 whitespace-nowrap">
+                        {latest.rssi?.toFixed(0)} dBm / {latest.snr?.toFixed(1)} dB
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

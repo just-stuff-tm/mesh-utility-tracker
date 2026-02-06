@@ -25,6 +25,7 @@ export interface IStorage {
 
   getScanResults(): Promise<ScanResult[]>;
   getLatestScanResults(): Promise<ScanResult[]>;
+  getScanResultsByZone(lat: number, lng: number, tolerance: number): Promise<ScanResult[]>;
   createScanResult(scan: InsertScanResult): Promise<ScanResult>;
 
   getCoverageZones(): Promise<CoverageZone[]>;
@@ -102,6 +103,18 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(scanResults)
       .where(gte(scanResults.timestamp, oneDayAgo))
       .orderBy(desc(scanResults.timestamp));
+  }
+
+  async getScanResultsByZone(lat: number, lng: number, tolerance: number): Promise<ScanResult[]> {
+    return db.select().from(scanResults)
+      .where(and(
+        gte(scanResults.latitude, lat - tolerance),
+        lte(scanResults.latitude, lat + tolerance),
+        gte(scanResults.longitude, lng - tolerance),
+        lte(scanResults.longitude, lng + tolerance),
+      ))
+      .orderBy(desc(scanResults.timestamp))
+      .limit(50);
   }
 
   async createScanResult(scan: InsertScanResult): Promise<ScanResult> {
