@@ -212,31 +212,28 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
       setScanStatus("submitting");
 
-      for (const contact of result.contacts) {
-        const nodeId = publicKeyHex(contact.publicKey);
-
-        try {
-          await apiRequest("POST", "/api/nodes", {
-            nodeId,
-            name: contact.advName || nodeId,
-            latitude: null,
-            longitude: null,
-          });
-        } catch {}
-      }
-
       let scanResultsSubmitted = 0;
 
       if (pos) {
         for (const rep of result.repeaters) {
           if (!rep.stats) continue;
 
-          const repeaterName = rep.contact.advName || publicKeyHex(rep.contact.publicKey);
+          const nodeId = publicKeyHex(rep.contact.publicKey);
+          const repeaterName = rep.contact.advName || nodeId;
+
+          try {
+            await apiRequest("POST", "/api/nodes", {
+              nodeId,
+              name: repeaterName,
+              latitude: null,
+              longitude: null,
+            });
+          } catch {}
 
           try {
             await apiRequest("POST", "/api/scan-results", {
               observerId: "local-observer",
-              nodeId: publicKeyHex(rep.contact.publicKey),
+              nodeId,
               rssi: rep.stats.lastRssi,
               snr: rep.stats.lastSnr,
               latitude: pos[0],
