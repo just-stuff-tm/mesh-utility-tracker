@@ -96,6 +96,7 @@ export async function registerRoutes(
           avgRssi: newAvgRssi,
           avgSnr: newAvgSnr,
           scanCount: newCount,
+          isDeadZone: false,
           centerLat: existingZone.centerLat,
           centerLng: existingZone.centerLng,
         });
