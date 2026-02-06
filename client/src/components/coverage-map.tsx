@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { CoverageZone, ScanResult } from "@shared/schema";
 import { getHexVertices } from "@shared/grid";
 
@@ -196,28 +196,25 @@ function RssiLegend() {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="absolute bottom-14 right-3 z-[1000]">
+    <div className="absolute top-1/2 -translate-y-1/2 right-3 z-[1000]">
       <div className="bg-background/90 dark:bg-card/90 backdrop-blur-sm rounded-md border border-border">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center justify-between gap-2 w-full px-2 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold"
+          className="flex flex-col items-center gap-1.5 w-full px-1.5 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold"
           data-testid="button-rssi-legend-toggle"
         >
-          <span>RSSI</span>
-          <div className="flex items-center gap-1">
-            {!expanded && (
-              <div className="flex gap-0.5">
-                {rssiItems.map((item) => (
-                  <div
-                    key={item.label}
-                    className="w-2 h-2 rounded-sm"
-                    style={{ background: item.color, opacity: 0.7 }}
-                  />
-                ))}
-              </div>
-            )}
-            {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
-          </div>
+          {!expanded && (
+            <div className="flex flex-col gap-1 items-center">
+              {rssiItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="w-2.5 h-2.5 rounded-sm"
+                  style={{ background: item.color, opacity: 0.7 }}
+                />
+              ))}
+            </div>
+          )}
+          {expanded ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
         </button>
         {expanded && (
           <div className="px-2 pb-2 space-y-1 text-[11px]">
