@@ -119,3 +119,6 @@ Preferred communication style: Simple, everyday language.
 - **2026-02-06**: Added PWA manifest (manifest.json) and apple-touch-icon for installable app experience on all platforms.
 - **2026-02-06**: Added CompatibilityDialog — shows on first load if Web Bluetooth is unavailable (e.g. Safari, Firefox). Guides iOS users to Bluefy, Android/desktop users to Chrome/Edge, and explains PWA installation. Dismisses for 7 days via localStorage. Skips dialog if already in PWA standalone mode, Bluefy, or a browser with Web Bluetooth support.
 - **2026-02-06**: Added checkConnectionAlive() — probes radio with battery query (5s timeout) on visibility change to detect stale BLE connections after iOS backgrounding.
+- **2026-02-07**: Added Privacy Policy page at /privacy — covers data collection, usage, permissions, storage/deletion, local storage, third-party services, and contact info. Linked from sidebar footer.
+- **2026-02-07**: Improved name resolution — scan results now look up existing node names from the database when discovery doesn't return a name, preventing "Unknown (...)" labels.
+- **2026-02-07**: Dead zone protection — POST /api/coverage-zones/dead-zone no longer overwrites zones that have successful scan data (scanCount > 0).

@@ -1,4 +1,4 @@
-import { Map, Radio, Activity, DollarSign } from "lucide-react";
+import { Map, Radio, Activity, DollarSign, Shield } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import appIconPath from "@assets/app_icon_1770389147147.png";
 import {
@@ -82,6 +82,15 @@ export function AppSidebar() {
               Support Development
             </span>
           </a>
+          <Link
+            href="/privacy"
+            onClick={() => { if (isMobile) setOpenMobile(false); }}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground"
+            data-testid="link-privacy-policy"
+          >
+            <Shield className="h-3 w-3" />
+            <span>Privacy Policy</span>
+          </Link>
           <p className="text-[10px] text-muted-foreground text-center">
             Mesh Utility v1.0
           </p>

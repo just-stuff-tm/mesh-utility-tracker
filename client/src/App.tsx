@@ -14,12 +14,14 @@ import NotFound from "@/pages/not-found";
 import MapPage from "@/pages/map-page";
 import NodesPage from "@/pages/nodes-page";
 import HistoryPage from "@/pages/history-page";
+import PrivacyPage from "@/pages/privacy-page";
 function Router() {
   return (
     <Switch>
       <Route path="/" component={MapPage} />
       <Route path="/nodes" component={NodesPage} />
       <Route path="/history" component={HistoryPage} />
+      <Route path="/privacy" component={PrivacyPage} />
       <Route component={NotFound} />
     </Switch>
   );
