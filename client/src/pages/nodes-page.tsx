@@ -50,7 +50,7 @@ export default function NodesPage() {
   );
 
   return (
-    <div className="p-4 max-w-4xl mx-auto space-y-4">
+    <div className="p-4 max-w-4xl mx-auto space-y-4 h-full overflow-y-auto">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold">Mesh Nodes</h1>

@@ -237,12 +237,26 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         ? publicKeyHex(selfInfoRef.current.publicKey)
         : null;
 
+      let existingNodes: Array<{ nodeId: string; name: string | null }> = [];
+      try {
+        const res = await fetch("/api/nodes");
+        if (res.ok) existingNodes = await res.json();
+      } catch {}
+      const nodeNameMap = new Map<string, string>();
+      for (const n of existingNodes) {
+        if (n.name) nodeNameMap.set(n.nodeId, n.name);
+      }
+
       if (pos) {
         for (const rep of result.repeaters) {
           if (!rep.stats) continue;
 
           const nodeId = publicKeyHex(rep.contact.publicKey);
-          const repeaterName = rep.contact.advName || nodeId;
+          const advName = rep.contact.advName || "";
+          const isUnknown = !advName || advName.startsWith("Unknown (");
+          const repeaterName = isUnknown
+            ? (nodeNameMap.get(nodeId) || advName || nodeId)
+            : advName;
 
           try {
             await apiRequest("POST", "/api/nodes", {

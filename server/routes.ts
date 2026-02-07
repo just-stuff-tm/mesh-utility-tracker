@@ -152,6 +152,9 @@ export async function registerRoutes(
       const { snapLat: sLat, snapLng: sLng } = snapToHexGrid(centerLat, centerLng);
       const existingZone = await storage.findNearbyZone(sLat, sLng, 40);
       if (existingZone) {
+        if (existingZone.scanCount && existingZone.scanCount > 0 && !existingZone.isDeadZone) {
+          return res.json(existingZone);
+        }
         const updated = await storage.updateCoverageZone(existingZone.id, {
           isDeadZone: true,
           avgRssi: null,
