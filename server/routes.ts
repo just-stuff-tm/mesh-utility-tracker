@@ -199,7 +199,7 @@ export async function registerRoutes(
   app.delete("/api/data/:radioId", async (req, res) => {
     try {
       const { radioId } = req.params;
-      if (!radioId || radioId.length < 10) {
+      if (!radioId || radioId.length < 6) {
         return res.status(400).json({ message: "Valid radioId required" });
       }
       const result = await storage.deleteDataByRadioId(radioId);
