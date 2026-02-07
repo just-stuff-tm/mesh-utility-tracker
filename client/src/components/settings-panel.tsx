@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings, Timer, MapPin, AlertTriangle, Trash2 } from "lucide-react";
+import { Settings, Timer, MapPin, AlertTriangle, Trash2, Radar } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -24,6 +24,8 @@ export function SettingsPanel() {
     setSmartScanEnabled,
     smartScanDays,
     setSmartScanDays,
+    statsRadiusMiles,
+    setStatsRadiusMiles,
     observerPosition,
     connected,
     selfInfo,
@@ -115,6 +117,30 @@ export function SettingsPanel() {
             onCheckedChange={setAutoCenter}
             data-testid="switch-auto-center"
           />
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Radar className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs">
+              Stats Radius: {statsRadiusMiles === 0 ? "All Data" : `${statsRadiusMiles} mi`}
+            </Label>
+          </div>
+          <Slider
+            value={[statsRadiusMiles]}
+            onValueChange={([v]) => setStatsRadiusMiles(v)}
+            min={0}
+            max={50}
+            step={1}
+            data-testid="slider-stats-radius"
+          />
+          <p className="text-xs text-muted-foreground">
+            {statsRadiusMiles === 0
+              ? "Showing averages for all coverage data"
+              : `Showing averages within ${statsRadiusMiles} miles of your location`}
+          </p>
         </div>
 
         <Separator />

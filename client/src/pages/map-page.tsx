@@ -15,7 +15,7 @@ import { publicKeyHex } from "@/lib/bluetooth";
 import type { CoverageZone, MeshNode, ScanResult } from "@shared/schema";
 
 export default function MapPage() {
-  const { observerPosition, autoCenter, connected, selfInfo } = useBluetoothContext();
+  const { observerPosition, autoCenter, connected, selfInfo, statsRadiusMiles } = useBluetoothContext();
   const [selectedZone, setSelectedZone] = useState<CoverageZone | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -121,6 +121,8 @@ export default function MapPage() {
             totalScans={latestScans.length}
             nodes={nodes}
             isConnected={connected}
+            observerPosition={observerPosition}
+            statsRadiusMiles={statsRadiusMiles}
           />
         </div>
       </div>

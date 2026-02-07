@@ -46,6 +46,7 @@ interface BluetoothContextValue {
   autoCenter: boolean;
   smartScanEnabled: boolean;
   smartScanDays: number;
+  statsRadiusMiles: number;
   wakeLockActive: boolean;
   deviceInfo: DeviceInfo | null;
   selfInfo: SelfInfo | null;
@@ -64,6 +65,7 @@ interface BluetoothContextValue {
   setAutoCenter: (v: boolean) => void;
   setSmartScanEnabled: (v: boolean) => void;
   setSmartScanDays: (v: number) => void;
+  setStatsRadiusMiles: (v: number) => void;
 }
 
 const BluetoothContext = createContext<BluetoothContextValue | null>(null);
@@ -87,6 +89,12 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   const [autoCenter, setAutoCenter] = useState(true);
   const [smartScanEnabled, setSmartScanEnabled] = useState(true);
   const [smartScanDays, setSmartScanDays] = useState(5);
+  const [statsRadiusMiles, setStatsRadiusMiles] = useState(() => {
+    try {
+      const stored = localStorage.getItem("mesh_stats_radius");
+      return stored ? parseInt(stored, 10) : 0;
+    } catch { return 0; }
+  });
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
   const [selfInfo, setSelfInfo] = useState<SelfInfo | null>(null);
@@ -509,6 +517,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         autoCenter,
         smartScanEnabled,
         smartScanDays,
+        statsRadiusMiles,
         wakeLockActive,
         deviceInfo,
         selfInfo,
@@ -527,6 +536,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         setAutoCenter,
         setSmartScanEnabled,
         setSmartScanDays,
+        setStatsRadiusMiles: (v: number) => {
+          setStatsRadiusMiles(v);
+          try { localStorage.setItem("mesh_stats_radius", String(v)); } catch {}
+        },
       }}
     >
       {children}

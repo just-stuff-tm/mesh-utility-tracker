@@ -122,3 +122,4 @@ Preferred communication style: Simple, everyday language.
 - **2026-02-07**: Added Privacy Policy page at /privacy — covers data collection, usage, permissions, storage/deletion, local storage, third-party services, and contact info. Linked from sidebar footer.
 - **2026-02-07**: Improved name resolution — scan results now look up existing node names from the database when discovery doesn't return a name, preventing "Unknown (...)" labels.
 - **2026-02-07**: Dead zone protection — POST /api/coverage-zones/dead-zone no longer overwrites zones that have successful scan data (scanCount > 0).
+- **2026-02-07**: Added Stats Radius setting — slider (0–50 miles) in settings panel filters bottom HUD averages (RSSI, SNR, zones, dead zones) to only include coverage data within the specified mileage from observer position. 0 = all data. Persisted via localStorage.
