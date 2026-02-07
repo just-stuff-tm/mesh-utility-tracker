@@ -12,6 +12,13 @@ import {
   AlertTriangle,
   HelpCircle,
   WifiOff,
+  Share2,
+  Trash2,
+  Map,
+  Layers,
+  History,
+  BarChart3,
+  BatteryMedium,
 } from "lucide-react";
 
 interface Section {
@@ -22,110 +29,148 @@ interface Section {
 
 const sections: Section[] = [
   {
-    icon: Bluetooth,
-    title: "Connecting Your Radio",
+    icon: HelpCircle,
+    title: "What Is Mesh Utility?",
     content: [
-      "Tap the Connect button in the settings panel (gear icon) to pair with your MeshCore radio via Bluetooth.",
-      "Important: Close any other app connected to your radio first (MeshCore app, etc.). Bluetooth only allows one connection at a time.",
-      "On iOS, use the Bluefy or WebBLE browser app since Safari doesn't support Web Bluetooth. On Android or desktop, use Chrome or Edge.",
-      "Once connected, you'll see your radio's name, battery level, and frequency in the settings panel.",
+      "Mesh Utility helps you see how well your LoRa mesh radio network covers an area. Walk or drive around with your radio connected, and the app builds a color-coded map showing where your signal is strong, weak, or missing entirely.",
+    ],
+  },
+  {
+    icon: Bluetooth,
+    title: "Getting Connected",
+    content: [
+      "Open the settings panel (gear icon) and tap Connect. Your phone or computer will search for your MeshCore radio over Bluetooth.",
+      "Only one app can use Bluetooth with your radio at a time. If you have MeshCore or another app connected, close it first.",
+      "On iPhones and iPads, you'll need the Bluefy or WebBLE browser since Safari doesn't support this type of Bluetooth. On Android, computers, or Chromebooks, use Chrome or Edge.",
+      "Once connected, the app shows your radio's name, battery level, and frequency at the top of the settings panel. The screen will stay awake while connected so you don't lose your Bluetooth link during scans.",
+      "If you put the app in the background (especially on iOS), the Bluetooth connection may drop. When you return, the app checks automatically and lets you know if you need to reconnect.",
     ],
   },
   {
     icon: Scan,
-    title: "Scanning for Nodes",
+    title: "Scanning",
     content: [
-      "After connecting, toggle the Scan switch to start automatic scanning. The app broadcasts a discovery message and listens for nearby repeaters.",
-      "Each scan takes about 40 seconds. The app collects signal strength (RSSI) and signal-to-noise ratio (SNR) from every repeater that responds.",
-      "Your current GPS location is recorded with each scan so the coverage map knows where you were standing.",
-      "Smart Scan mode (enabled in settings) skips areas you've recently scanned, except dead zones which are always re-scanned.",
+      "With your radio connected, flip the Scan switch to start. The app sends out a discovery signal and listens for any repeaters that respond, measuring how strong and clear each signal is.",
+      "Each scan cycle takes about 40 seconds. Your GPS location (and altitude when available) is recorded with each scan so the map knows exactly where you were.",
+      "Smart Scan skips areas you've already covered recently (you pick how many days count as \"recent\" in settings). Dead zones are always re-checked regardless. You can also tap Force Scan to override and scan your current spot right away.",
     ],
   },
   {
-    icon: MapPin,
-    title: "Reading the Coverage Map",
+    icon: Map,
+    title: "The Coverage Map",
     content: [
-      "The map shows hexagonal zones colored by signal quality. Each hex represents a small area where scans were taken.",
-      "Green = Excellent signal, Yellow-Green = Good, Yellow = Fair, Orange = Marginal, Red = Poor, Dark Red = Dead Zone (no response from any repeater).",
-      "Purple zones indicate a Noisy signal: the radio power (RSSI) is decent but the signal quality (SNR) is poor, usually from interference.",
-      "Tap any hex zone to see detailed info: average RSSI/SNR, scan count, altitude, and which repeaters were observed.",
+      "The main screen is a map covered with hexagonal zones. Each hex represents a small area where scans were taken, colored by signal quality.",
+      "Green means excellent signal. Yellow-green is good. Yellow is fair. Orange is marginal. Red is poor. Dark red means no repeater responded at all (a dead zone). Purple means the signal power is okay but clarity is bad, usually from interference.",
+      "Tap any hex to see its details: signal readings, how many scans were taken there, altitude, and which repeaters were heard.",
+      "Use the layer control in the top right corner to switch between Dark, Standard, and Satellite map views. The color legend in the upper left shows what each color means (tap it to expand the full scale).",
+    ],
+  },
+  {
+    icon: BatteryMedium,
+    title: "Map Overlay",
+    content: [
+      "While connected, an overlay at the top of the map shows your radio's name, battery level, and scan status. It also shows a countdown to the next scan and the result of the last scan.",
+      "The scan toggle button in the overlay lets you start or stop scanning without opening the settings panel.",
+    ],
+  },
+  {
+    icon: BarChart3,
+    title: "Bottom Stats Bar",
+    content: [
+      "At the bottom of the map, a stats bar shows averages for your coverage data: average signal strength (RSSI), average signal clarity (SNR), total zones scanned, and dead zones found.",
+      "You can filter these stats by distance using the Stats Radius setting. Set it to a specific number of miles (or kilometers) to only include data near your current position, or set it to 0 to see averages across all your data.",
     ],
   },
   {
     icon: Signal,
-    title: "Understanding Signal Quality",
+    title: "Signal Quality",
     content: [
-      "Signal quality is based on two measurements: RSSI (signal power in dBm) and SNR (signal clarity in dB).",
-      "Excellent: RSSI better than -90 dBm and SNR above 10 dB. Strong, clear signal.",
-      "Good: RSSI -90 to -100 dBm, SNR 0 to 10 dB. Reliable connection.",
-      "Fair: RSSI -100 to -110 dBm, SNR -7 to 0 dB. Usable but may have occasional issues.",
-      "Marginal: RSSI -110 to -115 dBm, SNR -13 to -7 dB. At the edge of usable range.",
-      "Poor: RSSI -115 to -120 dBm. Barely receiving a signal.",
-      "Dead Zone: No repeater responded at all. You're outside mesh coverage.",
+      "Each scan measures two things: signal power (RSSI) and signal clarity (SNR). The overall quality is whichever of the two is worse.",
+      "Excellent means both power and clarity are strong. Good means a reliable connection. Fair is usable with occasional hiccups. Marginal is at the edge of working range. Poor means you're barely picking up anything. A dead zone means no repeater responded at all.",
+      "A \"Noisy\" reading (shown in purple) means the radio is picking up decent power but the signal is garbled, often from nearby interference or competing signals.",
     ],
   },
   {
     icon: Radio,
-    title: "Nodes Page",
+    title: "Discovered Nodes",
     content: [
-      "The Nodes page lists all mesh network repeaters discovered during scans.",
-      "Each node shows its name and unique ID (first 4 bytes of its public key).",
-      "Nodes are discovered automatically during scans. The list updates as new repeaters respond.",
+      "The Nodes page lists every repeater your radio has heard during scans. Each entry shows the repeater's name and a short identifier based on its public key.",
+      "This list grows automatically as you scan in different areas and discover new repeaters.",
+    ],
+  },
+  {
+    icon: History,
+    title: "Scan History",
+    content: [
+      "The History page shows a timeline of your recent scans. Each entry includes the signal readings, which repeater responded, your location, altitude, and when the scan happened.",
+      "The app keeps the 5 most recent scans per hex zone to save space. Older scans at the same location are automatically cleaned up.",
     ],
   },
   {
     icon: Mountain,
-    title: "Altitude Tracking",
+    title: "Altitude",
     content: [
-      "The app tracks your altitude and records it with each scan.",
-      "On mobile devices with GPS, altitude comes directly from the GPS sensor.",
-      "On desktop or when GPS altitude isn't available, the app uses a free elevation API to estimate altitude based on your coordinates.",
-      "Altitude is shown in the map overlay, scan history, and zone popups. Switch between feet and meters in settings.",
+      "Your altitude is recorded with each scan. On phones with GPS, it comes directly from the GPS sensor. On desktop or when GPS altitude isn't available, the app estimates it from your coordinates using a free elevation service.",
+      "Altitude appears in the map overlay, scan history cards, and zone popups. You can switch between feet and meters in settings.",
     ],
   },
   {
     icon: Settings,
     title: "Settings",
     content: [
-      "Scan Interval: How often automatic scans run (in seconds). Default is 40s.",
-      "Smart Scan: When enabled, skips areas scanned within the freshness window (1-14 days). Dead zones are always re-scanned.",
-      "Force Scan: Override smart scan to scan your current location regardless of freshness.",
-      "Stats Radius: Filter the bottom stats display to only show data within a certain distance from your current position. Set to 0 for all data.",
-      "Units: Switch between Imperial (feet, miles) and Metric (meters, kilometers).",
-      "Map Layers: Use the layer control on the map to switch between Dark, Standard, and Satellite views.",
+      "Scan Interval sets how many seconds between automatic scans (minimum 40 seconds).",
+      "Auto-center keeps the map following your position as you move.",
+      "Update Radio Position controls whether your GPS coordinates get written back to the radio during scans. It's off by default to avoid overwriting your Companion radio's stored location. Only turn this on if you want the radio to track where you are.",
+      "Tile Caching (off by default) saves map tiles as you browse so they're available offline. You can also download all tiles for your current area at once, or clear cached tiles.",
+      "Units lets you switch between Imperial (feet, miles) and Metric (meters, kilometers).",
+      "Stats Radius filters the bottom stats bar to only show data within a certain distance from you. Set to 0 to include everything.",
+      "Smart Scanning and the freshness slider control whether the app skips areas scanned within a certain number of days.",
+      "Dead Zone button marks your current spot as a dead zone when no repeaters can reach it.",
     ],
   },
   {
     icon: WifiOff,
-    title: "Offline Mode",
+    title: "Online / Offline",
     content: [
-      "Mesh Utility works fully offline after your first visit. Scans, nodes, and coverage data are stored on your device automatically.",
-      "When you lose internet, the app continues to work. Scan results are saved locally and queued for upload. When connectivity returns, everything syncs to the server automatically.",
-      "Map tiles are cached as you browse. To download tiles for offline use, go to Settings and tap 'Download Area Tiles' — this saves map tiles for the area around your current location.",
-      "Check your connection status in the header bar. An orange 'Offline' badge appears when you're disconnected, and a blue indicator shows pending sync items.",
-      "In Settings, you can see how many tiles are cached and how many items are waiting to sync. Tap 'Sync Now' to manually push queued data when you're back online.",
+      "The app works fully offline after your first visit. Scans, nodes, and coverage data are all stored on your device automatically.",
+      "When you lose internet, everything keeps working. Scan results are saved locally and queued up. When connectivity returns, queued items sync to the server automatically.",
+      "You can also force offline mode using the toggle in settings. This is handy if you're on a slow or metered connection and want to batch your uploads for later. When you switch back online, any pending data syncs right away.",
+      "The header bar shows your connection status: an orange badge for offline, blue for items waiting to sync. In settings, you can tap Sync Now to manually push queued data.",
     ],
   },
   {
     icon: Smartphone,
-    title: "Installing as an App (PWA)",
+    title: "Installing the App",
     content: [
-      "Mesh Utility can be installed as an app on your phone or desktop for quick access.",
-      "On Android Chrome: Tap the three-dot menu and select 'Install app' or 'Add to Home screen'.",
-      "On iOS (Bluefy): Tap the share icon and select 'Add to Home Screen'.",
-      "On Desktop Chrome/Edge: Click the install icon in the address bar.",
-      "The installed app works just like a native app with its own icon and full-screen experience.",
+      "You can install Mesh Utility as a standalone app on your phone, tablet, or computer for quick access.",
+      "On Android, tap the browser menu and choose \"Install app\" or \"Add to Home screen.\" On iOS (in Bluefy), use the share button and \"Add to Home Screen.\" On desktop Chrome or Edge, click the install icon in the address bar.",
+      "The installed version runs full-screen with its own icon, just like a regular app.",
+    ],
+  },
+  {
+    icon: Share2,
+    title: "Sharing & Support",
+    content: [
+      "Use the Share button in the sidebar to send the app link to others. On phones it opens the system share sheet; on desktop it copies the link to your clipboard.",
+      "If you find the app useful, the Support link at the top lets you contribute to development.",
+    ],
+  },
+  {
+    icon: Trash2,
+    title: "Deleting Your Data",
+    content: [
+      "Connect your radio and go to Settings. The Delete My Data button at the bottom removes all scan results, coverage zones, and records tied to the radio you're currently connected with.",
+      "This is permanent and cannot be undone. It only affects data from that specific radio \u2014 data collected by other radios is not touched.",
     ],
   },
   {
     icon: AlertTriangle,
     title: "Troubleshooting",
     content: [
-      "Can't connect? Make sure no other app is using your radio's Bluetooth. Close MeshCore or other BLE apps first.",
-      "No scans happening? Check that location services are enabled and the app has permission. GPS is needed to record scan positions.",
-      "Map not updating? Pull down to refresh, or check that scan results are being submitted (look for the status in the map overlay).",
-      "Connection drops on iOS? Bluetooth connections may drop when the screen sleeps or the app is backgrounded. Return to the app and it will detect the disconnection.",
-      "Wrong frequency shown? The frequency displayed comes from your radio's configuration. If it looks wrong, check your radio's firmware settings.",
+      "Can't connect: Make sure no other app is using your radio's Bluetooth. Only one connection is allowed at a time.",
+      "No scans happening: Check that location services are on and the app has permission. GPS is needed to record where you are.",
+      "Map not updating: Try refreshing the page, or check the map overlay for scan status messages.",
+      "Connection drops on iOS: Bluetooth can disconnect when the screen sleeps or the app goes to the background. Return to the app and it will detect the disconnection automatically.",
     ],
   },
 ];
@@ -138,7 +183,7 @@ export default function ManualPage() {
         <div>
           <h1 className="text-xl font-semibold" data-testid="text-manual-title">How to Use Mesh Utility</h1>
           <p className="text-sm text-muted-foreground">
-            A guide to mapping your LoRa mesh network coverage
+            Everything you need to know about mapping your mesh network
           </p>
         </div>
       </div>

@@ -11,6 +11,7 @@ import { BluetoothProvider } from "@/lib/bluetooth-context";
 import { Heart } from "lucide-react";
 import { CompatibilityDialog } from "@/components/compatibility-dialog";
 import { OfflineIndicator } from "@/components/offline-indicator";
+import { PrivacyAcceptanceDialog, usePrivacyAccepted } from "@/components/privacy-acceptance-dialog";
 import NotFound from "@/pages/not-found";
 import MapPage from "@/pages/map-page";
 import NodesPage from "@/pages/nodes-page";
@@ -30,49 +31,61 @@ function Router() {
   );
 }
 
-function App() {
-  const style = {
-    "--sidebar-width": "14rem",
-    "--sidebar-width-icon": "3rem",
-  };
+function AppContent() {
+  const { accepted, accept } = usePrivacyAccepted();
 
+  if (!accepted) {
+    return (
+      <>
+        <PrivacyAcceptanceDialog accepted={accepted} onAccept={accept} />
+        <Toaster />
+      </>
+    );
+  }
+
+  return (
+    <BluetoothProvider>
+      <SidebarProvider style={{ "--sidebar-width": "14rem", "--sidebar-width-icon": "3rem" } as React.CSSProperties}>
+        <div className="flex h-screen w-full">
+          <AppSidebar />
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            <header className="flex items-center justify-between gap-2 p-2 border-b border-border shrink-0 z-50 bg-background">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <div className="flex items-center gap-2">
+                <OfflineIndicator />
+                <a
+                  href="https://cash.app/$yuptm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500/15 to-green-500/15 border border-emerald-500/25 px-2.5 py-1 transition-all duration-200 hover:from-emerald-500/25 hover:to-green-500/25 hover:border-emerald-500/40"
+                  data-testid="link-support-header"
+                >
+                  <Heart className="h-3 w-3 text-emerald-500" />
+                  <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                    Support
+                  </span>
+                </a>
+                <ThemeToggle />
+              </div>
+            </header>
+            <main className="flex-1 overflow-hidden">
+              <Router />
+            </main>
+          </div>
+        </div>
+      </SidebarProvider>
+      <CompatibilityDialog />
+      <Toaster />
+    </BluetoothProvider>
+  );
+}
+
+function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <BluetoothProvider>
-            <SidebarProvider style={style as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar />
-                <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-                  <header className="flex items-center justify-between gap-2 p-2 border-b border-border shrink-0 z-50 bg-background">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <div className="flex items-center gap-2">
-                      <OfflineIndicator />
-                      <a
-                        href="https://cash.app/$yuptm"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500/15 to-green-500/15 border border-emerald-500/25 px-2.5 py-1 transition-all duration-200 hover:from-emerald-500/25 hover:to-green-500/25 hover:border-emerald-500/40"
-                        data-testid="link-support-header"
-                      >
-                        <Heart className="h-3 w-3 text-emerald-500" />
-                        <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                          Support
-                        </span>
-                      </a>
-                      <ThemeToggle />
-                    </div>
-                  </header>
-                  <main className="flex-1 overflow-hidden">
-                    <Router />
-                  </main>
-                </div>
-              </div>
-            </SidebarProvider>
-            <CompatibilityDialog />
-            <Toaster />
-          </BluetoothProvider>
+          <AppContent />
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>
