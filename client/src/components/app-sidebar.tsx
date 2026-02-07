@@ -132,7 +132,7 @@ export function AppSidebar() {
             <span>Privacy Policy</span>
           </Link>
           <p className="text-[10px] text-muted-foreground text-center">
-            Mesh Utility v1.0
+            Mesh Utility v1.2
           </p>
         </div>
       </SidebarFooter>
