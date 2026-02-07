@@ -251,7 +251,7 @@ export function BluetoothPanel() {
                 {selfInfo && selfInfo.radioFreq > 0 && (
                   <div>
                     <span className="text-muted-foreground">Frequency</span>
-                    <p className="font-medium">{(selfInfo.radioFreq / 1e6).toFixed(1)} MHz</p>
+                    <p className="font-medium">{(selfInfo.radioFreq / 1e3).toFixed(3)} MHz</p>
                   </div>
                 )}
               </div>
