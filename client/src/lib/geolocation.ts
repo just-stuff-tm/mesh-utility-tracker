@@ -2,6 +2,7 @@ export interface Position {
   latitude: number;
   longitude: number;
   accuracy: number;
+  altitude: number | null;
 }
 
 export function getCurrentPosition(): Promise<Position> {
@@ -16,6 +17,7 @@ export function getCurrentPosition(): Promise<Position> {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
+          altitude: pos.coords.altitude,
         });
       },
       (err) => reject(err),
@@ -35,6 +37,7 @@ export function watchPosition(
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
         accuracy: pos.coords.accuracy,
+        altitude: pos.coords.altitude,
       });
     },
     errorCallback,
@@ -45,6 +48,22 @@ export function watchPosition(
 export function clearWatch(id: number | null) {
   if (id !== null) {
     navigator.geolocation.clearWatch(id);
+  }
+}
+
+export async function fetchElevation(lat: number, lng: number): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.elevation && Array.isArray(data.elevation) && data.elevation.length > 0) {
+      return data.elevation[0];
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
