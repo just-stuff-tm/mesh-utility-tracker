@@ -27,7 +27,7 @@ const observerIcon = new L.DivIcon({
   iconAnchor: [11, 11],
 });
 
-interface RssiStyle {
+interface SignalStyle {
   fill: string;
   border: string;
   fillOpacity: number;
@@ -35,13 +35,50 @@ interface RssiStyle {
   level: number;
 }
 
-function getRssiStyle(rssi: number): RssiStyle {
-  if (rssi >= -70) return { fill: "#22c55e", border: "#16a34a", fillOpacity: 0.55, label: "Excellent", level: 5 };
-  if (rssi >= -80) return { fill: "#4ade80", border: "#22c55e", fillOpacity: 0.50, label: "Very Good", level: 4 };
-  if (rssi >= -90) return { fill: "#84cc16", border: "#65a30d", fillOpacity: 0.45, label: "Good", level: 3 };
-  if (rssi >= -100) return { fill: "#facc15", border: "#eab308", fillOpacity: 0.42, label: "Fair", level: 2 };
-  if (rssi >= -110) return { fill: "#f97316", border: "#ea580c", fillOpacity: 0.42, label: "Poor", level: 1 };
-  return { fill: "#ef4444", border: "#dc2626", fillOpacity: 0.45, label: "Very Weak", level: 0 };
+function getRssiLevel(rssi: number): number {
+  if (rssi > -90) return 5;
+  if (rssi > -100) return 4;
+  if (rssi > -110) return 3;
+  if (rssi > -115) return 2;
+  if (rssi > -120) return 1;
+  return 0;
+}
+
+function getSnrLevel(snr: number): number {
+  if (snr > 10) return 5;
+  if (snr > 0) return 4;
+  if (snr > -7) return 3;
+  if (snr > -13) return 2;
+  return 0;
+}
+
+const SIGNAL_STYLES: Record<number, SignalStyle> = {
+  5: { fill: "#22c55e", border: "#16a34a", fillOpacity: 0.55, label: "Excellent", level: 5 },
+  4: { fill: "#4ade80", border: "#22c55e", fillOpacity: 0.50, label: "Good", level: 4 },
+  3: { fill: "#facc15", border: "#eab308", fillOpacity: 0.45, label: "Fair", level: 3 },
+  2: { fill: "#f97316", border: "#ea580c", fillOpacity: 0.42, label: "Marginal", level: 2 },
+  1: { fill: "#ef4444", border: "#dc2626", fillOpacity: 0.42, label: "Poor", level: 1 },
+  0: { fill: "#991b1b", border: "#7f1d1d", fillOpacity: 0.45, label: "No Link", level: 0 },
+};
+
+const NOISY_STYLE: SignalStyle = {
+  fill: "#a855f7", border: "#7c3aed", fillOpacity: 0.45, label: "Noisy", level: -1,
+};
+
+function getSignalStyle(rssi: number | null, snr: number | null): SignalStyle {
+  if (rssi === null && snr === null) return SIGNAL_STYLES[0];
+
+  const rssiLvl = rssi !== null ? getRssiLevel(rssi) : null;
+  const snrLvl = snr !== null ? getSnrLevel(snr) : null;
+
+  if (rssi !== null && rssiLvl !== null && rssiLvl >= 2 && snrLvl !== null && snrLvl <= 0) {
+    return NOISY_STYLE;
+  }
+
+  const effectiveRssi = rssiLvl ?? 3;
+  const effectiveSnr = snrLvl ?? 3;
+  const combined = Math.min(effectiveRssi, effectiveSnr);
+  return SIGNAL_STYLES[combined] ?? SIGNAL_STYLES[0];
 }
 
 function MapAutoUpdater({ center, autoCenter }: { center: [number, number] | null; autoCenter: boolean }) {
@@ -69,13 +106,14 @@ const MAP_LAYERS = {
   },
 } as const;
 
-const rssiItems = [
-  { color: "#22c55e", label: "Excellent", range: "> -70" },
-  { color: "#4ade80", label: "Very Good", range: "-70–-80" },
-  { color: "#84cc16", label: "Good", range: "-80–-90" },
-  { color: "#facc15", label: "Fair", range: "-90–-100" },
-  { color: "#f97316", label: "Poor", range: "-100–-110" },
-  { color: "#ef4444", label: "Very Weak", range: "< -110" },
+const legendItems = [
+  { color: "#22c55e", label: "Excellent", range: "RSSI > -90, SNR > 10" },
+  { color: "#4ade80", label: "Good", range: "RSSI > -100, SNR > 0" },
+  { color: "#facc15", label: "Fair", range: "RSSI > -110, SNR > -7" },
+  { color: "#f97316", label: "Marginal", range: "RSSI > -115, SNR > -13" },
+  { color: "#ef4444", label: "Poor", range: "RSSI > -120, SNR > -13" },
+  { color: "#991b1b", label: "No Link", range: "RSSI \u2264 -120 or SNR \u2264 -13" },
+  { color: "#a855f7", label: "Noisy", range: "RSSI > -115 but SNR \u2264 -13" },
 ];
 
 interface CoverageMapProps {
@@ -165,7 +203,7 @@ export function CoverageMap({
             );
           }
 
-          const style = getRssiStyle(zone.avgRssi || -100);
+          const style = getSignalStyle(zone.avgRssi, zone.avgSnr);
 
           return (
             <Polygon
@@ -205,7 +243,7 @@ function RssiLegend() {
         >
           {!expanded && (
             <div className="flex flex-col gap-1 items-center">
-              {rssiItems.map((item) => (
+              {legendItems.map((item) => (
                 <div
                   key={item.label}
                   className="w-2.5 h-2.5 rounded-sm"
@@ -218,7 +256,7 @@ function RssiLegend() {
         </button>
         {expanded && (
           <div className="px-2 pb-2 space-y-1 text-[11px]">
-            {rssiItems.map((item) => (
+            {legendItems.map((item) => (
               <div key={item.label} className="flex items-center gap-1.5">
                 <div
                   className="w-3 h-2.5 rounded-sm"
@@ -243,7 +281,7 @@ function RssiLegend() {
 }
 
 function ZonePopup({ zone }: { zone: CoverageZone }) {
-  const style = zone.isDeadZone ? null : getRssiStyle(zone.avgRssi || -100);
+  const style = zone.isDeadZone ? null : getSignalStyle(zone.avgRssi, zone.avgSnr);
   const [scans, setScans] = useState<ScanResult[]>([]);
   const [loaded, setLoaded] = useState(false);
 
