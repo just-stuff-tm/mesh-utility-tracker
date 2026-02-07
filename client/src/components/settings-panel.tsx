@@ -20,7 +20,7 @@ export function SettingsPanel() {
   const [downloadingTiles, setDownloadingTiles] = useState(false);
   const [tileCachingEnabled, setTileCachingEnabled] = useState(() => {
     const stored = localStorage.getItem("mesh-tile-caching");
-    return stored === null ? true : stored === "true";
+    return stored === null ? false : stored === "true";
   });
   const { online, pendingSync, syncing, syncNow } = useOfflineStatus();
   const {
