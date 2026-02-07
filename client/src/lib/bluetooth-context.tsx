@@ -10,6 +10,7 @@ import {
   discoverRepeaters,
   publicKeyHex,
   checkConnectionAlive,
+  remoteLog,
   on,
   type MeshContact,
   type DeviceInfo,
@@ -233,9 +234,12 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
       let scanResultsSubmitted = 0;
 
-      const radioId = selfInfoRef.current?.publicKey
-        ? publicKeyHex(selfInfoRef.current.publicKey)
-        : null;
+      const pk = selfInfoRef.current?.publicKey;
+      let radioId: string | null = null;
+      if (pk && pk.length >= 4) {
+        radioId = publicKeyHex(pk);
+      }
+      remoteLog("log", `[SUBMIT] radioId=${radioId}, publicKey type=${pk ? typeof pk : "null"}, length=${pk?.length ?? 0}, selfInfo exists=${!!selfInfoRef.current}`);
 
       let existingNodes: Array<{ nodeId: string; name: string | null }> = [];
       try {
@@ -425,7 +429,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const info = await getSelfInfo();
-        if (info) setSelfInfo(info as any);
+        if (info) {
+          remoteLog("log", `[CONNECT] selfInfo.publicKey: type=${typeof info.publicKey}, isUint8=${info.publicKey instanceof Uint8Array}, length=${info.publicKey?.length}, hex=${publicKeyHex(info.publicKey)}`);
+          setSelfInfo(info as any);
+        }
 
         const battery = await getBatteryVoltage();
         if (battery !== null) setBatteryMilliVolts(battery);

@@ -3,7 +3,7 @@ import { WebBleConnection, Constants } from "@liamcottle/meshcore.js";
 const remoteLogBuffer: { level: string; message: string }[] = [];
 let remoteLogTimer: ReturnType<typeof setTimeout> | null = null;
 
-function remoteLog(level: string, ...args: any[]) {
+export function remoteLog(level: string, ...args: any[]) {
   const message = args.map(a => {
     if (a instanceof Uint8Array) return Array.from(a.slice(0, 8)).map(b => b.toString(16).padStart(2, "0")).join("");
     if (typeof a === "object" && a !== null) {
@@ -615,8 +615,9 @@ export async function checkConnectionAlive(): Promise<boolean> {
   }
 }
 
-export function publicKeyHex(key: Uint8Array): string {
-  return Array.from(key.slice(0, 4))
+export function publicKeyHex(key: Uint8Array | number[]): string {
+  const arr = key instanceof Uint8Array ? key : new Uint8Array(key);
+  return Array.from(arr.slice(0, 4))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("")
     .toUpperCase();
