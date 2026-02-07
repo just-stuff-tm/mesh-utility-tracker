@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { drainOutbox, getOutboxCount, isOnline, db } from "./offline-store";
 import { queryClient } from "./queryClient";
 
@@ -6,6 +6,7 @@ export function useOfflineStatus() {
   const [online, setOnline] = useState(isOnline());
   const [pendingSync, setPendingSync] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const syncingRef = useRef(false);
 
   const refreshPendingCount = useCallback(async () => {
     const count = await getOutboxCount();
@@ -13,7 +14,8 @@ export function useOfflineStatus() {
   }, []);
 
   const syncNow = useCallback(async () => {
-    if (!isOnline() || syncing) return;
+    if (!isOnline() || syncingRef.current) return;
+    syncingRef.current = true;
     setSyncing(true);
     try {
       const result = await drainOutbox();
@@ -29,9 +31,10 @@ export function useOfflineStatus() {
         queryClient.invalidateQueries({ queryKey: ["/api/scan-results/latest"] });
       }
     } finally {
+      syncingRef.current = false;
       setSyncing(false);
     }
-  }, [syncing, refreshPendingCount]);
+  }, [refreshPendingCount]);
 
   useEffect(() => {
     const handleOnline = () => {

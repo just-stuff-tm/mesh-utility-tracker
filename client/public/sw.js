@@ -101,8 +101,8 @@ self.addEventListener("fetch", (event) => {
         } catch {
           const cached = await cache.match(event.request);
           if (cached) return cached;
-          return new Response(JSON.stringify([]), {
-            status: 200,
+          return new Response(JSON.stringify({ offline: true, message: "No cached data" }), {
+            status: 503,
             headers: { "Content-Type": "application/json" },
           });
         }

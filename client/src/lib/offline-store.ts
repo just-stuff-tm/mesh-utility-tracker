@@ -111,6 +111,12 @@ export async function getLocalCollection(tableName: string): Promise<unknown[]> 
   return table.toArray();
 }
 
+export async function getLocalOnlyEntries(tableName: string): Promise<unknown[]> {
+  const table = (db as any)[tableName] as Table | undefined;
+  if (!table) return [];
+  return table.filter((item: any) => typeof item.id === "string" && item.id.startsWith("local-")).toArray();
+}
+
 export async function getLocalDeadZones(): Promise<LocalCoverageZone[]> {
   return db.coverageZones.filter((z) => z.isDeadZone === true).toArray();
 }
@@ -136,12 +142,19 @@ export async function getOutboxCount(): Promise<number> {
   return db.outbox.count();
 }
 
+const MAX_OUTBOX_RETRIES = 5;
+
 export async function drainOutbox(): Promise<{ synced: number; failed: number }> {
   const entries = await db.outbox.orderBy("createdAt").toArray();
   let synced = 0;
   let failed = 0;
 
   for (const entry of entries) {
+    if (entry.retries >= MAX_OUTBOX_RETRIES) {
+      await db.outbox.delete(entry.id!);
+      failed++;
+      continue;
+    }
     try {
       const res = await fetch(entry.url, {
         method: entry.method,
@@ -152,12 +165,17 @@ export async function drainOutbox(): Promise<{ synced: number; failed: number }>
       if (res.ok) {
         await db.outbox.delete(entry.id!);
         synced++;
+      } else if (res.status >= 400 && res.status < 500) {
+        await db.outbox.delete(entry.id!);
+        failed++;
       } else {
         const updated = { ...entry, retries: entry.retries + 1 };
         await db.outbox.put(updated);
         failed++;
       }
     } catch {
+      const updated = { ...entry, retries: entry.retries + 1 };
+      await db.outbox.put(updated);
       failed++;
     }
   }

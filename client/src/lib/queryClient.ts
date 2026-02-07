@@ -3,6 +3,7 @@ import {
   getTableForEndpoint,
   saveCollectionToLocal,
   getLocalCollection,
+  getLocalOnlyEntries,
   getLocalDeadZones,
   getLocalLatestScans,
   enqueueMutation,
@@ -37,15 +38,33 @@ export async function apiRequest(
     return queuedResponse;
   }
 
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    await throwIfResNotOk(res);
+    return res;
+  } catch (err) {
+    if (method !== "GET") {
+      await enqueueMutation({
+        url,
+        method,
+        payload: data || null,
+        createdAt: Date.now(),
+        retries: 0,
+      });
+      return new Response(JSON.stringify({ queued: true }), {
+        status: 202,
+        statusText: "Queued for sync",
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    throw err;
+  }
 }
 
 export function isQueuedResponse(res: Response): boolean {
@@ -90,6 +109,13 @@ export const getQueryFn: <T>(options: {
       const tableName = getTableForEndpoint(endpoint);
       if (tableName && Array.isArray(json)) {
         saveCollectionToLocal(tableName, json).catch(() => {});
+
+        try {
+          const localEntries = await getLocalOnlyEntries(tableName);
+          if (localEntries.length > 0) {
+            return [...json, ...localEntries];
+          }
+        } catch {}
       }
 
       return json;
