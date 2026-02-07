@@ -19,7 +19,6 @@ import {
   History,
   BarChart3,
   BatteryMedium,
-  Download,
   MessageCircle,
 } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
@@ -54,7 +53,7 @@ const sections: Section[] = [
     title: "Scanning",
     content: [
       "With your radio connected, flip the Scan switch to start. The app sends out a discovery signal and listens for any repeaters that respond, measuring how strong and clear each signal is.",
-      "Each scan cycle takes about 40 seconds. Your GPS location (and altitude when available) is recorded with each scan so the map knows exactly where you were.",
+      "Each scan cycle takes about 20 seconds. Your GPS location (and altitude when available) is recorded with each scan so the map knows exactly where you were.",
       "Smart Scan skips areas you've already covered recently (you pick how many days count as \"recent\" in settings). Dead zones are always re-checked regardless. You can also tap Force Scan to override and scan your current spot right away.",
     ],
   },
@@ -121,7 +120,7 @@ const sections: Section[] = [
     icon: Settings,
     title: "Settings",
     content: [
-      "Scan Interval sets how many seconds between automatic scans (minimum 40 seconds).",
+      "Scan Interval sets how many seconds between automatic scans (minimum 20 seconds).",
       "Auto-center keeps the map following your position as you move.",
       "Update Radio Position controls whether your GPS coordinates get written back to the radio during scans. It's off by default to avoid overwriting your Companion radio's stored location. Only turn this on if you want the radio to track where you are.",
       "Tile Caching (off by default) saves map tiles as you browse so they're available offline. You can also download all tiles for your current area at once, or clear cached tiles.",
@@ -148,14 +147,6 @@ const sections: Section[] = [
       "You can install Mesh Utility as a standalone app on your phone, tablet, or computer for quick access.",
       "On Android, tap the browser menu and choose \"Install app\" or \"Add to Home screen.\" On iOS (in Bluefy), use the share button and \"Add to Home Screen.\" On desktop Chrome or Edge, click the install icon in the address bar.",
       "The installed version runs full-screen with its own icon, just like a regular app.",
-    ],
-  },
-  {
-    icon: Download,
-    title: "Download by Version",
-    content: [
-      "You can download specific versions of Mesh Utility from the project's GitHub releases page. Each release includes the version number, changelog, and downloadable assets.",
-      "Visit the GitHub repository to browse available versions, report issues, or contribute to the project.",
     ],
   },
   {
