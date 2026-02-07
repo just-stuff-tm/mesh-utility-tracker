@@ -348,8 +348,8 @@ export function SettingsPanel() {
             value={[statsRadiusMiles]}
             onValueChange={([v]) => setStatsRadiusMiles(v)}
             min={0}
-            max={50}
-            step={1}
+            max={1000}
+            step={5}
             data-testid="slider-stats-radius"
           />
           <p className="text-xs text-muted-foreground">
