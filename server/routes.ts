@@ -115,6 +115,8 @@ export async function registerRoutes(
         });
       }
 
+      await storage.clearDeadZonesNear(snapLat, snapLng, existingZone?.id);
+
       const tolerance = 0.001;
       await storage.pruneZoneScanResults(snapLat, snapLng, tolerance, 5);
 

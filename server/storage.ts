@@ -1,4 +1,4 @@
-import { eq, desc, and, or, gte, lte, sql } from "drizzle-orm";
+import { eq, ne, desc, and, or, gte, lte, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, observers, meshNodes, scanResults, coverageZones,
@@ -39,6 +39,7 @@ export interface IStorage {
   deleteCoverageZone(id: string): Promise<boolean>;
   findNearbyZone(lat: number, lng: number, radiusMeters: number): Promise<CoverageZone | undefined>;
   deleteDataByRadioId(radioId: string): Promise<{ scanResults: number; coverageZones: number; observers: number }>;
+  clearDeadZonesNear(lat: number, lng: number, excludeId?: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -228,6 +229,24 @@ export class DatabaseStorage implements IStorage {
       const dist = haversineDistance(lat, lng, z.centerLat, z.centerLng);
       return dist <= radiusMeters;
     });
+  }
+
+  async clearDeadZonesNear(snapLat: number, snapLng: number, excludeId?: string): Promise<number> {
+    const tolerance = 0.0001;
+    const conditions = [
+      eq(coverageZones.isDeadZone, true),
+      gte(coverageZones.centerLat, snapLat - tolerance),
+      lte(coverageZones.centerLat, snapLat + tolerance),
+      gte(coverageZones.centerLng, snapLng - tolerance),
+      lte(coverageZones.centerLng, snapLng + tolerance),
+    ];
+    if (excludeId) {
+      conditions.push(ne(coverageZones.id, excludeId));
+    }
+    const result = await db.delete(coverageZones)
+      .where(and(...conditions))
+      .returning();
+    return result.length;
   }
 }
 

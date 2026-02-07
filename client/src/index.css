@@ -277,6 +277,14 @@
     background-color: var(--elevate-2);
   }
 
+  /* Leaflet popup z-index - ensure popups appear above all map elements */
+  .leaflet-popup {
+    z-index: 1200 !important;
+  }
+  .leaflet-popup-pane {
+    z-index: 1200 !important;
+  }
+
   /* Leaflet layer control theming */
   .leaflet-control-layers {
     background: hsl(var(--card)) !important;
