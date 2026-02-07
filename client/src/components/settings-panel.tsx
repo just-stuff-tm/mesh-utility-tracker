@@ -12,9 +12,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, isQueuedResponse, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { useOfflineStatus } from "@/lib/use-offline";
+import { usePrivacyContext } from "@/App";
 
 export function SettingsPanel() {
   const { toast } = useToast();
+  const { requireAcceptance } = usePrivacyContext();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [tileCacheCount, setTileCacheCount] = useState<number | null>(null);
   const [downloadingTiles, setDownloadingTiles] = useState(false);
@@ -429,7 +431,18 @@ export function SettingsPanel() {
             </div>
             <Switch
               checked={!forceOffline}
-              onCheckedChange={(checked) => toggleForceOffline(!checked)}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  const allowed = requireAcceptance(() => {
+                    toggleForceOffline(false);
+                  });
+                  if (allowed) {
+                    toggleForceOffline(false);
+                  }
+                } else {
+                  toggleForceOffline(true);
+                }
+              }}
               data-testid="switch-online-offline"
             />
           </div>

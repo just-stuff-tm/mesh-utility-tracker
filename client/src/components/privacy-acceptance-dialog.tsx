@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,39 +8,73 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Shield } from "lucide-react";
+import { Shield, WifiOff } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const PRIVACY_ACCEPTED_KEY = "mesh-privacy-accepted";
 
-export function usePrivacyAccepted() {
-  const [accepted, setAccepted] = useState(
-    () => localStorage.getItem(PRIVACY_ACCEPTED_KEY) === "true"
-  );
+export function isPrivacyAccepted(): boolean {
+  return localStorage.getItem(PRIVACY_ACCEPTED_KEY) === "true";
+}
 
-  const accept = () => {
+export function usePrivacyAccepted() {
+  const [accepted, setAccepted] = useState(() => isPrivacyAccepted());
+  const [showDialog, setShowDialog] = useState(false);
+  const pendingCallbackRef = useRef<(() => void) | null>(null);
+
+  const accept = useCallback(() => {
     localStorage.setItem(PRIVACY_ACCEPTED_KEY, "true");
     setAccepted(true);
-  };
+    setShowDialog(false);
+    if (pendingCallbackRef.current) {
+      const cb = pendingCallbackRef.current;
+      pendingCallbackRef.current = null;
+      cb();
+    }
+  }, []);
 
-  return { accepted, accept };
+  const closeDialog = useCallback(() => {
+    setShowDialog(false);
+    pendingCallbackRef.current = null;
+  }, []);
+
+  const requireAcceptance = useCallback((onAccepted: () => void): boolean => {
+    if (isPrivacyAccepted()) return true;
+    pendingCallbackRef.current = onAccepted;
+    setShowDialog(true);
+    return false;
+  }, []);
+
+  return { accepted, accept, showDialog, closeDialog, requireAcceptance };
 }
 
 export function PrivacyAcceptanceDialog({
-  accepted,
+  open,
   onAccept,
+  onSkip,
+  onClose,
+  mode,
 }: {
-  accepted: boolean;
+  open: boolean;
   onAccept: () => void;
+  onSkip?: () => void;
+  onClose?: () => void;
+  mode: "initial" | "require";
 }) {
-  if (accepted) return null;
+  if (!open) return null;
 
   return (
-    <Dialog open={!accepted} onOpenChange={() => {}}>
+    <Dialog open={open} onOpenChange={() => {
+      if (mode === "require" && onClose) onClose();
+    }}>
       <DialogContent
-        className="max-w-md [&>button]:hidden"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+        className={`max-w-md ${mode === "initial" ? "[&>button]:hidden" : ""}`}
+        onPointerDownOutside={(e) => {
+          if (mode === "initial") e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (mode === "initial") e.preventDefault();
+        }}
         data-testid="dialog-privacy-acceptance"
       >
         <DialogHeader>
@@ -49,7 +83,9 @@ export function PrivacyAcceptanceDialog({
             Privacy Policy
           </DialogTitle>
           <DialogDescription>
-            Please review and accept our privacy policy to use Mesh Utility.
+            {mode === "initial"
+              ? "Please review our privacy policy to continue."
+              : "You must accept the privacy policy before switching to online mode."}
           </DialogDescription>
         </DialogHeader>
 
@@ -84,7 +120,7 @@ export function PrivacyAcceptanceDialog({
           </div>
         </ScrollArea>
 
-        <DialogFooter>
+        <DialogFooter className="flex flex-col gap-2 sm:flex-col">
           <Button
             onClick={onAccept}
             className="w-full"
@@ -92,6 +128,17 @@ export function PrivacyAcceptanceDialog({
           >
             I Accept
           </Button>
+          {mode === "initial" && onSkip && (
+            <Button
+              variant="outline"
+              onClick={onSkip}
+              className="w-full"
+              data-testid="button-skip-privacy"
+            >
+              <WifiOff className="h-3.5 w-3.5 mr-1.5" />
+              Skip (Offline Only)
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
