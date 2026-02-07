@@ -127,3 +127,6 @@ Preferred communication style: Simple, everyday language.
 - **2026-02-07**: Added approximate altitude display — GPS altitude used when available (mobile devices), falls back to Open-Meteo free elevation API for desktop. Shown in MapHud as "ft ASL" or "m ASL" based on unit preference.
 - **2026-02-07**: Added imperial/metric unit toggle in settings — persisted via localStorage. Affects altitude display (ft vs m) and stats radius label (mi vs km). Default is imperial.
 - **2026-02-07**: Altitude stored with scan results — scan_results table has nullable `altitude` column (meters). Altitude shown in history page scan cards and coverage zone popups, formatted per unit preference.
+- **2026-02-07**: Added BLE connection tip in bluetooth panel — reminds users to disconnect other apps before connecting.
+- **2026-02-07**: Added "How to Use" manual page at /manual — covers connecting, scanning, reading the map, signal quality, nodes, altitude, settings, PWA install, and troubleshooting. Accessible from sidebar navigation.
+- **2026-02-07**: Added Share App button in sidebar footer — uses Web Share API on mobile, falls back to clipboard copy on desktop.

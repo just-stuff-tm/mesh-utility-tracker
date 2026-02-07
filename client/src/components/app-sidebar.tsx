@@ -1,5 +1,7 @@
-import { Map, Radio, Activity, DollarSign, Shield } from "lucide-react";
+import { Map, Radio, Activity, DollarSign, Shield, HelpCircle, Share2 } from "lucide-react";
 import { useLocation, Link } from "wouter";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import appIconPath from "@assets/app_icon_1770389147147.png";
 import {
   Sidebar,
@@ -19,11 +21,39 @@ const navItems = [
   { title: "Coverage Map", url: "/", icon: Map },
   { title: "Nodes", url: "/nodes", icon: Radio },
   { title: "Scan History", url: "/history", icon: Activity },
+  { title: "How to Use", url: "/manual", icon: HelpCircle },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
+  const { toast } = useToast();
+
+  const handleShare = () => {
+    const url = window.location.origin;
+    const shareData = {
+      title: "Mesh Utility",
+      text: "Map your LoRa MeshCore mesh network coverage",
+      url,
+    };
+    if (navigator.share) {
+      navigator.share(shareData).catch(() => {});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        toast({ title: "Link copied to clipboard" });
+      }).catch(() => {
+        toast({ title: "Could not copy link", variant: "destructive" });
+      });
+    } else {
+      const input = document.createElement("input");
+      input.value = url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      toast({ title: "Link copied to clipboard" });
+    }
+  };
 
   return (
     <Sidebar>
@@ -70,6 +100,16 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-3">
         <div className="flex flex-col gap-2 items-center">
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={handleShare}
+            data-testid="button-share-app"
+          >
+            <Share2 className="h-3 w-3 mr-1.5" />
+            Share App
+          </Button>
           <a
             href="https://cash.app/$yuptm"
             target="_blank"

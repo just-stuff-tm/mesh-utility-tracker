@@ -81,6 +81,12 @@ export function BluetoothPanel() {
           </p>
         )}
 
+        {!connected && !connecting && supported && (
+          <p className="text-xs text-muted-foreground">
+            Make sure no other app (MeshCore, etc.) is connected to your radio. Only one app can use Bluetooth at a time.
+          </p>
+        )}
+
         {!connected && showReconnect && lastRadioName && (
           <div className="bg-muted/50 rounded-md p-2 space-y-2" data-no-close>
             <p className="text-xs text-muted-foreground">
