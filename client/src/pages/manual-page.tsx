@@ -19,7 +19,10 @@ import {
   History,
   BarChart3,
   BatteryMedium,
+  Download,
+  MessageCircle,
 } from "lucide-react";
+import { SiDiscord } from "react-icons/si";
 
 interface Section {
   icon: typeof Bluetooth;
@@ -148,9 +151,18 @@ const sections: Section[] = [
     ],
   },
   {
-    icon: Share2,
-    title: "Sharing & Support",
+    icon: Download,
+    title: "Download by Version",
     content: [
+      "You can download specific versions of Mesh Utility from the project's GitHub releases page. Each release includes the version number, changelog, and downloadable assets.",
+      "Visit the GitHub repository to browse available versions, report issues, or contribute to the project.",
+    ],
+  },
+  {
+    icon: MessageCircle,
+    title: "Community & Support",
+    content: [
+      "Join the Mesh Utility Discord server to connect with other users, ask questions, share coverage maps, and get help with setup. The Discord link is also available in the header bar.",
       "Use the Share button in the sidebar to send the app link to others. On phones it opens the system share sheet; on desktop it copies the link to your clipboard.",
       "If you find the app useful, the Support link at the top lets you contribute to development.",
     ],
@@ -202,6 +214,20 @@ export default function ManualPage() {
                     {paragraph}
                   </p>
                 ))}
+                {section.title === "Community & Support" && (
+                  <a
+                    href="https://discord.gg/Xyhjz7CtuW"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 hover-elevate mt-1"
+                    data-testid="link-discord-manual"
+                  >
+                    <SiDiscord className="h-3.5 w-3.5 text-indigo-500" />
+                    <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                      Join Discord
+                    </span>
+                  </a>
+                )}
               </div>
             </Card>
           ))}

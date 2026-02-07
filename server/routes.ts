@@ -211,6 +211,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/observers/online", async (_req, res) => {
+    try {
+      const count = await storage.getActiveObserverCount(24);
+      res.json({ count });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/observers", async (_req, res) => {
     try {
       const list = await storage.getObservers();

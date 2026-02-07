@@ -40,6 +40,7 @@ export interface IStorage {
   findNearbyZone(lat: number, lng: number, radiusMeters: number): Promise<CoverageZone | undefined>;
   deleteDataByRadioId(radioId: string): Promise<{ scanResults: number; coverageZones: number; observers: number }>;
   clearDeadZonesNear(lat: number, lng: number, excludeId?: string): Promise<number>;
+  getActiveObserverCount(hoursAgo?: number): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -247,6 +248,18 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .returning();
     return result.length;
+  }
+
+  async getActiveObserverCount(hoursAgo: number = 24): Promise<number> {
+    const cutoff = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+    const result = await db
+      .select({ count: sql<number>`COUNT(DISTINCT ${scanResults.radioId})` })
+      .from(scanResults)
+      .where(and(
+        gte(scanResults.timestamp, cutoff),
+        sql`${scanResults.radioId} IS NOT NULL`
+      ));
+    return Number(result[0]?.count ?? 0);
   }
 }
 
