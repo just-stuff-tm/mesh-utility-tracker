@@ -108,13 +108,15 @@ export function PrivacyAcceptanceDialog({
             </p>
             <p className="text-xs">
               Read the{" "}
-              <button
-                onClick={() => window.open("/privacy", "_blank")}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="underline text-primary hover:text-primary/80"
                 data-testid="link-full-privacy-policy"
               >
                 full privacy policy
-              </button>{" "}
+              </a>{" "}
               for complete details.
             </p>
           </div>

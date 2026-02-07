@@ -1,5 +1,5 @@
 import { useState, createContext, useContext } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -61,6 +61,8 @@ if (!isPrivacyAccepted() && !getForceOffline()) {
 
 function AppContent() {
   const { accepted, accept, showDialog, closeDialog, requireAcceptance } = usePrivacyAccepted();
+  const [location] = useLocation();
+  const isPrivacyRoute = location === "/privacy";
   const [showInitialPrivacy, setShowInitialPrivacy] = useState(!accepted);
 
   const handleAcceptInitial = () => {
@@ -76,7 +78,7 @@ function AppContent() {
     <BluetoothProvider>
       <PrivacyContext.Provider value={{ accepted, requireAcceptance, accept, showDialog, openDialog: () => {}, closeDialog }}>
         <PrivacyAcceptanceDialog
-          open={showInitialPrivacy}
+          open={showInitialPrivacy && !isPrivacyRoute}
           onAccept={handleAcceptInitial}
           onSkip={handleSkip}
           mode="initial"
