@@ -183,7 +183,24 @@ export async function drainOutbox(): Promise<{ synced: number; failed: number }>
   return { synced, failed };
 }
 
+let forceOffline = false;
+
+export function setForceOffline(value: boolean): void {
+  forceOffline = value;
+  localStorage.setItem("mesh-force-offline", String(value));
+  window.dispatchEvent(new Event(value ? "offline" : "online"));
+}
+
+export function getForceOffline(): boolean {
+  return forceOffline;
+}
+
+export function initForceOffline(): void {
+  forceOffline = localStorage.getItem("mesh-force-offline") === "true";
+}
+
 export function isOnline(): boolean {
+  if (forceOffline) return false;
   return navigator.onLine;
 }
 

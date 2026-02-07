@@ -22,7 +22,7 @@ export function SettingsPanel() {
     const stored = localStorage.getItem("mesh-tile-caching");
     return stored === null ? false : stored === "true";
   });
-  const { online, pendingSync, syncing, syncNow } = useOfflineStatus();
+  const { online, pendingSync, syncing, syncNow, forceOffline, toggleForceOffline } = useOfflineStatus();
   const {
     scanInterval,
     setScanInterval,
@@ -416,20 +416,29 @@ export function SettingsPanel() {
         <Separator />
 
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            {online ? (
-              <Wifi className="h-3.5 w-3.5 text-emerald-500" />
-            ) : (
-              <WifiOff className="h-3.5 w-3.5 text-orange-500" />
-            )}
-            <Label className="text-xs">
-              {online ? "Online" : "Offline Mode"}
-            </Label>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {online ? (
+                <Wifi className="h-3.5 w-3.5 text-emerald-500" />
+              ) : (
+                <WifiOff className="h-3.5 w-3.5 text-orange-500" />
+              )}
+              <Label className="text-xs">
+                {online ? "Online" : "Offline Mode"}
+              </Label>
+            </div>
+            <Switch
+              checked={!forceOffline}
+              onCheckedChange={(checked) => toggleForceOffline(!checked)}
+              data-testid="switch-online-offline"
+            />
           </div>
           <p className="text-xs text-muted-foreground">
-            {online
-              ? "Data syncs to the server in real time."
-              : "Scans are saved locally and will sync when you're back online."}
+            {forceOffline
+              ? "Forced offline. Scans are saved locally and will sync when you switch back online."
+              : online
+                ? "Data syncs to the server in real time."
+                : "No network connection. Scans are saved locally and will sync when connectivity returns."}
           </p>
           {pendingSync > 0 && (
             <div className="flex items-center justify-between gap-2">

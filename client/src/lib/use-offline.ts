@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { drainOutbox, getOutboxCount, isOnline, db } from "./offline-store";
+import { drainOutbox, getOutboxCount, isOnline, db, getForceOffline, setForceOffline, initForceOffline } from "./offline-store";
 import { queryClient } from "./queryClient";
+
+initForceOffline();
 
 export function useOfflineStatus() {
   const [online, setOnline] = useState(isOnline());
+  const [forced, setForced] = useState(getForceOffline());
   const [pendingSync, setPendingSync] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const syncingRef = useRef(false);
@@ -36,10 +39,19 @@ export function useOfflineStatus() {
     }
   }, [refreshPendingCount]);
 
+  const toggleForceOffline = useCallback((value: boolean) => {
+    setForceOffline(value);
+    setForced(value);
+    setOnline(!value && navigator.onLine);
+    if (!value && navigator.onLine) {
+      syncNow();
+    }
+  }, [syncNow]);
+
   useEffect(() => {
     const handleOnline = () => {
-      setOnline(true);
-      syncNow();
+      setOnline(isOnline());
+      if (isOnline()) syncNow();
     };
     const handleOffline = () => setOnline(false);
 
@@ -53,5 +65,5 @@ export function useOfflineStatus() {
     };
   }, [syncNow, refreshPendingCount]);
 
-  return { online, pendingSync, syncing, syncNow, refreshPendingCount };
+  return { online, pendingSync, syncing, syncNow, refreshPendingCount, forceOffline: forced, toggleForceOffline };
 }
