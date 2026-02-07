@@ -3,6 +3,8 @@ const TILE_CACHE = "map-tiles-v1";
 const CDN_CACHE = "cdn-assets-v1";
 const API_CACHE = "api-cache-v1";
 
+let tileCachingEnabled = true;
+
 const APP_SHELL_URLS = [
   "/",
   "/manifest.json",
@@ -52,21 +54,31 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
   if (isTileRequest(url)) {
-    event.respondWith(
-      caches.open(TILE_CACHE).then(async (cache) => {
-        const cached = await cache.match(event.request);
-        if (cached) return cached;
-        try {
-          const response = await fetch(event.request);
-          if (response.ok || response.status === 0) {
-            cache.put(event.request, response.clone());
+    if (tileCachingEnabled) {
+      event.respondWith(
+        caches.open(TILE_CACHE).then(async (cache) => {
+          const cached = await cache.match(event.request);
+          if (cached) return cached;
+          try {
+            const response = await fetch(event.request);
+            if (response.ok || response.status === 0) {
+              cache.put(event.request, response.clone());
+            }
+            return response;
+          } catch {
+            return new Response("", { status: 408 });
           }
-          return response;
-        } catch {
-          return new Response("", { status: 408 });
-        }
-      })
-    );
+        })
+      );
+    } else {
+      event.respondWith(
+        caches.open(TILE_CACHE).then(async (cache) => {
+          const cached = await cache.match(event.request);
+          if (cached) return cached;
+          return fetch(event.request).catch(() => new Response("", { status: 408 }));
+        })
+      );
+    }
     return;
   }
 
@@ -165,6 +177,20 @@ self.addEventListener("message", (event) => {
         }
       });
     }
+  }
+
+  if (event.data && event.data.type === "SET_TILE_CACHING") {
+    tileCachingEnabled = !!event.data.enabled;
+  }
+
+  if (event.data && event.data.type === "CLEAR_TILE_CACHE") {
+    caches.delete(TILE_CACHE).then(() => {
+      self.clients.matchAll().then((clients) => {
+        for (const client of clients) {
+          client.postMessage({ type: "TILE_CACHE_SIZE", count: 0 });
+        }
+      });
+    });
   }
 
   if (event.data && event.data.type === "GET_TILE_CACHE_SIZE") {

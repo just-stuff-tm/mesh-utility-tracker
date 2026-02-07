@@ -18,6 +18,10 @@ export function SettingsPanel() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [tileCacheCount, setTileCacheCount] = useState<number | null>(null);
   const [downloadingTiles, setDownloadingTiles] = useState(false);
+  const [tileCachingEnabled, setTileCachingEnabled] = useState(() => {
+    const stored = localStorage.getItem("mesh-tile-caching");
+    return stored === null ? true : stored === "true";
+  });
   const { online, pendingSync, syncing, syncNow } = useOfflineStatus();
   const {
     scanInterval,
@@ -101,9 +105,25 @@ export function SettingsPanel() {
     navigator.serviceWorker.addEventListener("message", handler);
     if (navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: "GET_TILE_CACHE_SIZE" });
+      navigator.serviceWorker.controller.postMessage({ type: "SET_TILE_CACHING", enabled: tileCachingEnabled });
     }
     return () => navigator.serviceWorker.removeEventListener("message", handler);
   }, []);
+
+  const handleTileCachingToggle = (enabled: boolean) => {
+    setTileCachingEnabled(enabled);
+    localStorage.setItem("mesh-tile-caching", String(enabled));
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "SET_TILE_CACHING", enabled });
+    }
+  };
+
+  const handleClearTileCache = () => {
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "CLEAR_TILE_CACHE" });
+      toast({ title: "Tile cache cleared" });
+    }
+  };
 
   const handleMarkDeadZone = () => {
     if (!observerPosition) {
@@ -159,12 +179,21 @@ export function SettingsPanel() {
         <Separator />
 
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Download className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs" data-testid="label-offline-tiles">Offline Map Tiles</Label>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Download className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-xs" data-testid="label-offline-tiles">Offline Map Tiles</Label>
+            </div>
+            <Switch
+              checked={tileCachingEnabled}
+              onCheckedChange={handleTileCachingToggle}
+              data-testid="switch-tile-caching"
+            />
           </div>
           <p className="text-xs text-muted-foreground">
-            Map tiles are cached as you browse. Download tiles for your current area to use offline.
+            {tileCachingEnabled
+              ? "Tiles are cached as you browse for offline use. Download tiles for your current area below."
+              : "Tile caching is off. Previously cached tiles are still available."}
           </p>
           {tileCacheCount !== null && (
             <p className="text-xs text-muted-foreground">
@@ -218,7 +247,7 @@ export function SettingsPanel() {
               navigator.serviceWorker.addEventListener("message", handler);
               navigator.serviceWorker.controller.postMessage({ type: "PREFETCH_TILES", urls: tileUrls });
             }}
-            disabled={downloadingTiles || !observerPosition}
+            disabled={downloadingTiles || !observerPosition || !tileCachingEnabled}
             className="w-full"
             data-testid="button-download-tiles"
             data-no-close
@@ -235,6 +264,19 @@ export function SettingsPanel() {
               </>
             )}
           </Button>
+          {tileCacheCount !== null && tileCacheCount > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleClearTileCache}
+              className="w-full text-destructive border-destructive/30"
+              data-testid="button-clear-tile-cache"
+              data-no-close
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Clear Tile Cache
+            </Button>
+          )}
         </div>
 
         <Separator />
