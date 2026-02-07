@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings, Timer, MapPin, AlertTriangle, Trash2, Radar } from "lucide-react";
+import { Settings, Timer, MapPin, AlertTriangle, Trash2, Radar, Ruler } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -26,6 +26,8 @@ export function SettingsPanel() {
     setSmartScanDays,
     statsRadiusMiles,
     setStatsRadiusMiles,
+    unitSystem,
+    setUnitSystem,
     observerPosition,
     connected,
     selfInfo,
@@ -121,11 +123,42 @@ export function SettingsPanel() {
 
         <Separator />
 
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Ruler className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs">Units</Label>
+          </div>
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant={unitSystem === "imperial" ? "default" : "outline"}
+              onClick={() => setUnitSystem("imperial")}
+              className="text-[10px] px-2 h-7"
+              data-testid="button-units-imperial"
+              data-no-close
+            >
+              Imperial
+            </Button>
+            <Button
+              size="sm"
+              variant={unitSystem === "metric" ? "default" : "outline"}
+              onClick={() => setUnitSystem("metric")}
+              className="text-[10px] px-2 h-7"
+              data-testid="button-units-metric"
+              data-no-close
+            >
+              Metric
+            </Button>
+          </div>
+        </div>
+
+        <Separator />
+
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Radar className="h-3.5 w-3.5 text-muted-foreground" />
             <Label className="text-xs">
-              Stats Radius: {statsRadiusMiles === 0 ? "All Data" : `${statsRadiusMiles} mi`}
+              Stats Radius: {statsRadiusMiles === 0 ? "All Data" : unitSystem === "metric" ? `${Math.round(statsRadiusMiles * 1.60934)} km` : `${statsRadiusMiles} mi`}
             </Label>
           </div>
           <Slider
@@ -139,7 +172,9 @@ export function SettingsPanel() {
           <p className="text-xs text-muted-foreground">
             {statsRadiusMiles === 0
               ? "Showing averages for all coverage data"
-              : `Showing averages within ${statsRadiusMiles} miles of your location`}
+              : unitSystem === "metric"
+                ? `Showing averages within ${Math.round(statsRadiusMiles * 1.60934)} km of your location`
+                : `Showing averages within ${statsRadiusMiles} miles of your location`}
           </p>
         </div>
 

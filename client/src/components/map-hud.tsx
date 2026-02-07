@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Play, Pause, Radio, Signal, Clock, AlertTriangle, Zap, Cpu, ChevronDown, ChevronUp } from "lucide-react";
+import { Play, Pause, Radio, Signal, Clock, AlertTriangle, Zap, Cpu, ChevronDown, ChevronUp, Mountain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useBluetoothContext, type ScanStatus } from "@/lib/bluetooth-context";
@@ -53,6 +53,8 @@ export function MapHud() {
     forceScan,
     batteryMilliVolts,
     smartScanEnabled,
+    altitudeMeters,
+    unitSystem,
   } = useBluetoothContext();
 
   const [expanded, setExpanded] = useState(true);
@@ -61,6 +63,12 @@ export function MapHud() {
   const batteryV = batteryMilliVolts ? (batteryMilliVolts / 1000).toFixed(2) : null;
   const isActive = scanStatus !== "idle" && scanStatus !== "done" && scanStatus !== "error";
   const wasSmartSkipped = lastScanResult?.errorMessage?.includes("skipped");
+
+  const altitudeDisplay = altitudeMeters !== null
+    ? unitSystem === "imperial"
+      ? `${Math.round(altitudeMeters * 3.28084).toLocaleString()} ft`
+      : `${Math.round(altitudeMeters).toLocaleString()} m`
+    : null;
 
   if (!expanded) {
     return (
@@ -143,6 +151,13 @@ export function MapHud() {
           {deviceInfo.firmwareVersion && (
             <span className="ml-auto shrink-0" data-testid="text-firmware-version">{deviceInfo.firmwareVersion}</span>
           )}
+        </div>
+      )}
+
+      {altitudeDisplay && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border text-[10px] text-muted-foreground">
+          <Mountain className="h-3 w-3 shrink-0" />
+          <span data-testid="text-altitude">{altitudeDisplay} ASL</span>
         </div>
       )}
 

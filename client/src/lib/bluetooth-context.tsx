@@ -16,11 +16,12 @@ import {
   type DeviceInfo,
   type SelfInfo,
 } from "@/lib/bluetooth";
-import { getCurrentPosition, watchPosition, clearWatch } from "@/lib/geolocation";
+import { getCurrentPosition, watchPosition, clearWatch, fetchElevation } from "@/lib/geolocation";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { snapToHexGrid } from "@shared/grid";
 
 export type ScanStatus = "idle" | "advertising" | "waiting" | "querying" | "submitting" | "done" | "error";
+export type UnitSystem = "imperial" | "metric";
 
 export interface LastScanResult {
   contactsFound: number;
@@ -47,6 +48,8 @@ interface BluetoothContextValue {
   smartScanEnabled: boolean;
   smartScanDays: number;
   statsRadiusMiles: number;
+  unitSystem: UnitSystem;
+  altitudeMeters: number | null;
   wakeLockActive: boolean;
   deviceInfo: DeviceInfo | null;
   selfInfo: SelfInfo | null;
@@ -66,6 +69,7 @@ interface BluetoothContextValue {
   setSmartScanEnabled: (v: boolean) => void;
   setSmartScanDays: (v: number) => void;
   setStatsRadiusMiles: (v: number) => void;
+  setUnitSystem: (v: UnitSystem) => void;
 }
 
 const BluetoothContext = createContext<BluetoothContextValue | null>(null);
@@ -95,6 +99,13 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       return stored ? parseInt(stored, 10) : 0;
     } catch { return 0; }
   });
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>(() => {
+    try {
+      const stored = localStorage.getItem("mesh_unit_system");
+      return (stored === "metric" ? "metric" : "imperial") as UnitSystem;
+    } catch { return "imperial" as UnitSystem; }
+  });
+  const [altitudeMeters, setAltitudeMeters] = useState<number | null>(null);
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
   const [selfInfo, setSelfInfo] = useState<SelfInfo | null>(null);
@@ -137,15 +148,29 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     smartScanDaysRef.current = smartScanDays;
   }, [smartScanDays]);
 
+  const lastElevationFetch = useRef<string | null>(null);
+
   useEffect(() => {
+    const handlePosition = (pos: { latitude: number; longitude: number; altitude: number | null }) => {
+      setObserverPosition([pos.latitude, pos.longitude]);
+      if (pos.altitude !== null) {
+        setAltitudeMeters(pos.altitude);
+      } else {
+        const key = `${pos.latitude.toFixed(3)},${pos.longitude.toFixed(3)}`;
+        if (lastElevationFetch.current !== key) {
+          lastElevationFetch.current = key;
+          fetchElevation(pos.latitude, pos.longitude).then((elev) => {
+            if (elev !== null) setAltitudeMeters(elev);
+          });
+        }
+      }
+    };
+
     getCurrentPosition()
-      .then((pos) => setObserverPosition([pos.latitude, pos.longitude]))
+      .then(handlePosition)
       .catch(() => {});
 
-    const watchId = watchPosition(
-      (pos) => setObserverPosition([pos.latitude, pos.longitude]),
-      () => {}
-    );
+    const watchId = watchPosition(handlePosition, () => {});
     return () => clearWatch(watchId);
   }, []);
 
@@ -518,6 +543,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         smartScanEnabled,
         smartScanDays,
         statsRadiusMiles,
+        unitSystem,
+        altitudeMeters,
         wakeLockActive,
         deviceInfo,
         selfInfo,
@@ -539,6 +566,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         setStatsRadiusMiles: (v: number) => {
           setStatsRadiusMiles(v);
           try { localStorage.setItem("mesh_stats_radius", String(v)); } catch {}
+        },
+        setUnitSystem: (v: UnitSystem) => {
+          setUnitSystem(v);
+          try { localStorage.setItem("mesh_unit_system", v); } catch {}
         },
       }}
     >

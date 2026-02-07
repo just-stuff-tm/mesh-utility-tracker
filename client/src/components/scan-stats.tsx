@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Activity, Signal, Radio, MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { CoverageZone, ScanResult, MeshNode } from "@shared/schema";
+import type { UnitSystem } from "@/lib/bluetooth-context";
 
 function distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 3958.8;
@@ -21,9 +22,10 @@ interface ScanStatsProps {
   isConnected: boolean;
   observerPosition: [number, number] | null;
   statsRadiusMiles: number;
+  unitSystem: UnitSystem;
 }
 
-export function ScanStats({ coverageZones, totalScans, nodes, isConnected, observerPosition, statsRadiusMiles }: ScanStatsProps) {
+export function ScanStats({ coverageZones, totalScans, nodes, isConnected, observerPosition, statsRadiusMiles, unitSystem }: ScanStatsProps) {
   const filteredZones = useMemo(() => {
     if (statsRadiusMiles === 0 || !observerPosition) return coverageZones;
     return coverageZones.filter((z) => {
@@ -69,7 +71,9 @@ export function ScanStats({ coverageZones, totalScans, nodes, isConnected, obser
   ];
 
   const radiusLabel = statsRadiusMiles > 0 && observerPosition
-    ? `Within ${statsRadiusMiles} mi`
+    ? unitSystem === "metric"
+      ? `Within ${Math.round(statsRadiusMiles * 1.60934)} km`
+      : `Within ${statsRadiusMiles} mi`
     : null;
 
   return (
