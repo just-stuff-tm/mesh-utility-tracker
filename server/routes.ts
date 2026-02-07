@@ -221,7 +221,7 @@ export async function registerRoutes(
   app.post("/api/observers", async (req, res) => {
     try {
       const parsed = insertObserverSchema.parse(req.body);
-      const observer = await storage.createObserver(parsed);
+      const observer = await storage.upsertObserver(parsed);
       res.json(observer);
     } catch (err: any) {
       res.status(400).json({ message: err.message });

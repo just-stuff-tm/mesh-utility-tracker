@@ -273,7 +273,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
           try {
             await apiRequest("POST", "/api/scan-results", {
-              observerId: "local-observer",
+              observerId: radioId || "local-observer",
               nodeId,
               rssi: rep.stats.rssi,
               snr: rep.stats.snr,
@@ -430,8 +430,18 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       try {
         const info = await getSelfInfo();
         if (info) {
-          remoteLog("log", `[CONNECT] selfInfo.publicKey: type=${typeof info.publicKey}, isUint8=${info.publicKey instanceof Uint8Array}, length=${info.publicKey?.length}, hex=${publicKeyHex(info.publicKey)}`);
+          const rid = info.publicKey?.length >= 4 ? publicKeyHex(info.publicKey) : null;
+          remoteLog("log", `[CONNECT] selfInfo.publicKey: type=${typeof info.publicKey}, isUint8=${info.publicKey instanceof Uint8Array}, length=${info.publicKey?.length}, hex=${rid}`);
           setSelfInfo(info as any);
+
+          if (rid) {
+            try {
+              await apiRequest("POST", "/api/observers", {
+                name: info.name || result.deviceName || "Observer",
+                deviceId: rid,
+              });
+            } catch {}
+          }
         }
 
         const battery = await getBatteryVoltage();

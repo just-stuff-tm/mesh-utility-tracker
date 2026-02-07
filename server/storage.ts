@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, observers, meshNodes, scanResults, coverageZones,
@@ -16,8 +16,10 @@ export interface IStorage {
 
   getObservers(): Promise<Observer[]>;
   getObserver(id: string): Promise<Observer | undefined>;
+  getObserverByDeviceId(deviceId: string): Promise<Observer | undefined>;
   createObserver(observer: InsertObserver): Promise<Observer>;
   updateObserver(id: string, data: Partial<InsertObserver>): Promise<Observer | undefined>;
+  upsertObserver(observer: InsertObserver): Promise<Observer>;
 
   getNodes(): Promise<MeshNode[]>;
   getNode(nodeId: string): Promise<MeshNode | undefined>;
@@ -36,7 +38,7 @@ export interface IStorage {
   updateCoverageZone(id: string, data: Partial<InsertCoverageZone>): Promise<CoverageZone | undefined>;
   deleteCoverageZone(id: string): Promise<boolean>;
   findNearbyZone(lat: number, lng: number, radiusMeters: number): Promise<CoverageZone | undefined>;
-  deleteDataByRadioId(radioId: string): Promise<{ scanResults: number; coverageZones: number }>;
+  deleteDataByRadioId(radioId: string): Promise<{ scanResults: number; coverageZones: number; observers: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -64,6 +66,11 @@ export class DatabaseStorage implements IStorage {
     return observer;
   }
 
+  async getObserverByDeviceId(deviceId: string): Promise<Observer | undefined> {
+    const [observer] = await db.select().from(observers).where(eq(observers.deviceId, deviceId));
+    return observer;
+  }
+
   async createObserver(observer: InsertObserver): Promise<Observer> {
     const [result] = await db.insert(observers).values(observer).returning();
     return result;
@@ -71,6 +78,21 @@ export class DatabaseStorage implements IStorage {
 
   async updateObserver(id: string, data: Partial<InsertObserver>): Promise<Observer | undefined> {
     const [result] = await db.update(observers).set(data).where(eq(observers.id, id)).returning();
+    return result;
+  }
+
+  async upsertObserver(observer: InsertObserver): Promise<Observer> {
+    if (observer.deviceId) {
+      const existing = await this.getObserverByDeviceId(observer.deviceId);
+      if (existing) {
+        const [result] = await db.update(observers)
+          .set({ name: observer.name, lastSeen: new Date(), latitude: observer.latitude, longitude: observer.longitude })
+          .where(eq(observers.id, existing.id))
+          .returning();
+        return result;
+      }
+    }
+    const [result] = await db.insert(observers).values(observer).returning();
     return result;
   }
 
@@ -177,14 +199,17 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async deleteDataByRadioId(radioId: string): Promise<{ scanResults: number; coverageZones: number }> {
+  async deleteDataByRadioId(radioId: string): Promise<{ scanResults: number; coverageZones: number; observers: number }> {
     const deletedScans = await db.delete(scanResults)
-      .where(eq(scanResults.radioId, radioId))
+      .where(or(eq(scanResults.radioId, radioId), eq(scanResults.observerId, radioId)))
       .returning();
     const deletedZones = await db.delete(coverageZones)
       .where(eq(coverageZones.radioId, radioId))
       .returning();
-    return { scanResults: deletedScans.length, coverageZones: deletedZones.length };
+    const deletedObservers = await db.delete(observers)
+      .where(eq(observers.deviceId, radioId))
+      .returning();
+    return { scanResults: deletedScans.length, coverageZones: deletedZones.length, observers: deletedObservers.length };
   }
 
   async findNearbyZone(lat: number, lng: number, radiusMeters: number): Promise<CoverageZone | undefined> {

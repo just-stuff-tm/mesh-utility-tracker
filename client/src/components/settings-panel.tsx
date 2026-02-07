@@ -41,7 +41,7 @@ export function SettingsPanel() {
       setConfirmDelete(false);
       toast({
         title: "Data deleted",
-        description: `Removed ${data.deleted.scanResults} scan results and ${data.deleted.coverageZones} coverage zones`,
+        description: `Removed ${data.deleted.scanResults} scan results, ${data.deleted.coverageZones} coverage zones, and ${data.deleted.observers || 0} observer records`,
       });
     },
     onError: () => {
