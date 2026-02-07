@@ -1,4 +1,13 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import {
+  getTableForEndpoint,
+  saveCollectionToLocal,
+  getLocalCollection,
+  getLocalDeadZones,
+  getLocalLatestScans,
+  enqueueMutation,
+  isOnline,
+} from "./offline-store";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -12,6 +21,22 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  if (!isOnline() && method !== "GET") {
+    await enqueueMutation({
+      url,
+      method,
+      payload: data || null,
+      createdAt: Date.now(),
+      retries: 0,
+    });
+    const queuedResponse = new Response(JSON.stringify({ queued: true }), {
+      status: 202,
+      statusText: "Queued for sync",
+      headers: { "Content-Type": "application/json" },
+    });
+    return queuedResponse;
+  }
+
   const res = await fetch(url, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
@@ -23,22 +48,58 @@ export async function apiRequest(
   return res;
 }
 
+export function isQueuedResponse(res: Response): boolean {
+  return res.status === 202;
+}
+
+async function getOfflineData(endpoint: string): Promise<unknown | null> {
+  const base = endpoint.split("?")[0];
+  if (base === "/api/coverage-zones/dead") {
+    return getLocalDeadZones();
+  }
+  if (base === "/api/scan-results/latest") {
+    return getLocalLatestScans();
+  }
+  const tableName = getTableForEndpoint(endpoint);
+  if (tableName) {
+    return getLocalCollection(tableName);
+  }
+  return null;
+}
+
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
-    });
+    const endpoint = queryKey.join("/") as string;
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    try {
+      const res = await fetch(endpoint, {
+        credentials: "include",
+      });
+
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      const json = await res.json();
+
+      const tableName = getTableForEndpoint(endpoint);
+      if (tableName && Array.isArray(json)) {
+        saveCollectionToLocal(tableName, json).catch(() => {});
+      }
+
+      return json;
+    } catch (err) {
+      const offlineData = await getOfflineData(endpoint);
+      if (offlineData !== null) {
+        return offlineData as any;
+      }
+      throw err;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({

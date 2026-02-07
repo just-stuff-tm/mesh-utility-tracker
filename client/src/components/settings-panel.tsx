@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Settings, Timer, MapPin, AlertTriangle, Trash2, Radar, Ruler } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings, Timer, MapPin, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -9,12 +9,16 @@ import { Separator } from "@/components/ui/separator";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
 import { publicKeyHex } from "@/lib/bluetooth";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, isQueuedResponse, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
+import { useOfflineStatus } from "@/lib/use-offline";
 
 export function SettingsPanel() {
   const { toast } = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [tileCacheCount, setTileCacheCount] = useState<number | null>(null);
+  const [downloadingTiles, setDownloadingTiles] = useState(false);
+  const { online, pendingSync, syncing, syncNow } = useOfflineStatus();
   const {
     scanInterval,
     setScanInterval,
@@ -36,13 +40,23 @@ export function SettingsPanel() {
   const deleteDataMutation = useMutation({
     mutationFn: async (radioId: string) => {
       const res = await apiRequest("DELETE", `/api/data/${radioId}`);
+      if (isQueuedResponse(res)) {
+        return { queued: true } as any;
+      }
       return res.json();
     },
     onSuccess: (data) => {
+      setConfirmDelete(false);
+      if (data.queued) {
+        toast({
+          title: "Delete queued",
+          description: "Data will be deleted when you're back online",
+        });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
       queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
-      setConfirmDelete(false);
       toast({
         title: "Data deleted",
         description: `Removed ${data.deleted.scanResults} scan results, ${data.deleted.coverageZones} coverage zones, and ${data.deleted.observers || 0} observer records`,
@@ -62,13 +76,34 @@ export function SettingsPanel() {
   const markDeadZoneMutation = useMutation({
     mutationFn: async (data: { centerLat: number; centerLng: number }) => {
       const res = await apiRequest("POST", "/api/coverage-zones/dead-zone", data);
+      if (isQueuedResponse(res)) {
+        return { queued: true } as any;
+      }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data.queued) {
+        toast({ title: "Dead zone queued for sync when back online" });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
       toast({ title: "Dead zone marked at your current location" });
     },
   });
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "TILE_CACHE_SIZE") {
+        setTileCacheCount(e.data.count);
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", handler);
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "GET_TILE_CACHE_SIZE" });
+    }
+    return () => navigator.serviceWorker.removeEventListener("message", handler);
+  }, []);
 
   const handleMarkDeadZone = () => {
     if (!observerPosition) {
@@ -229,6 +264,128 @@ export function SettingsPanel() {
           >
             <AlertTriangle className="h-3 w-3 mr-1" />
             Mark Dead Zone
+          </Button>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            {online ? (
+              <Wifi className="h-3.5 w-3.5 text-emerald-500" />
+            ) : (
+              <WifiOff className="h-3.5 w-3.5 text-orange-500" />
+            )}
+            <Label className="text-xs">
+              {online ? "Online" : "Offline Mode"}
+            </Label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {online
+              ? "Data syncs to the server in real time."
+              : "Scans are saved locally and will sync when you're back online."}
+          </p>
+          {pendingSync > 0 && (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-orange-500">
+                {pendingSync} pending {pendingSync === 1 ? "item" : "items"} to sync
+              </p>
+              {online && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={syncNow}
+                  disabled={syncing}
+                  className="text-[10px]"
+                  data-testid="button-sync-now"
+                  data-no-close
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${syncing ? "animate-spin" : ""}`} />
+                  {syncing ? "Syncing..." : "Sync Now"}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Download className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs">Offline Map Tiles</Label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Map tiles are cached as you browse. Download tiles for your current area to use offline.
+          </p>
+          {tileCacheCount !== null && (
+            <p className="text-xs text-muted-foreground">
+              {tileCacheCount} tiles cached
+            </p>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (!observerPosition) {
+                toast({ title: "Location not available", variant: "destructive" });
+                return;
+              }
+              if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
+                toast({ title: "Service worker not ready. Reload the app.", variant: "destructive" });
+                return;
+              }
+              setDownloadingTiles(true);
+              const [lat, lng] = observerPosition;
+              const tileUrls: string[] = [];
+              for (let z = 13; z <= 16; z++) {
+                const n = Math.pow(2, z);
+                const xCenter = Math.floor(((lng + 180) / 360) * n);
+                const yCenter = Math.floor(
+                  ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * n
+                );
+                const range = z <= 13 ? 4 : z <= 14 ? 6 : z <= 15 ? 8 : 10;
+                for (let dx = -range; dx <= range; dx++) {
+                  for (let dy = -range; dy <= range; dy++) {
+                    const x = xCenter + dx;
+                    const y = yCenter + dy;
+                    if (x >= 0 && x < n && y >= 0 && y < n) {
+                      const s = ["a", "b", "c", "d"][Math.abs(x + y) % 4];
+                      tileUrls.push(`https://${s}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`);
+                    }
+                  }
+                }
+              }
+              const handler = (e: MessageEvent) => {
+                if (e.data?.type === "PREFETCH_COMPLETE") {
+                  setDownloadingTiles(false);
+                  toast({
+                    title: "Tiles downloaded",
+                    description: `Cached ${e.data.count} new tiles (${e.data.total} total requested)`,
+                  });
+                  navigator.serviceWorker.removeEventListener("message", handler);
+                  navigator.serviceWorker.controller?.postMessage({ type: "GET_TILE_CACHE_SIZE" });
+                }
+              };
+              navigator.serviceWorker.addEventListener("message", handler);
+              navigator.serviceWorker.controller.postMessage({ type: "PREFETCH_TILES", urls: tileUrls });
+            }}
+            disabled={downloadingTiles || !observerPosition}
+            className="w-full"
+            data-testid="button-download-tiles"
+            data-no-close
+          >
+            {downloadingTiles ? (
+              <>
+                <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                Downloading...
+              </>
+            ) : (
+              <>
+                <MapPinned className="h-3 w-3 mr-1" />
+                Download Area Tiles
+              </>
+            )}
           </Button>
         </div>
 

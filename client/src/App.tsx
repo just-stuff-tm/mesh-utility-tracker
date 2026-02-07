@@ -10,6 +10,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { BluetoothProvider } from "@/lib/bluetooth-context";
 import { Heart } from "lucide-react";
 import { CompatibilityDialog } from "@/components/compatibility-dialog";
+import { OfflineIndicator } from "@/components/offline-indicator";
 import NotFound from "@/pages/not-found";
 import MapPage from "@/pages/map-page";
 import NodesPage from "@/pages/nodes-page";
@@ -47,6 +48,7 @@ function App() {
                   <header className="flex items-center justify-between gap-2 p-2 border-b border-border shrink-0 z-50 bg-background">
                     <SidebarTrigger data-testid="button-sidebar-toggle" />
                     <div className="flex items-center gap-2">
+                      <OfflineIndicator />
                       <a
                         href="https://cash.app/$yuptm"
                         target="_blank"

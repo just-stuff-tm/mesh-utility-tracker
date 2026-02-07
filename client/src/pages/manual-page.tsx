@@ -11,6 +11,7 @@ import {
   Mountain,
   AlertTriangle,
   HelpCircle,
+  WifiOff,
 } from "lucide-react";
 
 interface Section {
@@ -92,6 +93,17 @@ const sections: Section[] = [
       "Stats Radius: Filter the bottom stats display to only show data within a certain distance from your current position. Set to 0 for all data.",
       "Units: Switch between Imperial (feet, miles) and Metric (meters, kilometers).",
       "Map Layers: Use the layer control on the map to switch between Dark, Standard, and Satellite views.",
+    ],
+  },
+  {
+    icon: WifiOff,
+    title: "Offline Mode",
+    content: [
+      "Mesh Utility works fully offline after your first visit. Scans, nodes, and coverage data are stored on your device automatically.",
+      "When you lose internet, the app continues to work. Scan results are saved locally and queued for upload. When connectivity returns, everything syncs to the server automatically.",
+      "Map tiles are cached as you browse. To download tiles for offline use, go to Settings and tap 'Download Area Tiles' — this saves map tiles for the area around your current location.",
+      "Check your connection status in the header bar. An orange 'Offline' badge appears when you're disconnected, and a blue indicator shows pending sync items.",
+      "In Settings, you can see how many tiles are cached and how many items are waiting to sync. Tap 'Sync Now' to manually push queued data when you're back online.",
     ],
   },
   {

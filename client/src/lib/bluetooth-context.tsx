@@ -18,6 +18,7 @@ import {
 } from "@/lib/bluetooth";
 import { getCurrentPosition, watchPosition, clearWatch, fetchElevation } from "@/lib/geolocation";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { db, generateLocalId, isOnline } from "@/lib/offline-store";
 import { snapToHexGrid } from "@shared/grid";
 
 export type ScanStatus = "idle" | "advertising" | "waiting" | "querying" | "submitting" | "done" | "error";
@@ -283,7 +284,12 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetch("/api/nodes");
         if (res.ok) existingNodes = await res.json();
-      } catch {}
+      } catch {
+        try {
+          const local = await db.nodes.toArray();
+          existingNodes = local.map((n) => ({ nodeId: n.nodeId, name: n.name }));
+        } catch {}
+      }
       const nodeNameMap = new Map<string, string>();
       for (const n of existingNodes) {
         if (n.name) nodeNameMap.set(n.nodeId, n.name);
@@ -300,30 +306,93 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
             ? (nodeNameMap.get(nodeId) || advName || nodeId)
             : advName;
 
-          try {
-            await apiRequest("POST", "/api/nodes", {
-              nodeId,
-              name: repeaterName,
-              latitude: null,
-              longitude: null,
-            });
-          } catch {}
+          const nodeData = {
+            nodeId,
+            name: repeaterName,
+            latitude: null as number | null,
+            longitude: null as number | null,
+          };
 
           try {
-            await apiRequest("POST", "/api/scan-results", {
-              observerId: radioId || "local-observer",
-              nodeId,
-              rssi: rep.stats.rssi,
-              snr: rep.stats.snr,
-              latitude: pos[0],
-              longitude: pos[1],
-              altitude: altitudeRef.current,
-              senderName: repeaterName,
-              receiverName: selfInfoRef.current?.name || "Observer",
-              radioId,
-            });
+            await apiRequest("POST", "/api/nodes", nodeData);
+          } catch {}
+
+          if (!isOnline()) {
+            try {
+              const existing = await db.nodes.where("nodeId").equals(nodeId).first();
+              await db.nodes.put({
+                id: existing?.id || generateLocalId(),
+                nodeId,
+                name: repeaterName,
+                hardwareType: existing?.hardwareType || null,
+                lastSeen: new Date().toISOString(),
+                latitude: null,
+                longitude: null,
+              });
+            } catch {}
+          }
+
+          const scanData = {
+            observerId: radioId || "local-observer",
+            nodeId,
+            rssi: rep.stats.rssi,
+            snr: rep.stats.snr,
+            latitude: pos[0],
+            longitude: pos[1],
+            altitude: altitudeRef.current,
+            senderName: repeaterName,
+            receiverName: selfInfoRef.current?.name || "Observer",
+            radioId,
+          };
+
+          try {
+            await apiRequest("POST", "/api/scan-results", scanData);
             scanResultsSubmitted++;
           } catch {}
+
+          if (!isOnline()) {
+            try {
+              const scanId = generateLocalId();
+              await db.scanResults.put({
+                id: scanId,
+                ...scanData,
+                timestamp: new Date().toISOString(),
+              });
+
+              const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
+              const existing = await db.coverageZones
+                .filter((z) => Math.abs(z.centerLat - snapLat) < 0.0001 && Math.abs(z.centerLng - snapLng) < 0.0001)
+                .first();
+              if (existing) {
+                const newCount = (existing.scanCount || 0) + 1;
+                const newAvgRssi = ((existing.avgRssi || 0) * (existing.scanCount || 0) + rep.stats.rssi) / newCount;
+                const newAvgSnr = ((existing.avgSnr || 0) * (existing.scanCount || 0) + rep.stats.snr) / newCount;
+                await db.coverageZones.put({
+                  ...existing,
+                  avgRssi: newAvgRssi,
+                  avgSnr: newAvgSnr,
+                  scanCount: newCount,
+                  isDeadZone: false,
+                  lastScanned: new Date().toISOString(),
+                });
+              } else {
+                await db.coverageZones.put({
+                  id: generateLocalId(),
+                  centerLat: snapLat,
+                  centerLng: snapLng,
+                  radiusMeters: 80,
+                  avgRssi: rep.stats.rssi,
+                  avgSnr: rep.stats.snr,
+                  scanCount: 1,
+                  lastScanned: new Date().toISOString(),
+                  isDeadZone: false,
+                  polygon: null,
+                  radioId,
+                });
+              }
+              scanResultsSubmitted++;
+            } catch {}
+          }
         }
 
         if (result.repeaters.length === 0) {
@@ -334,6 +403,30 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
               radioId,
             });
           } catch {}
+
+          if (!isOnline()) {
+            try {
+              const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
+              const existing = await db.coverageZones
+                .filter((z) => Math.abs(z.centerLat - snapLat) < 0.0001 && Math.abs(z.centerLng - snapLng) < 0.0001)
+                .first();
+              if (!existing || (existing.scanCount === 0 || existing.isDeadZone)) {
+                await db.coverageZones.put({
+                  id: existing?.id || generateLocalId(),
+                  centerLat: snapLat,
+                  centerLng: snapLng,
+                  radiusMeters: 80,
+                  avgRssi: null,
+                  avgSnr: null,
+                  scanCount: 0,
+                  lastScanned: new Date().toISOString(),
+                  isDeadZone: true,
+                  polygon: null,
+                  radioId,
+                });
+              }
+            } catch {}
+          }
         }
       }
 
