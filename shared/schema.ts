@@ -54,6 +54,7 @@ export const scanResults = pgTable("scan_results", {
   snr: real("snr").notNull(),
   latitude: real("latitude").notNull(),
   longitude: real("longitude").notNull(),
+  altitude: real("altitude"),
   timestamp: timestamp("timestamp").defaultNow(),
   senderName: text("sender_name"),
   receiverName: text("receiver_name"),

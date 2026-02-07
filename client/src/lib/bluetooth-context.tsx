@@ -127,6 +127,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   const contactsRef = useRef<MeshContact[]>([]);
   const smartScanEnabledRef = useRef(smartScanEnabled);
   const smartScanDaysRef = useRef(smartScanDays);
+  const altitudeRef = useRef<number | null>(null);
 
   useEffect(() => {
     positionRef.current = observerPosition;
@@ -147,6 +148,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     smartScanDaysRef.current = smartScanDays;
   }, [smartScanDays]);
+
+  useEffect(() => {
+    altitudeRef.current = altitudeMeters;
+  }, [altitudeMeters]);
 
   const lastElevationFetch = useRef<string | null>(null);
 
@@ -312,6 +317,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
               snr: rep.stats.snr,
               latitude: pos[0],
               longitude: pos[1],
+              altitude: altitudeRef.current,
               senderName: repeaterName,
               receiverName: selfInfoRef.current?.name || "Observer",
               radioId,
