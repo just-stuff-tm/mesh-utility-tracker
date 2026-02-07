@@ -188,7 +188,7 @@ export default function SettingsPage() {
           <h3 className="text-sm font-semibold">About</h3>
         </div>
         <div className="text-xs text-muted-foreground space-y-1">
-          <p>Mesh Utility v1.0 - LoRa MeshCore Radio Management</p>
+          <p>Mesh Utility v1.2 - LoRa MeshCore Radio Management</p>
           <p>Connects to MeshCore radios via Web Bluetooth API to discover mesh nodes and map RF coverage.</p>
           <p>Requires Chrome, Edge, or another Chromium-based browser with Web Bluetooth support.</p>
         </div>
