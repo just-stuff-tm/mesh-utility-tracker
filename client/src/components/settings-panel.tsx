@@ -158,6 +158,87 @@ export function SettingsPanel() {
 
         <Separator />
 
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Download className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs" data-testid="label-offline-tiles">Offline Map Tiles</Label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Map tiles are cached as you browse. Download tiles for your current area to use offline.
+          </p>
+          {tileCacheCount !== null && (
+            <p className="text-xs text-muted-foreground">
+              {tileCacheCount} tiles cached
+            </p>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (!observerPosition) {
+                toast({ title: "Location not available", variant: "destructive" });
+                return;
+              }
+              if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
+                toast({ title: "Service worker not ready. Reload the app.", variant: "destructive" });
+                return;
+              }
+              setDownloadingTiles(true);
+              const [lat, lng] = observerPosition;
+              const tileUrls: string[] = [];
+              for (let z = 13; z <= 16; z++) {
+                const n = Math.pow(2, z);
+                const xCenter = Math.floor(((lng + 180) / 360) * n);
+                const yCenter = Math.floor(
+                  ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * n
+                );
+                const range = z <= 13 ? 4 : z <= 14 ? 6 : z <= 15 ? 8 : 10;
+                for (let dx = -range; dx <= range; dx++) {
+                  for (let dy = -range; dy <= range; dy++) {
+                    const x = xCenter + dx;
+                    const y = yCenter + dy;
+                    if (x >= 0 && x < n && y >= 0 && y < n) {
+                      const s = ["a", "b", "c", "d"][Math.abs(x + y) % 4];
+                      tileUrls.push(`https://${s}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`);
+                    }
+                  }
+                }
+              }
+              const handler = (e: MessageEvent) => {
+                if (e.data?.type === "PREFETCH_COMPLETE") {
+                  setDownloadingTiles(false);
+                  toast({
+                    title: "Tiles downloaded",
+                    description: `Cached ${e.data.count} new tiles (${e.data.total} total requested)`,
+                  });
+                  navigator.serviceWorker.removeEventListener("message", handler);
+                  navigator.serviceWorker.controller?.postMessage({ type: "GET_TILE_CACHE_SIZE" });
+                }
+              };
+              navigator.serviceWorker.addEventListener("message", handler);
+              navigator.serviceWorker.controller.postMessage({ type: "PREFETCH_TILES", urls: tileUrls });
+            }}
+            disabled={downloadingTiles || !observerPosition}
+            className="w-full"
+            data-testid="button-download-tiles"
+            data-no-close
+          >
+            {downloadingTiles ? (
+              <>
+                <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                Downloading...
+              </>
+            ) : (
+              <>
+                <MapPinned className="h-3 w-3 mr-1" />
+                Download Area Tiles
+              </>
+            )}
+          </Button>
+        </div>
+
+        <Separator />
+
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Ruler className="h-3.5 w-3.5 text-muted-foreground" />
@@ -306,87 +387,6 @@ export function SettingsPanel() {
               )}
             </div>
           )}
-        </div>
-
-        <Separator />
-
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Download className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs">Offline Map Tiles</Label>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Map tiles are cached as you browse. Download tiles for your current area to use offline.
-          </p>
-          {tileCacheCount !== null && (
-            <p className="text-xs text-muted-foreground">
-              {tileCacheCount} tiles cached
-            </p>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              if (!observerPosition) {
-                toast({ title: "Location not available", variant: "destructive" });
-                return;
-              }
-              if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
-                toast({ title: "Service worker not ready. Reload the app.", variant: "destructive" });
-                return;
-              }
-              setDownloadingTiles(true);
-              const [lat, lng] = observerPosition;
-              const tileUrls: string[] = [];
-              for (let z = 13; z <= 16; z++) {
-                const n = Math.pow(2, z);
-                const xCenter = Math.floor(((lng + 180) / 360) * n);
-                const yCenter = Math.floor(
-                  ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) * n
-                );
-                const range = z <= 13 ? 4 : z <= 14 ? 6 : z <= 15 ? 8 : 10;
-                for (let dx = -range; dx <= range; dx++) {
-                  for (let dy = -range; dy <= range; dy++) {
-                    const x = xCenter + dx;
-                    const y = yCenter + dy;
-                    if (x >= 0 && x < n && y >= 0 && y < n) {
-                      const s = ["a", "b", "c", "d"][Math.abs(x + y) % 4];
-                      tileUrls.push(`https://${s}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`);
-                    }
-                  }
-                }
-              }
-              const handler = (e: MessageEvent) => {
-                if (e.data?.type === "PREFETCH_COMPLETE") {
-                  setDownloadingTiles(false);
-                  toast({
-                    title: "Tiles downloaded",
-                    description: `Cached ${e.data.count} new tiles (${e.data.total} total requested)`,
-                  });
-                  navigator.serviceWorker.removeEventListener("message", handler);
-                  navigator.serviceWorker.controller?.postMessage({ type: "GET_TILE_CACHE_SIZE" });
-                }
-              };
-              navigator.serviceWorker.addEventListener("message", handler);
-              navigator.serviceWorker.controller.postMessage({ type: "PREFETCH_TILES", urls: tileUrls });
-            }}
-            disabled={downloadingTiles || !observerPosition}
-            className="w-full"
-            data-testid="button-download-tiles"
-            data-no-close
-          >
-            {downloadingTiles ? (
-              <>
-                <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                Downloading...
-              </>
-            ) : (
-              <>
-                <MapPinned className="h-3 w-3 mr-1" />
-                Download Area Tiles
-              </>
-            )}
-          </Button>
         </div>
 
         <Separator />
