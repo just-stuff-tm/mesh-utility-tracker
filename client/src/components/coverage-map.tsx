@@ -58,7 +58,7 @@ const SIGNAL_STYLES: Record<number, SignalStyle> = {
   3: { fill: "#facc15", border: "#eab308", fillOpacity: 0.45, label: "Fair", level: 3 },
   2: { fill: "#f97316", border: "#ea580c", fillOpacity: 0.42, label: "Marginal", level: 2 },
   1: { fill: "#ef4444", border: "#dc2626", fillOpacity: 0.42, label: "Poor", level: 1 },
-  0: { fill: "#991b1b", border: "#7f1d1d", fillOpacity: 0.45, label: "No Link", level: 0 },
+  0: { fill: "#991b1b", border: "#7f1d1d", fillOpacity: 0.45, label: "Dead Zone", level: 0 },
 };
 
 const NOISY_STYLE: SignalStyle = {
@@ -77,8 +77,8 @@ function getSignalStyle(rssi: number | null, snr: number | null): SignalStyle {
 
   const effectiveRssi = rssiLvl ?? 3;
   const effectiveSnr = snrLvl ?? 3;
-  const combined = Math.min(effectiveRssi, effectiveSnr);
-  return SIGNAL_STYLES[combined] ?? SIGNAL_STYLES[0];
+  const combined = Math.max(1, Math.min(effectiveRssi, effectiveSnr));
+  return SIGNAL_STYLES[combined] ?? SIGNAL_STYLES[1];
 }
 
 function MapAutoUpdater({ center, autoCenter }: { center: [number, number] | null; autoCenter: boolean }) {
@@ -111,9 +111,9 @@ const legendItems = [
   { color: "#4ade80", label: "Good", range: "RSSI > -100, SNR > 0" },
   { color: "#facc15", label: "Fair", range: "RSSI > -110, SNR > -7" },
   { color: "#f97316", label: "Marginal", range: "RSSI > -115, SNR > -13" },
-  { color: "#ef4444", label: "Poor", range: "RSSI > -120, SNR > -13" },
-  { color: "#991b1b", label: "No Link", range: "RSSI \u2264 -120 or SNR \u2264 -13" },
-  { color: "#a855f7", label: "Noisy", range: "RSSI > -115 but SNR \u2264 -13" },
+  { color: "#ef4444", label: "Poor", range: "Weak signal, at limit" },
+  { color: "#991b1b", label: "Dead Zone", range: "No response received" },
+  { color: "#a855f7", label: "Noisy", range: "Good signal, bad SNR" },
 ];
 
 interface CoverageMapProps {
