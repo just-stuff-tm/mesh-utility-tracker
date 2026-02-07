@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Signal, Clock, MapPin, Radio } from "lucide-react";
+import { Activity, Signal, Clock, MapPin, Radio, Mountain } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useBluetoothContext } from "@/lib/bluetooth-context";
 import type { ScanResult } from "@shared/schema";
 
 function getSignalBadge(rssi: number): { label: string; variant: "default" | "secondary" | "destructive" } {
@@ -21,7 +22,14 @@ function formatTime(date: string | Date | null): string {
   return d.toLocaleString();
 }
 
+function formatAltitude(meters: number | null, units: "imperial" | "metric"): string | null {
+  if (meters == null) return null;
+  if (units === "imperial") return `${Math.round(meters * 3.28084)} ft`;
+  return `${Math.round(meters)} m`;
+}
+
 export default function HistoryPage() {
+  const { unitSystem } = useBluetoothContext();
   const { data: scans = [], isLoading } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan-results"],
   });
@@ -101,6 +109,12 @@ export default function HistoryPage() {
                           <MapPin className="h-3 w-3 text-muted-foreground" />
                           <span>{scan.latitude.toFixed(4)}, {scan.longitude.toFixed(4)}</span>
                         </div>
+                        {scan.altitude != null && (
+                          <div className="flex items-center gap-1" data-testid={`text-altitude-${scan.id}`}>
+                            <Mountain className="h-3 w-3 text-muted-foreground" />
+                            <span>{formatAltitude(scan.altitude, unitSystem)}</span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3 text-muted-foreground" />
                           <span>{formatTime(scan.timestamp)}</span>

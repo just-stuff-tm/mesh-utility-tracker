@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mountain } from "lucide-react";
 import type { CoverageZone, ScanResult } from "@shared/schema";
 import { getHexVertices } from "@shared/grid";
+import { useBluetoothContext } from "@/lib/bluetooth-context";
 
 import "leaflet/dist/leaflet.css";
 
@@ -281,6 +282,7 @@ function RssiLegend() {
 }
 
 function ZonePopup({ zone }: { zone: CoverageZone }) {
+  const { unitSystem } = useBluetoothContext();
   const style = zone.isDeadZone ? null : getSignalStyle(zone.avgRssi, zone.avgSnr);
   const [scans, setScans] = useState<ScanResult[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -325,6 +327,22 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
         <span className="font-mono text-[10px]">
           {zone.centerLat.toFixed(4)}, {zone.centerLng.toFixed(4)}
         </span>
+        {loaded && (() => {
+          const scansWithAlt = scans
+            .filter((s) => s.altitude != null)
+            .sort((a, b) => new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime());
+          if (scansWithAlt.length === 0) return null;
+          const latest = scansWithAlt[0].altitude!;
+          const formatted = unitSystem === "imperial"
+            ? `${Math.round(latest * 3.28084)} ft`
+            : `${Math.round(latest)} m`;
+          return (
+            <>
+              <span className="text-gray-500">Altitude</span>
+              <span className="font-semibold">{formatted} ASL</span>
+            </>
+          );
+        })()}
       </div>
       {loaded && scans.length > 0 && (
         <div className="border-t border-gray-200 pt-2 space-y-1.5">
