@@ -156,13 +156,13 @@ export function SettingsPanel() {
           <Slider
             value={[scanInterval]}
             onValueChange={([v]) => setScanInterval(v)}
-            min={40}
+            min={20}
             max={300}
             step={10}
             data-testid="slider-scan-interval"
           />
           <p className="text-xs text-muted-foreground">
-            Minimum 40s between scans
+            Minimum 20s between scans
           </p>
         </div>
 
