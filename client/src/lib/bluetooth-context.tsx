@@ -50,6 +50,7 @@ interface BluetoothContextValue {
   smartScanDays: number;
   statsRadiusMiles: number;
   unitSystem: UnitSystem;
+  updateRadioPosition: boolean;
   altitudeMeters: number | null;
   wakeLockActive: boolean;
   deviceInfo: DeviceInfo | null;
@@ -71,6 +72,7 @@ interface BluetoothContextValue {
   setSmartScanDays: (v: number) => void;
   setStatsRadiusMiles: (v: number) => void;
   setUnitSystem: (v: UnitSystem) => void;
+  setUpdateRadioPosition: (v: boolean) => void;
 }
 
 const BluetoothContext = createContext<BluetoothContextValue | null>(null);
@@ -106,6 +108,13 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       return (stored === "metric" ? "metric" : "imperial") as UnitSystem;
     } catch { return "imperial" as UnitSystem; }
   });
+  const [updateRadioPosition, setUpdateRadioPosition] = useState(() => {
+    try {
+      const stored = localStorage.getItem("mesh_update_radio_position");
+      return stored === "true";
+    } catch { return false; }
+  });
+  const updateRadioPositionRef = useRef(updateRadioPosition);
   const [altitudeMeters, setAltitudeMeters] = useState<number | null>(null);
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
@@ -149,6 +158,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     smartScanDaysRef.current = smartScanDays;
   }, [smartScanDays]);
+
+  useEffect(() => {
+    updateRadioPositionRef.current = updateRadioPosition;
+  }, [updateRadioPosition]);
 
   useEffect(() => {
     altitudeRef.current = altitudeMeters;
@@ -250,9 +263,15 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     setScanStatus("advertising");
 
     try {
-      const result = await discoverRepeaters(pos?.[0], pos?.[1], (status) => {
-        setScanStatus(status as ScanStatus);
-      }, contactsRef.current);
+      const shouldUpdatePosition = updateRadioPositionRef.current;
+      const result = await discoverRepeaters(
+        shouldUpdatePosition ? pos?.[0] : undefined,
+        shouldUpdatePosition ? pos?.[1] : undefined,
+        (status) => {
+          setScanStatus(status as ScanStatus);
+        },
+        contactsRef.current,
+      );
       if (!result) {
         setScanStatus("error");
         setLastScanResult({
@@ -643,6 +662,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         smartScanDays,
         statsRadiusMiles,
         unitSystem,
+        updateRadioPosition,
         altitudeMeters,
         wakeLockActive,
         deviceInfo,
@@ -669,6 +689,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         setUnitSystem: (v: UnitSystem) => {
           setUnitSystem(v);
           try { localStorage.setItem("mesh_unit_system", v); } catch {}
+        },
+        setUpdateRadioPosition: (v: boolean) => {
+          setUpdateRadioPosition(v);
+          try { localStorage.setItem("mesh_update_radio_position", String(v)); } catch {}
         },
       }}
     >

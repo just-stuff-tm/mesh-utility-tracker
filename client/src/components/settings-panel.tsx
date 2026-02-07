@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Timer, MapPin, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned } from "lucide-react";
+import { Settings, Timer, MapPin, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned, Radio } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -28,6 +28,8 @@ export function SettingsPanel() {
     setScanInterval,
     autoCenter,
     setAutoCenter,
+    updateRadioPosition,
+    setUpdateRadioPosition,
     smartScanEnabled,
     setSmartScanEnabled,
     smartScanDays,
@@ -174,6 +176,27 @@ export function SettingsPanel() {
             onCheckedChange={setAutoCenter}
             data-testid="switch-auto-center"
           />
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Radio className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-xs">Update Radio Position</Label>
+            </div>
+            <Switch
+              checked={updateRadioPosition}
+              onCheckedChange={setUpdateRadioPosition}
+              data-testid="switch-update-radio-position"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {updateRadioPosition
+              ? "Your GPS coordinates will be sent to the radio during scans, updating its stored position."
+              : "Radio position will not be changed during scans. Enable only if you want the radio to track your location."}
+          </p>
         </div>
 
         <Separator />
