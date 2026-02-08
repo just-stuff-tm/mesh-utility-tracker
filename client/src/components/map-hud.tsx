@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Play, Pause, Radio, Signal, Clock, AlertTriangle, Zap, Cpu, ChevronDown, ChevronUp, Mountain } from "lucide-react";
+import { Play, Pause, Radio, Signal, Clock, AlertTriangle, Zap, Cpu, ChevronDown, ChevronUp, Mountain, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useBluetoothContext, type ScanStatus } from "@/lib/bluetooth-context";
@@ -55,6 +55,8 @@ export function MapHud() {
     smartScanEnabled,
     altitudeMeters,
     unitSystem,
+    autoCenter,
+    setAutoCenter,
   } = useBluetoothContext();
 
   const [expanded, setExpanded] = useState(true);
@@ -133,6 +135,16 @@ export function MapHud() {
               {batteryV}V
             </Badge>
           )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className={`toggle-elevate ${autoCenter ? "toggle-elevated" : ""}`}
+            onClick={() => setAutoCenter(!autoCenter)}
+            title={autoCenter ? "Auto-center on" : "Auto-center off"}
+            data-testid="button-auto-center"
+          >
+            <MapPin className={`h-3 w-3 ${autoCenter ? "text-blue-400" : ""}`} />
+          </Button>
           <Button
             size="icon"
             variant="ghost"

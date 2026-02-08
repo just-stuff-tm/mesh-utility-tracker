@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Timer, MapPin, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned, Radio, Wrench } from "lucide-react";
+import { Settings, Timer, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned, Radio, Wrench } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -28,8 +28,6 @@ export function SettingsPanel() {
   const {
     scanInterval,
     setScanInterval,
-    autoCenter,
-    setAutoCenter,
     updateRadioPosition,
     setUpdateRadioPosition,
     smartScanEnabled,
@@ -185,20 +183,6 @@ export function SettingsPanel() {
           <p className="text-xs text-muted-foreground">
             Minimum 20s between scans
           </p>
-        </div>
-
-        <Separator />
-
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs">Auto-center map</Label>
-          </div>
-          <Switch
-            checked={autoCenter}
-            onCheckedChange={setAutoCenter}
-            data-testid="switch-auto-center"
-          />
         </div>
 
         <Separator />
