@@ -288,15 +288,18 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    if (zone.isDeadZone) { setLoaded(true); return; }
     fetch(`/api/scan-results/zone?lat=${zone.centerLat}&lng=${zone.centerLng}`)
       .then((r) => r.json())
       .then((data) => { setScans(data); setLoaded(true); })
       .catch(() => setLoaded(true));
-  }, [zone.centerLat, zone.centerLng]);
+  }, [zone.centerLat, zone.centerLng, zone.isDeadZone]);
 
-  const observers = Array.from(new Set(scans.map((s) => s.receiverName).filter(Boolean)));
+  const observers = zone.isDeadZone ? [] : Array.from(new Set(scans.map((s) => s.receiverName).filter(Boolean)));
   const repeaterMap = new Map<string, string>();
-  scans.forEach((s) => { if (!repeaterMap.has(s.nodeId)) repeaterMap.set(s.nodeId, s.senderName || s.nodeId); });
+  if (!zone.isDeadZone) {
+    scans.forEach((s) => { if (!repeaterMap.has(s.nodeId)) repeaterMap.set(s.nodeId, s.senderName || s.nodeId); });
+  }
   const repeaters = Array.from(repeaterMap.entries());
 
   return (

@@ -233,13 +233,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async clearDeadZonesNear(snapLat: number, snapLng: number, excludeId?: string): Promise<number> {
-    const tolerance = 0.0001;
+    const latTol = 0.00053;
+    const lngTol = 0.00073;
     const conditions = [
       eq(coverageZones.isDeadZone, true),
-      gte(coverageZones.centerLat, snapLat - tolerance),
-      lte(coverageZones.centerLat, snapLat + tolerance),
-      gte(coverageZones.centerLng, snapLng - tolerance),
-      lte(coverageZones.centerLng, snapLng + tolerance),
+      gte(coverageZones.centerLat, snapLat - latTol),
+      lte(coverageZones.centerLat, snapLat + latTol),
+      gte(coverageZones.centerLng, snapLng - lngTol),
+      lte(coverageZones.centerLng, snapLng + lngTol),
     ];
     if (excludeId) {
       conditions.push(ne(coverageZones.id, excludeId));
