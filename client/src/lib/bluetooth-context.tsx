@@ -547,7 +547,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     if (!connected || !isScanning || !observerPosition) return;
     const { snapLat, snapLng } = snapToHexGrid(observerPosition[0], observerPosition[1]);
     const currentSnap = `${snapLat},${snapLng}`;
-    if (lastSnapRef.current && currentSnap !== lastSnapRef.current && checkIsInDeadZone()) {
+    if (smartScanEnabled && lastSnapRef.current && currentSnap !== lastSnapRef.current && checkIsInDeadZone()) {
       lastSnapRef.current = currentSnap;
       if (scanTimerRef.current) {
         clearInterval(scanTimerRef.current);
@@ -557,7 +557,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         runAutoScanRef.current?.();
       }, scanInterval * 1000);
     }
-  }, [connected, isScanning, observerPosition, scanInterval, checkIsInDeadZone]);
+  }, [connected, isScanning, observerPosition, scanInterval, smartScanEnabled, checkIsInDeadZone]);
 
   const acquireWakeLock = useCallback(async () => {
     try {
