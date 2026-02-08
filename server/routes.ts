@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { resetPool } from "./db";
 import { insertScanResultSchema, insertMeshNodeSchema, insertObserverSchema, insertCoverageZoneSchema } from "@shared/schema";
 import { snapToHexGrid } from "@shared/grid";
 
@@ -8,6 +9,15 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  app.post("/api/reset-sync", async (_req, res) => {
+    try {
+      await resetPool();
+      res.json({ success: true, message: "Database connections reset" });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
 
   app.post("/api/remote-log", (req, res) => {
     const entries = req.body;

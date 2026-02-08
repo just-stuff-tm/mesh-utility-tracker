@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Timer, MapPin, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned, Radio } from "lucide-react";
+import { Settings, Timer, MapPin, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned, Radio, Wrench } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -80,6 +80,27 @@ export function SettingsPanel() {
     const radioId = publicKeyHex(selfInfo.publicKey);
     deleteDataMutation.mutate(radioId);
   };
+
+  const resetSyncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/reset-sync", { method: "POST" });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        queryClient.invalidateQueries();
+        toast({
+          title: "Sync fixed",
+          description: "Server connections have been reset. Try syncing again.",
+        });
+      } else {
+        toast({ title: "Reset failed", description: data.message, variant: "destructive" });
+      }
+    },
+    onError: () => {
+      toast({ title: "Could not reach server", description: "The server may be down. Try again later.", variant: "destructive" });
+    },
+  });
 
   const markDeadZoneMutation = useMutation({
     mutationFn: async (data: { centerLat: number; centerLng: number }) => {
@@ -473,6 +494,20 @@ export function SettingsPanel() {
                 </Button>
               )}
             </div>
+          )}
+          {!forceOffline && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => resetSyncMutation.mutate()}
+              disabled={resetSyncMutation.isPending}
+              className="w-full"
+              data-testid="button-fix-sync"
+              data-no-close
+            >
+              <Wrench className={`h-3 w-3 mr-1 ${resetSyncMutation.isPending ? "animate-spin" : ""}`} />
+              {resetSyncMutation.isPending ? "Fixing..." : "Fix Sync Issues"}
+            </Button>
           )}
         </div>
 

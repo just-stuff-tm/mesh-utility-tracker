@@ -138,6 +138,7 @@ const sections: Section[] = [
       "When you lose internet, everything keeps working. Scan results are saved locally and queued up. When connectivity returns, queued items sync to the server automatically.",
       "You can also force offline mode using the toggle in settings. This is handy if you're on a slow or metered connection and want to batch your uploads for later. When you switch back online, any pending data syncs right away.",
       "The header bar shows your connection status: an orange badge for offline, blue for items waiting to sync. In settings, you can tap Sync Now to manually push queued data.",
+      "If uploads seem stuck or sync stops working, tap Fix Sync Issues in settings. This resets the server's database connections and usually resolves the problem without any data loss.",
     ],
   },
   {
