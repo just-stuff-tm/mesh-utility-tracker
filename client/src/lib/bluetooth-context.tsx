@@ -138,6 +138,9 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   const smartScanEnabledRef = useRef(smartScanEnabled);
   const smartScanDaysRef = useRef(smartScanDays);
   const altitudeRef = useRef<number | null>(null);
+  const scanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const runAutoScanRef = useRef<(() => void) | null>(null);
+  const lastSnapRef = useRef<string | null>(null);
 
   useEffect(() => {
     positionRef.current = observerPosition;
@@ -229,6 +232,27 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     return () => unsubs.forEach((fn) => fn());
   }, []);
 
+
+  const checkIsInDeadZone = useCallback((): boolean => {
+    const pos = positionRef.current;
+    if (!pos) return false;
+    try {
+      const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
+      const cachedZones = queryClient.getQueryData<any[]>(["/api/coverage-zones"]);
+      if (!cachedZones) return false;
+      const tolerance = 0.00005;
+      for (const z of cachedZones) {
+        if (
+          z.isDeadZone &&
+          Math.abs(z.centerLat - snapLat) < tolerance &&
+          Math.abs(z.centerLng - snapLng) < tolerance
+        ) {
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  }, []);
 
   const checkSmartScanSkip = useCallback((): boolean => {
     if (!smartScanEnabledRef.current) return false;
@@ -478,10 +502,18 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!connected || !isScanning) {
       setNextScanCountdown(null);
+      scanTimerRef.current = null;
+      runAutoScanRef.current = null;
+      lastSnapRef.current = null;
       return;
     }
 
     const runAutoScan = () => {
+      const pos = positionRef.current;
+      if (pos) {
+        const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
+        lastSnapRef.current = `${snapLat},${snapLng}`;
+      }
       const skip = checkSmartScanSkip();
       if (skip) {
         setScanStatus("done");
@@ -496,16 +528,36 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       setNextScanCountdown(scanInterval);
     };
 
+    runAutoScanRef.current = runAutoScan;
     runAutoScan();
     const scanTimer = setInterval(runAutoScan, scanInterval * 1000);
+    scanTimerRef.current = scanTimer;
     const tickTimer = setInterval(() => {
       setNextScanCountdown((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
     }, 1000);
     return () => {
       clearInterval(scanTimer);
       clearInterval(tickTimer);
+      scanTimerRef.current = null;
+      runAutoScanRef.current = null;
     };
   }, [connected, isScanning, scanInterval, runDiscoverRepeaters, checkSmartScanSkip]);
+
+  useEffect(() => {
+    if (!connected || !isScanning || !observerPosition) return;
+    const { snapLat, snapLng } = snapToHexGrid(observerPosition[0], observerPosition[1]);
+    const currentSnap = `${snapLat},${snapLng}`;
+    if (lastSnapRef.current && currentSnap !== lastSnapRef.current && checkIsInDeadZone()) {
+      lastSnapRef.current = currentSnap;
+      if (scanTimerRef.current) {
+        clearInterval(scanTimerRef.current);
+      }
+      runAutoScanRef.current?.();
+      scanTimerRef.current = setInterval(() => {
+        runAutoScanRef.current?.();
+      }, scanInterval * 1000);
+    }
+  }, [connected, isScanning, observerPosition, scanInterval, checkIsInDeadZone]);
 
   const acquireWakeLock = useCallback(async () => {
     try {
