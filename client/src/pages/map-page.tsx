@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearch } from "wouter";
-import { Settings, Filter, X } from "lucide-react";
+import { Settings } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { CoverageMap } from "@/components/coverage-map";
 import { BluetoothPanel } from "@/components/bluetooth-panel";
@@ -10,8 +10,6 @@ import { SettingsPanel } from "@/components/settings-panel";
 import { NodeList } from "@/components/node-list";
 import { MapHud } from "@/components/map-hud";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -101,8 +99,11 @@ export default function MapPage() {
     }
     return Array.from(nodeIds).map((id) => {
       const node = nodes.find((n) => n.nodeId === id);
-      const displayName = node?.name && !node.name.startsWith("Unknown (") ? node.name : id;
-      return { nodeId: id, name: displayName };
+      const nodeName = node?.name && !node.name.startsWith("Unknown (") ? node.name : null;
+      const scanName = !nodeName
+        ? allScans.find((s) => s.nodeId === id && s.senderName && !s.senderName.startsWith("Unknown ("))?.senderName
+        : null;
+      return { nodeId: id, name: nodeName || scanName || id };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [allScans, nodes]);
 
@@ -135,6 +136,11 @@ export default function MapPage() {
           observerPosition={observerPosition}
           autoCenter={autoCenter}
           selectedZone={selectedZone}
+          filterNodes={filterableNodes}
+          filterNodeId={filterNodeId}
+          onFilterSelect={setFilterNodeId}
+          filterOpen={filterOpen}
+          onFilterToggle={() => setFilterOpen(!filterOpen)}
           onZoneClick={(zone) => {
             setSelectedZone(zone);
             setSheetOpen(false);
@@ -191,15 +197,6 @@ export default function MapPage() {
           </Sheet>
         </div>
 
-        <div className="absolute top-14 left-12 lg:left-3 z-[1000]">
-          <NodeFilter
-            nodes={filterableNodes}
-            selectedNodeId={filterNodeId}
-            onSelect={setFilterNodeId}
-            open={filterOpen}
-            onToggle={() => setFilterOpen(!filterOpen)}
-          />
-        </div>
 
         <div className="absolute bottom-3 left-3 z-[1001] max-w-[400px]">
           <ScanStats
@@ -224,83 +221,3 @@ export default function MapPage() {
   );
 }
 
-interface NodeFilterProps {
-  nodes: { nodeId: string; name: string }[];
-  selectedNodeId: string | null;
-  onSelect: (nodeId: string | null) => void;
-  open: boolean;
-  onToggle: () => void;
-}
-
-function NodeFilter({ nodes, selectedNodeId, onSelect, open, onToggle }: NodeFilterProps) {
-  const { t } = useI18n();
-  const selectedName = selectedNodeId
-    ? nodes.find((n) => n.nodeId === selectedNodeId)?.name || selectedNodeId
-    : null;
-
-  if (nodes.length === 0) return null;
-
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-1">
-        <Button
-          size="icon"
-          variant={selectedNodeId ? "default" : "secondary"}
-          onClick={onToggle}
-          data-testid="button-node-filter-toggle"
-          className="toggle-elevate"
-        >
-          <Filter className="h-4 w-4" />
-        </Button>
-        {selectedNodeId && !open && (
-          <div className="flex items-center gap-1">
-            <Badge variant="secondary" className="text-xs">
-              {t("coverage.showingNode", { name: selectedName || "" })}
-            </Badge>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => onSelect(null)}
-              data-testid="button-clear-node-filter"
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {open && (
-        <Card className="p-2 max-w-[200px] max-h-[300px] overflow-hidden">
-          <p className="text-xs font-medium text-muted-foreground mb-1.5 px-1">
-            {t("coverage.filterByNode")}
-          </p>
-          <ScrollArea className="max-h-[260px]">
-            <div className="space-y-0.5">
-              <button
-                className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
-                  !selectedNodeId ? "bg-muted font-medium" : "hover-elevate"
-                }`}
-                onClick={() => { onSelect(null); onToggle(); }}
-                data-testid="button-filter-all-nodes"
-              >
-                {t("coverage.allNodes")}
-              </button>
-              {nodes.map((node) => (
-                <button
-                  key={node.nodeId}
-                  className={`w-full text-left text-xs px-2 py-1.5 rounded-md truncate transition-colors ${
-                    selectedNodeId === node.nodeId ? "bg-muted font-medium" : "hover-elevate"
-                  }`}
-                  onClick={() => { onSelect(node.nodeId); onToggle(); }}
-                  data-testid={`button-filter-node-${node.nodeId}`}
-                >
-                  {node.name}
-                </button>
-              ))}
-            </div>
-          </ScrollArea>
-        </Card>
-      )}
-    </div>
-  );
-}

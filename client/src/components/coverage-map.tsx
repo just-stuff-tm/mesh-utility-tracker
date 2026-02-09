@@ -1,11 +1,16 @@
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
-import { ChevronLeft, ChevronRight, Mountain } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mountain, Filter, X } from "lucide-react";
 import type { CoverageZone, ScanResult, MeshNode } from "@shared/schema";
 import { getHexVertices } from "@shared/grid";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
 import { useI18n } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 import "leaflet/dist/leaflet.css";
 
@@ -131,6 +136,117 @@ const legendItems = [
   { color: "#a855f7", label: "coverage.noisy", range: "coverage.goodSignalBadSnr" },
 ];
 
+interface NodeFilterControlProps {
+  nodes: { nodeId: string; name: string }[];
+  selectedNodeId: string | null;
+  onSelect: (nodeId: string | null) => void;
+  open: boolean;
+  onToggle: () => void;
+}
+
+function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: NodeFilterControlProps) {
+  const map = useMap();
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const { t } = useI18n();
+
+  const selectedName = selectedNodeId
+    ? nodes.find((n) => n.nodeId === selectedNodeId)?.name || selectedNodeId
+    : null;
+
+  useEffect(() => {
+    const topRight = map.getContainer().querySelector(".leaflet-top.leaflet-right");
+    if (!topRight) return;
+    const wrapper = L.DomUtil.create("div", "leaflet-node-filter-wrapper");
+    wrapper.style.display = "flex";
+    wrapper.style.alignItems = "flex-start";
+    wrapper.style.gap = "6px";
+    wrapper.style.margin = "10px 10px 0 0";
+    L.DomEvent.disableClickPropagation(wrapper);
+    L.DomEvent.disableScrollPropagation(wrapper);
+    const layersCtrl = topRight.querySelector(".leaflet-control-layers");
+    if (layersCtrl) {
+      topRight.insertBefore(wrapper, layersCtrl);
+      wrapper.appendChild(layersCtrl);
+    } else {
+      topRight.prepend(wrapper);
+    }
+    const filterDiv = document.createElement("div");
+    wrapper.insertBefore(filterDiv, wrapper.firstChild);
+    setContainer(filterDiv);
+    return () => {
+      if (layersCtrl && topRight.contains(wrapper)) {
+        topRight.insertBefore(layersCtrl, wrapper);
+      }
+      wrapper.remove();
+      setContainer(null);
+    };
+  }, [map]);
+
+  if (!container || nodes.length === 0) return null;
+
+  return createPortal(
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-1">
+        {selectedNodeId && !open && (
+          <Badge variant="secondary" className="text-xs backdrop-blur-md whitespace-nowrap">
+            {t("coverage.showingNode", { name: selectedName || "" })}
+            <button
+              onClick={() => onSelect(null)}
+              className="ml-1"
+              data-testid="button-clear-node-filter"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        )}
+        <Button
+          size="icon"
+          variant={selectedNodeId ? "default" : "secondary"}
+          onClick={onToggle}
+          data-testid="button-node-filter-toggle"
+          className="toggle-elevate"
+        >
+          <Filter className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {open && (
+        <Card className="p-2 max-w-[200px] max-h-[300px] overflow-hidden">
+          <p className="text-xs font-medium text-muted-foreground mb-1.5 px-1">
+            {t("coverage.filterByNode")}
+          </p>
+          <ScrollArea className="max-h-[260px]">
+            <div className="space-y-0.5">
+              <button
+                className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
+                  !selectedNodeId ? "bg-muted font-medium" : "hover-elevate"
+                }`}
+                onClick={() => { onSelect(null); onToggle(); }}
+                data-testid="button-filter-all-nodes"
+              >
+                {t("coverage.allNodes")}
+              </button>
+              {nodes.map((node) => (
+                <button
+                  key={node.nodeId}
+                  className={`w-full text-left text-xs px-2 py-1.5 rounded-md truncate transition-colors ${
+                    selectedNodeId === node.nodeId ? "bg-muted font-medium" : "hover-elevate"
+                  }`}
+                  onClick={() => { onSelect(node.nodeId); onToggle(); }}
+                  data-testid={`button-filter-node-${node.nodeId}`}
+                >
+                  {node.name}
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        </Card>
+      )}
+    </div>,
+    container
+  );
+}
+
 interface CoverageMapProps {
   coverageZones: CoverageZone[];
   observerPosition: [number, number] | null;
@@ -138,6 +254,11 @@ interface CoverageMapProps {
   selectedZone: CoverageZone | null;
   onZoneClick: (zone: CoverageZone) => void;
   flyToTarget: { lat: number; lng: number } | null;
+  filterNodes?: { nodeId: string; name: string }[];
+  filterNodeId?: string | null;
+  onFilterSelect?: (nodeId: string | null) => void;
+  filterOpen?: boolean;
+  onFilterToggle?: () => void;
 }
 
 export function CoverageMap({
@@ -147,6 +268,11 @@ export function CoverageMap({
   selectedZone,
   onZoneClick,
   flyToTarget,
+  filterNodes = [],
+  filterNodeId = null,
+  onFilterSelect,
+  filterOpen = false,
+  onFilterToggle,
 }: CoverageMapProps) {
   const { t } = useI18n();
   const defaultCenter: [number, number] = observerPosition || [37.7749, -122.4194];
@@ -181,6 +307,16 @@ export function CoverageMap({
             />
           </LayersControl.BaseLayer>
         </LayersControl>
+
+        {filterNodes.length > 0 && onFilterSelect && onFilterToggle && (
+          <NodeFilterControl
+            nodes={filterNodes}
+            selectedNodeId={filterNodeId}
+            onSelect={onFilterSelect}
+            open={filterOpen}
+            onToggle={onFilterToggle}
+          />
+        )}
 
         <MapAutoUpdater center={observerPosition} autoCenter={autoCenter} />
         <FlyToLocation target={flyToTarget} />
