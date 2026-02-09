@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
 import { publicKeyHex } from "@/lib/bluetooth";
 import { snapToHexGrid } from "@shared/grid";
@@ -21,7 +22,8 @@ import type { CoverageZone, MeshNode, ScanResult } from "@shared/schema";
 
 export default function MapPage() {
   const { t } = useI18n();
-  const { observerPosition, autoCenter, connected, selfInfo, statsRadiusMiles, unitSystem } = useBluetoothContext();
+  const { toast } = useToast();
+  const { observerPosition, autoCenter, setAutoCenter, connected, selfInfo, statsRadiusMiles, unitSystem } = useBluetoothContext();
   const [selectedZone, setSelectedZone] = useState<CoverageZone | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filterNodeId, setFilterNodeId] = useState<string | null>(null);
@@ -129,6 +131,13 @@ export default function MapPage() {
           onZoneClick={(zone) => {
             setSelectedZone(zone);
             setSheetOpen(false);
+            if (autoCenter) {
+              setAutoCenter(false);
+              toast({
+                title: t("toast.autoCenterOff"),
+                description: t("toast.autoCenterOffDesc"),
+              });
+            }
           }}
           flyToTarget={flyToTarget}
         />

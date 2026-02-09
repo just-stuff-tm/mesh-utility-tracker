@@ -249,6 +249,8 @@ const translations: Record<Language, TranslationMap> = {
     "toast.serverDown": "The server may be down. Try again later.",
     "toast.deadZoneQueued": "Dead zone queued for sync when back online",
     "toast.deadZoneMarked": "Dead zone marked at your current location",
+    "toast.autoCenterOff": "Auto-center paused",
+    "toast.autoCenterOffDesc": "Tap the pin icon in the HUD to re-enable",
 
     "notFound.title": "404 Page Not Found",
     "notFound.desc": "Did you forget to add the page to the router?",
@@ -485,6 +487,8 @@ const translations: Record<Language, TranslationMap> = {
     "toast.serverDown": "El servidor puede estar ca\u00eddo. Int\u00e9ntalo m\u00e1s tarde.",
     "toast.deadZoneQueued": "Zona muerta en cola para sincronizar cuando vuelvas en l\u00ednea",
     "toast.deadZoneMarked": "Zona muerta marcada en tu ubicaci\u00f3n actual",
+    "toast.autoCenterOff": "Auto-centrado pausado",
+    "toast.autoCenterOffDesc": "Toca el icono de pin en el HUD para reactivar",
 
     "notFound.title": "404 P\u00e1gina No Encontrada",
     "notFound.desc": "\u00bfOlvidaste a\u00f1adir la p\u00e1gina al router?",
@@ -721,6 +725,8 @@ const translations: Record<Language, TranslationMap> = {
     "toast.serverDown": "Le serveur est peut-\u00eatre en panne. R\u00e9essayez plus tard.",
     "toast.deadZoneQueued": "Zone morte en file d\u2019attente pour synchronisation",
     "toast.deadZoneMarked": "Zone morte marqu\u00e9e \u00e0 votre position actuelle",
+    "toast.autoCenterOff": "Auto-centrage en pause",
+    "toast.autoCenterOffDesc": "Appuyez sur l'ic\u00f4ne \u00e9pingle dans le HUD pour r\u00e9activer",
 
     "notFound.title": "404 Page Non Trouv\u00e9e",
     "notFound.desc": "Avez-vous oubli\u00e9 d\u2019ajouter la page au routeur ?",
@@ -945,6 +951,9 @@ const translations: Record<Language, TranslationMap> = {
     "toast.serverDown": "Der Server ist m\u00f6glicherweise ausgefallen. Versuchen Sie es sp\u00e4ter erneut.",
     "toast.deadZoneQueued": "Tote Zone zur Synchronisation eingereiht",
     "toast.deadZoneMarked": "Tote Zone an Ihrem aktuellen Standort markiert",
+    "toast.autoCenterOff": "Auto-Zentrierung pausiert",
+    "toast.autoCenterOffDesc": "Tippen Sie auf das Pin-Symbol im HUD zum Reaktivieren",
+
     "notFound.title": "404 Seite Nicht Gefunden",
     "notFound.desc": "Haben Sie vergessen, die Seite zum Router hinzuzuf\u00fcgen?",
     "mapPage.settings": "Einstellungen",
@@ -1167,6 +1176,9 @@ const translations: Record<Language, TranslationMap> = {
     "toast.serverDown": "O servidor pode estar fora do ar. Tente novamente mais tarde.",
     "toast.deadZoneQueued": "Zona morta na fila para sincronizar quando voltar online",
     "toast.deadZoneMarked": "Zona morta marcada na sua localiza\u00e7\u00e3o atual",
+    "toast.autoCenterOff": "Auto-centraliza\u00e7\u00e3o pausada",
+    "toast.autoCenterOffDesc": "Toque no \u00edcone de pin no HUD para reativar",
+
     "notFound.title": "404 P\u00e1gina N\u00e3o Encontrada",
     "notFound.desc": "Voc\u00ea esqueceu de adicionar a p\u00e1gina ao roteador?",
     "mapPage.settings": "Configura\u00e7\u00f5es",
@@ -1389,6 +1401,9 @@ const translations: Record<Language, TranslationMap> = {
     "toast.serverDown": "\u670d\u52a1\u5668\u53ef\u80fd\u5df2\u5173\u95ed\u3002\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002",
     "toast.deadZoneQueued": "\u6b7b\u533a\u5df2\u6392\u961f\u7b49\u5f85\u540c\u6b65",
     "toast.deadZoneMarked": "\u5df2\u5728\u5f53\u524d\u4f4d\u7f6e\u6807\u8bb0\u6b7b\u533a",
+    "toast.autoCenterOff": "\u81ea\u52a8\u5c45\u4e2d\u5df2\u6682\u505c",
+    "toast.autoCenterOffDesc": "\u70b9\u51fbHUD\u4e2d\u7684\u56fe\u9489\u56fe\u6807\u91cd\u65b0\u542f\u7528",
+
     "notFound.title": "404 \u9875\u9762\u672a\u627e\u5230",
     "notFound.desc": "\u60a8\u662f\u5426\u5fd8\u8bb0\u5c06\u9875\u9762\u6dfb\u52a0\u5230\u8def\u7531\u5668\uff1f",
     "mapPage.settings": "\u8bbe\u7f6e",
@@ -1611,6 +1626,9 @@ const translations: Record<Language, TranslationMap> = {
     "toast.serverDown": "\u30b5\u30fc\u30d0\u30fc\u304c\u30c0\u30a6\u30f3\u3057\u3066\u3044\u308b\u53ef\u80fd\u6027\u304c\u3042\u308a\u307e\u3059\u3002",
     "toast.deadZoneQueued": "\u30c7\u30c3\u30c9\u30be\u30fc\u30f3\u3092\u540c\u671f\u30ad\u30e5\u30fc\u306b\u8ffd\u52a0",
     "toast.deadZoneMarked": "\u73fe\u5728\u5730\u306b\u30c7\u30c3\u30c9\u30be\u30fc\u30f3\u3092\u30de\u30fc\u30af\u3057\u307e\u3057\u305f",
+    "toast.autoCenterOff": "\u81ea\u52a8\u30bb\u30f3\u30bf\u30ea\u30f3\u30b0\u4e00\u6642\u505c\u6b62",
+    "toast.autoCenterOffDesc": "HUD\u306e\u30d4\u30f3\u30a2\u30a4\u30b3\u30f3\u3092\u30bf\u30c3\u30d7\u3057\u3066\u518d\u6709\u52b9\u5316",
+
     "notFound.title": "404 \u30da\u30fc\u30b8\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093",
     "notFound.desc": "\u30eb\u30fc\u30bf\u30fc\u306b\u30da\u30fc\u30b8\u3092\u8ffd\u52a0\u3057\u5fd8\u308c\u307e\u3057\u305f\u304b\uff1f",
     "mapPage.settings": "\u8a2d\u5b9a",
@@ -1833,6 +1851,9 @@ const translations: Record<Language, TranslationMap> = {
     "toast.serverDown": "\uc11c\ubc84\uac00 \ub2e4\uc6b4\ub418\uc5c8\uc744 \uc218 \uc788\uc2b5\ub2c8\ub2e4. \ub098\uc911\uc5d0 \ub2e4\uc2dc \uc2dc\ub3c4\ud558\uc138\uc694.",
     "toast.deadZoneQueued": "\ub370\ub4dc\uc874\uc774 \ub3d9\uae30\ud654 \ub300\uae30\uc5f4\uc5d0 \ucd94\uac00\ub428",
     "toast.deadZoneMarked": "\ud604\uc7ac \uc704\uce58\uc5d0 \ub370\ub4dc\uc874 \ud45c\uc2dc\ub428",
+    "toast.autoCenterOff": "\uc790\ub3d9 \uc911\uc559\uc815\ub82c \uc77c\uc2dc\uc911\uc9c0",
+    "toast.autoCenterOffDesc": "HUD\uc758 \ud540 \uc544\uc774\ucf58\uc744 \ud0ed\ud558\uc5ec \ub2e4\uc2dc \ud65c\uc131\ud654",
+
     "notFound.title": "404 \ud398\uc774\uc9c0\ub97c \ucc3e\uc744 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4",
     "notFound.desc": "\ub77c\uc6b0\ud130\uc5d0 \ud398\uc774\uc9c0\ub97c \ucd94\uac00\ud558\ub294 \uac83\uc744 \uc78a\uc73c\uc168\ub098\uc694?",
     "mapPage.settings": "\uc124\uc815",
