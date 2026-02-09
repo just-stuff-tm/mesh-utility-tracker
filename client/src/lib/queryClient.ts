@@ -94,6 +94,13 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const endpoint = queryKey.join("/") as string;
 
+    if (!isOnline()) {
+      const offlineData = await getOfflineData(endpoint);
+      if (offlineData !== null) {
+        return offlineData as any;
+      }
+    }
+
     try {
       const res = await fetch(endpoint, {
         credentials: "include",

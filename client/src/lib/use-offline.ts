@@ -27,12 +27,11 @@ export function useOfflineStatus() {
         await db.nodes.where("id").startsWith("local-").delete();
         await db.scanResults.where("id").startsWith("local-").delete();
         await db.coverageZones.where("id").startsWith("local-").delete();
-
-        queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/scan-results/latest"] });
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scan-results/latest"] });
     } finally {
       syncingRef.current = false;
       setSyncing(false);

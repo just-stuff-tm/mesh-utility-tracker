@@ -161,8 +161,18 @@ function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: 
     wrapper.style.alignItems = "flex-start";
     wrapper.style.gap = "6px";
     wrapper.style.margin = "10px 10px 0 0";
+    wrapper.style.pointerEvents = "auto";
+    wrapper.style.position = "relative";
+    wrapper.style.zIndex = "1000";
     L.DomEvent.disableClickPropagation(wrapper);
     L.DomEvent.disableScrollPropagation(wrapper);
+    const stopAll = (e: Event) => { e.stopPropagation(); };
+    wrapper.addEventListener("pointerdown", stopAll);
+    wrapper.addEventListener("pointerup", stopAll);
+    wrapper.addEventListener("touchstart", stopAll, { passive: false });
+    wrapper.addEventListener("touchend", stopAll);
+    wrapper.addEventListener("mousedown", stopAll);
+    wrapper.addEventListener("mouseup", stopAll);
     const layersCtrl = topRight.querySelector(".leaflet-control-layers");
     if (layersCtrl) {
       topRight.insertBefore(wrapper, layersCtrl);
@@ -171,9 +181,16 @@ function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: 
       topRight.prepend(wrapper);
     }
     const filterDiv = document.createElement("div");
+    filterDiv.style.pointerEvents = "auto";
     wrapper.insertBefore(filterDiv, wrapper.firstChild);
     setContainer(filterDiv);
     return () => {
+      wrapper.removeEventListener("pointerdown", stopAll);
+      wrapper.removeEventListener("pointerup", stopAll);
+      wrapper.removeEventListener("touchstart", stopAll);
+      wrapper.removeEventListener("touchend", stopAll);
+      wrapper.removeEventListener("mousedown", stopAll);
+      wrapper.removeEventListener("mouseup", stopAll);
       if (layersCtrl && topRight.contains(wrapper)) {
         topRight.insertBefore(layersCtrl, wrapper);
       }
