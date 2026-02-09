@@ -111,6 +111,15 @@ function FlyToLocation({ target }: { target: { lat: number; lng: number } | null
   return null;
 }
 
+function FitBoundsHandler({ bounds }: { bounds: L.LatLngBoundsExpression | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!bounds) return;
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17, animate: true });
+  }, [bounds, map]);
+  return null;
+}
+
 const MAP_LAYERS = {
   dark: {
     url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
@@ -148,10 +157,6 @@ function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: 
   const map = useMap();
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const { t } = useI18n();
-
-  const selectedName = selectedNodeId
-    ? nodes.find((n) => n.nodeId === selectedNodeId)?.name || selectedNodeId
-    : null;
 
   useEffect(() => {
     const topRight = map.getContainer().querySelector(".leaflet-top.leaflet-right");
@@ -203,37 +208,34 @@ function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: 
 
   return createPortal(
     <div className="flex flex-col items-end gap-1">
-      <div className="flex items-center gap-1">
-        {selectedNodeId && !open && (
-          <Badge variant="secondary" className="text-xs backdrop-blur-md whitespace-nowrap">
-            {t("coverage.showingNode", { name: selectedName || "" })}
-            <button
-              onClick={() => onSelect(null)}
-              className="ml-1"
-              data-testid="button-clear-node-filter"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        )}
-        <Button
-          size="icon"
-          variant={selectedNodeId ? "default" : "secondary"}
-          onClick={onToggle}
-          data-testid="button-node-filter-toggle"
-          className="toggle-elevate"
-        >
-          <Filter className="h-4 w-4" />
-        </Button>
-      </div>
+      <Button
+        size="icon"
+        variant={selectedNodeId ? "default" : "secondary"}
+        onClick={onToggle}
+        data-testid="button-node-filter-toggle"
+        className="toggle-elevate"
+      >
+        <Filter className="h-4 w-4" />
+      </Button>
 
       {open && (
-        <Card className="p-2 max-w-[200px] max-h-[300px] overflow-hidden">
-          <p className="text-xs font-medium text-muted-foreground mb-1.5 px-1">
-            {t("coverage.filterByNode")}
-          </p>
-          <ScrollArea className="max-h-[260px]">
-            <div className="space-y-0.5">
+        <Card className="p-2 max-w-[220px] flex flex-col" style={{ maxHeight: "min(350px, 50vh)" }}>
+          <div className="flex items-center justify-between mb-1.5 px-1 shrink-0 gap-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("coverage.filterByNode")}
+            </p>
+            {selectedNodeId && (
+              <button
+                onClick={() => { onSelect(null); onToggle(); }}
+                className="text-xs text-muted-foreground hover-elevate rounded-md px-1.5 py-0.5 flex items-center gap-1"
+                data-testid="button-clear-node-filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="space-y-0.5 pr-2">
               <button
                 className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
                   !selectedNodeId ? "bg-muted font-medium" : "hover-elevate"
@@ -271,6 +273,7 @@ interface CoverageMapProps {
   selectedZone: CoverageZone | null;
   onZoneClick: (zone: CoverageZone) => void;
   flyToTarget: { lat: number; lng: number } | null;
+  fitBoundsTarget: L.LatLngBoundsExpression | null;
   filterNodes?: { nodeId: string; name: string }[];
   filterNodeId?: string | null;
   onFilterSelect?: (nodeId: string | null) => void;
@@ -285,6 +288,7 @@ export function CoverageMap({
   selectedZone,
   onZoneClick,
   flyToTarget,
+  fitBoundsTarget,
   filterNodes = [],
   filterNodeId = null,
   onFilterSelect,
@@ -337,6 +341,7 @@ export function CoverageMap({
 
         <MapAutoUpdater center={observerPosition} autoCenter={autoCenter} />
         <FlyToLocation target={flyToTarget} />
+        <FitBoundsHandler bounds={fitBoundsTarget} />
 
         {observerPosition && (
           <Marker position={observerPosition} icon={observerIcon}>

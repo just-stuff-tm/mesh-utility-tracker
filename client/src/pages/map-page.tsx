@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearch } from "wouter";
+import L from "leaflet";
 import { Settings } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { CoverageMap } from "@/components/coverage-map";
@@ -27,6 +28,7 @@ export default function MapPage() {
   const [filterNodeId, setFilterNodeId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
+  const [fitBoundsTarget, setFitBoundsTarget] = useState<L.LatLngBoundsExpression | null>(null);
 
   const searchString = useSearch();
   useEffect(() => {
@@ -116,6 +118,35 @@ export default function MapPage() {
     });
   }, [coverageZones, filterNodeId, zoneNodeMap]);
 
+  const handleFilterSelect = useCallback((nodeId: string | null) => {
+    setFilterNodeId(nodeId);
+    if (nodeId) {
+      const zones = coverageZones.filter((zone) => {
+        const key = `${zone.centerLat.toFixed(6)},${zone.centerLng.toFixed(6)}`;
+        const nodeSet = zoneNodeMap.get(key);
+        return nodeSet?.has(nodeId);
+      });
+      if (zones.length > 0) {
+        const lats = zones.map((z) => z.centerLat);
+        const lngs = zones.map((z) => z.centerLng);
+        const bounds: L.LatLngBoundsExpression = [
+          [Math.min(...lats) - 0.001, Math.min(...lngs) - 0.001],
+          [Math.max(...lats) + 0.001, Math.max(...lngs) + 0.001],
+        ];
+        if (autoCenter) {
+          setAutoCenter(false);
+          toast({
+            title: t("toast.autoCenterOff"),
+            description: t("toast.autoCenterOffDesc"),
+          });
+        }
+        setFitBoundsTarget(bounds);
+      }
+    } else {
+      setFitBoundsTarget(null);
+    }
+  }, [coverageZones, zoneNodeMap, autoCenter, setAutoCenter, toast, t]);
+
   const controlsContent = (
     <div className="space-y-4">
       <BluetoothPanel />
@@ -138,9 +169,10 @@ export default function MapPage() {
           selectedZone={selectedZone}
           filterNodes={filterableNodes}
           filterNodeId={filterNodeId}
-          onFilterSelect={setFilterNodeId}
+          onFilterSelect={handleFilterSelect}
           filterOpen={filterOpen}
           onFilterToggle={() => setFilterOpen(!filterOpen)}
+          fitBoundsTarget={fitBoundsTarget}
           onZoneClick={(zone) => {
             setSelectedZone(zone);
             setSheetOpen(false);
