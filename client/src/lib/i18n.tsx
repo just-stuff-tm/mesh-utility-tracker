@@ -194,7 +194,6 @@ const translations: Record<Language, TranslationMap> = {
     "history.node": "Node",
     "history.sender": "Sender",
     "history.observer": "Observer",
-
     "stats.nodes": "Nodes",
     "stats.zones": "Zones",
     "stats.avgRssi": "Avg RSSI",
@@ -433,7 +432,6 @@ const translations: Record<Language, TranslationMap> = {
     "history.node": "Nodo",
     "history.sender": "Emisor",
     "history.observer": "Observador",
-
     "stats.nodes": "Nodos",
     "stats.zones": "Zonas",
     "stats.avgRssi": "RSSI Prom",
