@@ -5,17 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/lib/i18n";
 import type { MeshNode, ScanResult } from "@shared/schema";
-
-function getTimeSince(date: Date | string | null): string {
-  if (!date) return "Unknown";
-  const d = typeof date === "string" ? new Date(date) : date;
-  const seconds = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
 
 function getSignalColor(rssi: number): string {
   if (rssi >= -60) return "text-green-500";
@@ -26,6 +17,17 @@ function getSignalColor(rssi: number): string {
 }
 
 export default function NodesPage() {
+  const { t } = useI18n();
+
+  const getTimeSince = (date: Date | string | null): string => {
+    if (!date) return t("time.unknown");
+    const d = typeof date === "string" ? new Date(date) : date;
+    const seconds = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (seconds < 60) return t("time.sAgo", { value: seconds });
+    if (seconds < 3600) return t("time.mAgo", { value: Math.floor(seconds / 60) });
+    if (seconds < 86400) return t("time.hAgo", { value: Math.floor(seconds / 3600) });
+    return t("time.dAgo", { value: Math.floor(seconds / 86400) });
+  };
   const [search, setSearch] = useState("");
 
   const { data: nodes = [], isLoading: nodesLoading } = useQuery<MeshNode[]>({
@@ -53,18 +55,18 @@ export default function NodesPage() {
     <div className="p-4 max-w-4xl mx-auto space-y-4 h-full overflow-y-auto">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold">Mesh Nodes</h1>
+          <h1 className="text-xl font-semibold">{t("nodes.meshNodes")}</h1>
           <p className="text-sm text-muted-foreground">
-            All discovered nodes on the network
+            {t("nodes.allDiscovered")}
           </p>
         </div>
-        <Badge variant="secondary">{nodes.length} nodes</Badge>
+        <Badge variant="secondary">{nodes.length} {t("nav.nodes")}</Badge>
       </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search nodes..."
+          placeholder={t("nodes.searchNodes")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
@@ -90,10 +92,10 @@ export default function NodesPage() {
         <Card className="p-8 text-center">
           <Radio className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground">
-            {search ? "No nodes match your search" : "No nodes discovered yet"}
+            {search ? t("nodes.noMatch") : t("nodes.noNodesDiscovered")}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Connect a radio and start scanning to discover mesh nodes
+            {t("nodes.connectAndScan")}
           </p>
         </Card>
       ) : (
@@ -109,7 +111,7 @@ export default function NodesPage() {
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div>
                     <h3 className="text-sm font-semibold">
-                      {node.name || "Unnamed Node"}
+                      {node.name || t("nodes.unnamedNode")}
                     </h3>
                     <p className="text-xs text-muted-foreground font-mono">
                       {node.nodeId}
@@ -149,7 +151,7 @@ export default function NodesPage() {
                     </Card>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">No scan data available</p>
+                  <p className="text-xs text-muted-foreground">{t("nodes.noScanData")}</p>
                 )}
               </Card>
             );

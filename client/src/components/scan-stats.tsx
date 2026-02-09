@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Activity, Signal, Radio, MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useI18n } from "@/lib/i18n";
 import type { CoverageZone, ScanResult, MeshNode } from "@shared/schema";
 import type { UnitSystem } from "@/lib/bluetooth-context";
 
@@ -26,6 +27,7 @@ interface ScanStatsProps {
 }
 
 export function ScanStats({ coverageZones, totalScans, nodes, isConnected, observerPosition, statsRadiusMiles, unitSystem }: ScanStatsProps) {
+  const { t } = useI18n();
   const filteredZones = useMemo(() => {
     if (statsRadiusMiles === 0 || !observerPosition) return coverageZones;
     return coverageZones.filter((z) => {
@@ -46,25 +48,25 @@ export function ScanStats({ coverageZones, totalScans, nodes, isConnected, obser
   const stats = [
     {
       icon: Radio,
-      label: "Nodes",
+      label: t("stats.nodes"),
       value: nodes.length.toString(),
-      sub: isConnected ? "Active" : "Offline",
+      sub: isConnected ? t("stats.active") : t("bluetooth.offline"),
     },
     {
       icon: MapPin,
-      label: "Zones",
+      label: t("stats.zones"),
       value: activeZones.length.toString(),
-      sub: `${deadZones.length} dead`,
+      sub: `${deadZones.length} ${t("stats.dead")}`,
     },
     {
       icon: Signal,
-      label: "Avg RSSI",
+      label: t("stats.avgRssi"),
       value: avgRssi ? `${avgRssi.toFixed(0)}` : "--",
       sub: "dBm",
     },
     {
       icon: Activity,
-      label: "Avg SNR",
+      label: t("stats.avgSnr"),
       value: avgSnr ? `${avgSnr.toFixed(1)}` : "--",
       sub: "dB",
     },
@@ -72,8 +74,8 @@ export function ScanStats({ coverageZones, totalScans, nodes, isConnected, obser
 
   const radiusLabel = statsRadiusMiles > 0 && observerPosition
     ? unitSystem === "metric"
-      ? `Within ${Math.round(statsRadiusMiles * 1.60934)} km`
-      : `Within ${statsRadiusMiles} mi`
+      ? t("stats.within", { value: `${Math.round(statsRadiusMiles * 1.60934)} km` })
+      : t("stats.within", { value: `${statsRadiusMiles} mi` })
     : null;
 
   return (

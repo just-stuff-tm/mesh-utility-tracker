@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Mountain } from "lucide-react";
 import type { CoverageZone, ScanResult } from "@shared/schema";
 import { getHexVertices } from "@shared/grid";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
+import { useI18n } from "@/lib/i18n";
 
 import "leaflet/dist/leaflet.css";
 
@@ -54,16 +55,16 @@ function getSnrLevel(snr: number): number {
 }
 
 const SIGNAL_STYLES: Record<number, SignalStyle> = {
-  5: { fill: "#22c55e", border: "#16a34a", fillOpacity: 0.55, label: "Excellent", level: 5 },
-  4: { fill: "#4ade80", border: "#22c55e", fillOpacity: 0.50, label: "Good", level: 4 },
-  3: { fill: "#facc15", border: "#eab308", fillOpacity: 0.45, label: "Fair", level: 3 },
-  2: { fill: "#f97316", border: "#ea580c", fillOpacity: 0.42, label: "Marginal", level: 2 },
-  1: { fill: "#ef4444", border: "#dc2626", fillOpacity: 0.42, label: "Poor", level: 1 },
-  0: { fill: "#991b1b", border: "#7f1d1d", fillOpacity: 0.45, label: "Dead Zone", level: 0 },
+  5: { fill: "#22c55e", border: "#16a34a", fillOpacity: 0.55, label: "coverage.excellent", level: 5 },
+  4: { fill: "#4ade80", border: "#22c55e", fillOpacity: 0.50, label: "coverage.good", level: 4 },
+  3: { fill: "#facc15", border: "#eab308", fillOpacity: 0.45, label: "coverage.fair", level: 3 },
+  2: { fill: "#f97316", border: "#ea580c", fillOpacity: 0.42, label: "coverage.marginal", level: 2 },
+  1: { fill: "#ef4444", border: "#dc2626", fillOpacity: 0.42, label: "coverage.poor", level: 1 },
+  0: { fill: "#991b1b", border: "#7f1d1d", fillOpacity: 0.45, label: "coverage.deadZone", level: 0 },
 };
 
 const NOISY_STYLE: SignalStyle = {
-  fill: "#a855f7", border: "#7c3aed", fillOpacity: 0.45, label: "Noisy", level: -1,
+  fill: "#a855f7", border: "#7c3aed", fillOpacity: 0.45, label: "coverage.noisy", level: -1,
 };
 
 function getSignalStyle(rssi: number | null, snr: number | null): SignalStyle {
@@ -108,13 +109,13 @@ const MAP_LAYERS = {
 } as const;
 
 const legendItems = [
-  { color: "#22c55e", label: "Excellent", range: "RSSI > -90, SNR > 10" },
-  { color: "#4ade80", label: "Good", range: "RSSI > -100, SNR > 0" },
-  { color: "#facc15", label: "Fair", range: "RSSI > -110, SNR > -7" },
-  { color: "#f97316", label: "Marginal", range: "RSSI > -115, SNR > -13" },
-  { color: "#ef4444", label: "Poor", range: "Weak signal, at limit" },
-  { color: "#991b1b", label: "Dead Zone", range: "No response received" },
-  { color: "#a855f7", label: "Noisy", range: "Good signal, bad SNR" },
+  { color: "#22c55e", label: "coverage.excellent", range: "RSSI > -90, SNR > 10" },
+  { color: "#4ade80", label: "coverage.good", range: "RSSI > -100, SNR > 0" },
+  { color: "#facc15", label: "coverage.fair", range: "RSSI > -110, SNR > -7" },
+  { color: "#f97316", label: "coverage.marginal", range: "RSSI > -115, SNR > -13" },
+  { color: "#ef4444", label: "coverage.poor", range: "coverage.weakSignal" },
+  { color: "#991b1b", label: "coverage.deadZone", range: "coverage.noResponse" },
+  { color: "#a855f7", label: "coverage.noisy", range: "coverage.goodSignalBadSnr" },
 ];
 
 interface CoverageMapProps {
@@ -132,6 +133,7 @@ export function CoverageMap({
   selectedZone,
   onZoneClick,
 }: CoverageMapProps) {
+  const { t } = useI18n();
   const defaultCenter: [number, number] = observerPosition || [37.7749, -122.4194];
 
   return (
@@ -171,7 +173,7 @@ export function CoverageMap({
           <Marker position={observerPosition} icon={observerIcon}>
             <Popup>
               <div className="text-sm">
-                <p className="font-semibold">Observer (You)</p>
+                <p className="font-semibold">{t("coverage.observer")}</p>
                 <p className="text-xs text-gray-500">
                   {observerPosition[0].toFixed(5)}, {observerPosition[1].toFixed(5)}
                 </p>
@@ -232,6 +234,7 @@ export function CoverageMap({
 }
 
 function RssiLegend() {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -263,8 +266,8 @@ function RssiLegend() {
                   className="w-3 h-2.5 rounded-sm"
                   style={{ background: item.color, opacity: 0.7 }}
                 />
-                <span className="flex-1">{item.label}</span>
-                <span className="text-muted-foreground text-[9px]">{item.range}</span>
+                <span className="flex-1">{t(item.label)}</span>
+                <span className="text-muted-foreground text-[9px]">{item.range.startsWith("coverage.") ? t(item.range) : item.range}</span>
               </div>
             ))}
             <div className="flex items-center gap-1.5 pt-1 border-t border-border">
@@ -272,7 +275,7 @@ function RssiLegend() {
                 className="w-3 h-2.5 rounded-sm border border-dashed"
                 style={{ borderColor: "#ef4444", background: "rgba(239,68,68,0.15)" }}
               />
-              <span>Dead Zone</span>
+              <span>{t("coverage.deadZone")}</span>
             </div>
           </div>
         )}
@@ -282,6 +285,7 @@ function RssiLegend() {
 }
 
 function ZonePopup({ zone }: { zone: CoverageZone }) {
+  const { t } = useI18n();
   const { unitSystem } = useBluetoothContext();
   const style = zone.isDeadZone ? null : getSignalStyle(zone.avgRssi, zone.avgSnr);
   const [scans, setScans] = useState<ScanResult[]>([]);
@@ -312,7 +316,7 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
           />
         )}
         <p className="font-semibold text-base">
-          {zone.isDeadZone ? "Dead Zone" : `${style?.label} Coverage`}
+          {zone.isDeadZone ? t("coverage.deadZone") : `${style ? t(style.label) : ""} ${t("coverage.coverage")}`}
         </p>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
@@ -320,13 +324,13 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
         <span className="font-semibold">{zone.avgRssi?.toFixed(1) ?? "N/A"} dBm</span>
         <span className="text-gray-500">SNR</span>
         <span className="font-semibold">{zone.avgSnr?.toFixed(1) ?? "N/A"} dB</span>
-        <span className="text-gray-500">Scan Count</span>
+        <span className="text-gray-500">{t("coverage.scanCount")}</span>
         <span className="font-semibold">{zone.scanCount ?? 0}</span>
-        <span className="text-gray-500">Last Scan</span>
+        <span className="text-gray-500">{t("coverage.lastScanned")}</span>
         <span className="font-medium">
           {zone.lastScanned ? new Date(zone.lastScanned).toLocaleDateString() : "Never"}
         </span>
-        <span className="text-gray-500">Grid Cell</span>
+        <span className="text-gray-500">{t("coverage.gridCell")}</span>
         <span className="font-mono text-[10px]">
           {zone.centerLat.toFixed(4)}, {zone.centerLng.toFixed(4)}
         </span>
@@ -341,7 +345,7 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
             : `${Math.round(latest)} m`;
           return (
             <>
-              <span className="text-gray-500">Altitude</span>
+              <span className="text-gray-500">{t("coverage.altitude")}</span>
               <span className="font-semibold">{formatted} ASL</span>
             </>
           );
@@ -351,13 +355,13 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
         <div className="border-t border-gray-200 pt-2 space-y-1.5">
           {observers.length > 0 && (
             <div className="text-xs">
-              <span className="text-gray-500 font-medium">Observer</span>
+              <span className="text-gray-500 font-medium">{t("coverage.observerLabel")}</span>
               <p className="font-semibold">{observers.join(", ")}</p>
             </div>
           )}
           {repeaters.length > 0 && (
             <div className="text-xs">
-              <span className="text-gray-500 font-medium">Repeaters Observed</span>
+              <span className="text-gray-500 font-medium">{t("coverage.repeatersObserved")}</span>
               {repeaters.map(([nodeId, name]) => {
                 const latest = scans.find((s) => s.nodeId === nodeId);
                 return (

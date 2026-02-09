@@ -15,6 +15,7 @@ import { CompatibilityDialog } from "@/components/compatibility-dialog";
 import { OfflineIndicator } from "@/components/offline-indicator";
 import { PrivacyAcceptanceDialog, usePrivacyAccepted, isPrivacyAccepted } from "@/components/privacy-acceptance-dialog";
 import { setForceOffline, getForceOffline } from "@/lib/offline-store";
+import { I18nProvider, useI18n } from "@/lib/i18n";
 import NotFound from "@/pages/not-found";
 import MapPage from "@/pages/map-page";
 import NodesPage from "@/pages/nodes-page";
@@ -65,6 +66,7 @@ function ObserversOnline() {
     queryKey: ["/api/observers/online"],
     refetchInterval: 60000,
   });
+  const { t } = useI18n();
   const count = data?.count ?? 0;
   return (
     <div
@@ -73,7 +75,7 @@ function ObserversOnline() {
     >
       <Users className="h-3 w-3 text-muted-foreground" />
       <span className="text-[11px] font-medium text-muted-foreground">
-        {count} online
+        {t("header.online", { count })}
       </span>
     </div>
   );
@@ -81,6 +83,7 @@ function ObserversOnline() {
 
 function AppContent() {
   const { accepted, accept, showDialog, closeDialog, requireAcceptance } = usePrivacyAccepted();
+  const { t } = useI18n();
   const [location] = useLocation();
   const isPrivacyRoute = location === "/privacy";
   const [showInitialPrivacy, setShowInitialPrivacy] = useState(!accepted);
@@ -127,7 +130,7 @@ function AppContent() {
                   >
                     <Heart className="h-3 w-3 text-emerald-500" />
                     <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                      Support
+                      {t("header.support")}
                     </span>
                   </a>
                   <a
@@ -161,11 +164,13 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <AppContent />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <I18nProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <AppContent />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </I18nProvider>
     </ThemeProvider>
   );
 }

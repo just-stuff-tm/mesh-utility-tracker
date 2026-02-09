@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Bluetooth, Download, Smartphone, Monitor, ExternalLink } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type Platform = "ios" | "android" | "desktop";
 
@@ -39,6 +40,7 @@ const DISMISS_KEY = "mesh-compat-dismissed";
 const DISMISS_DURATION = 7 * 24 * 60 * 60 * 1000;
 
 export function CompatibilityDialog() {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -71,10 +73,10 @@ export function CompatibilityDialog() {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bluetooth className="h-5 w-5 text-blue-500" />
-            Bluetooth Setup Required
+            {t("compat.title")}
           </DialogTitle>
           <DialogDescription>
-            Mesh Utility needs Web Bluetooth to connect to your MeshCore radio. Here's how to get started:
+            {t("compat.desc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -84,10 +86,10 @@ export function CompatibilityDialog() {
               <div className="space-y-3">
                 <h4 className="font-medium flex items-center gap-2">
                   <Smartphone className="h-4 w-4" />
-                  Option 1: Use Bluefy Browser
+                  {t("compat.option1Bluefy")}
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  Bluefy is a browser that supports Web Bluetooth on iPhone/iPad. Open this page in Bluefy to connect to your radio.
+                  {t("compat.bluefyDesc")}
                 </p>
                 <a
                   href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055"
@@ -97,7 +99,7 @@ export function CompatibilityDialog() {
                 >
                   <Button variant="outline" className="w-full gap-2">
                     <ExternalLink className="h-4 w-4" />
-                    Get Bluefy on App Store
+                    {t("compat.getBluefyAppStore")}
                   </Button>
                 </a>
               </div>
@@ -105,10 +107,10 @@ export function CompatibilityDialog() {
               <div className="border-t border-border pt-3 space-y-3">
                 <h4 className="font-medium flex items-center gap-2">
                   <Download className="h-4 w-4" />
-                  Option 2: Install as App
+                  {t("compat.option2Install")}
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  In Bluefy, tap the share button and choose "Add to Home Screen" to install Mesh Utility as an app for quick access.
+                  {t("compat.bluefyInstallDesc")}
                 </p>
               </div>
             </>
@@ -119,20 +121,20 @@ export function CompatibilityDialog() {
               <div className="space-y-3">
                 <h4 className="font-medium flex items-center gap-2">
                   <Smartphone className="h-4 w-4" />
-                  Use Chrome or Edge
+                  {t("compat.useChromeEdge")}
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  Open this page in Chrome or Edge on your Android device. These browsers support Web Bluetooth natively.
+                  {t("compat.androidDesc")}
                 </p>
               </div>
 
               <div className="border-t border-border pt-3 space-y-3">
                 <h4 className="font-medium flex items-center gap-2">
                   <Download className="h-4 w-4" />
-                  Install as App
+                  {t("compat.installAsApp")}
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  Tap the browser menu and choose "Install app" or "Add to Home Screen" for a full-screen experience.
+                  {t("compat.androidInstallDesc")}
                 </p>
               </div>
             </>
@@ -143,20 +145,20 @@ export function CompatibilityDialog() {
               <div className="space-y-3">
                 <h4 className="font-medium flex items-center gap-2">
                   <Monitor className="h-4 w-4" />
-                  Use Chrome or Edge
+                  {t("compat.useChromeEdge")}
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  Web Bluetooth is supported in Chrome and Edge on desktop. Open this page in one of those browsers to connect to your radio.
+                  {t("compat.desktopDesc")}
                 </p>
               </div>
 
               <div className="border-t border-border pt-3 space-y-3">
                 <h4 className="font-medium flex items-center gap-2">
                   <Download className="h-4 w-4" />
-                  Install as App
+                  {t("compat.installAsApp")}
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  In Chrome or Edge, click the install icon in the address bar to add Mesh Utility as a desktop app.
+                  {t("compat.desktopInstallDesc")}
                 </p>
               </div>
             </>
@@ -165,7 +167,7 @@ export function CompatibilityDialog() {
 
         <DialogFooter>
           <Button onClick={handleDismiss} className="w-full" data-testid="button-dismiss-compat">
-            Got it
+            {t("compat.gotIt")}
           </Button>
         </DialogFooter>
       </DialogContent>

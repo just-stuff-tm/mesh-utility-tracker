@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Shield, WifiOff } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useI18n } from "@/lib/i18n";
 
 const PRIVACY_ACCEPTED_KEY = "mesh-privacy-accepted";
 
@@ -61,6 +62,9 @@ export function PrivacyAcceptanceDialog({
   onClose?: () => void;
   mode: "initial" | "require";
 }) {
+  const { t } = useI18n();
+  const parts = t("privacy.readFull").split("{link}");
+
   if (!open) return null;
 
   return (
@@ -80,34 +84,24 @@ export function PrivacyAcceptanceDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
-            Privacy Policy
+            {t("privacy.title")}
           </DialogTitle>
           <DialogDescription>
             {mode === "initial"
-              ? "Please review our privacy policy to continue."
-              : "You must accept the privacy policy before switching to online mode."}
+              ? t("privacy.reviewDesc")
+              : t("privacy.requireDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="max-h-[50vh]">
           <div className="space-y-3 pr-3 text-sm text-muted-foreground">
-            <p>
-              Mesh Utility collects location data, radio signal measurements, and device identifiers when you scan. This data is used to build the coverage map and is stored on our server.
-            </p>
-            <p>
-              We do not collect your name, email, or personal contact information. No account or login is required. We do not use tracking cookies or share data with advertisers.
-            </p>
-            <p>
-              The app requires Bluetooth and Location permissions to function. You can revoke these at any time through your browser or device settings.
-            </p>
-            <p>
-              Data is also stored on your device for offline use. You can delete all data associated with your radio at any time from the Settings panel.
-            </p>
-            <p>
-              Map tiles are loaded from CartoDB and Cloudflare. These services may log standard web request information. Altitude estimates may use the Open-Meteo elevation API.
-            </p>
+            <p>{t("privacy.body1")}</p>
+            <p>{t("privacy.body2")}</p>
+            <p>{t("privacy.body3")}</p>
+            <p>{t("privacy.body4")}</p>
+            <p>{t("privacy.body5")}</p>
             <p className="text-xs">
-              Read the{" "}
+              {parts[0]}
               <a
                 href="/privacy"
                 target="_blank"
@@ -115,9 +109,9 @@ export function PrivacyAcceptanceDialog({
                 className="underline text-primary hover:text-primary/80"
                 data-testid="link-full-privacy-policy"
               >
-                full privacy policy
-              </a>{" "}
-              for complete details.
+                {t("privacy.fullPolicy")}
+              </a>
+              {parts[1]}
             </p>
           </div>
         </ScrollArea>
@@ -128,7 +122,7 @@ export function PrivacyAcceptanceDialog({
             className="w-full"
             data-testid="button-accept-privacy"
           >
-            I Accept
+            {t("privacy.iAccept")}
           </Button>
           {mode === "initial" && onSkip && (
             <Button
@@ -138,7 +132,7 @@ export function PrivacyAcceptanceDialog({
               data-testid="button-skip-privacy"
             >
               <WifiOff className="h-3.5 w-3.5 mr-1.5" />
-              Skip (Offline Only)
+              {t("privacy.skipOffline")}
             </Button>
           )}
         </DialogFooter>

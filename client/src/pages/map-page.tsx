@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Settings } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 import { CoverageMap } from "@/components/coverage-map";
 import { BluetoothPanel } from "@/components/bluetooth-panel";
 import { ScanStats } from "@/components/scan-stats";
@@ -15,6 +16,7 @@ import { publicKeyHex } from "@/lib/bluetooth";
 import type { CoverageZone, MeshNode, ScanResult } from "@shared/schema";
 
 export default function MapPage() {
+  const { t } = useI18n();
   const { observerPosition, autoCenter, connected, selfInfo, statsRadiusMiles, unitSystem } = useBluetoothContext();
   const [selectedZone, setSelectedZone] = useState<CoverageZone | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -90,7 +92,7 @@ export default function MapPage() {
               onInteractOutside={() => setSheetOpen(false)}
             >
               <SheetHeader className="p-3 border-b border-border">
-                <SheetTitle className="text-sm">Settings</SheetTitle>
+                <SheetTitle className="text-sm">{t("mapPage.settings")}</SheetTitle>
               </SheetHeader>
               <ScrollArea className="h-[calc(100vh-60px)]">
                 <div

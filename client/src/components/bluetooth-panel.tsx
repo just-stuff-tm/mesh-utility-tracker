@@ -3,20 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
-
-function getScanStatusLabel(status: string): string {
-  switch (status) {
-    case "advertising": return "Sending advert...";
-    case "waiting": return "Waiting for responses...";
-    case "querying": return "Querying repeaters...";
-    case "submitting": return "Saving results...";
-    case "done": return "Scan complete";
-    case "error": return "Scan failed";
-    default: return "Idle";
-  }
-}
+import { useI18n } from "@/lib/i18n";
 
 export function BluetoothPanel() {
+  const { t } = useI18n();
   const {
     connected,
     connecting,
@@ -51,7 +41,7 @@ export function BluetoothPanel() {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Radio className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Radio Connection</span>
+        <span className="text-sm font-medium">{t("bluetooth.radioConnection")}</span>
       </div>
 
       <Card className="p-3 space-y-3">
@@ -63,11 +53,11 @@ export function BluetoothPanel() {
               <BluetoothOff className="h-4 w-4 text-muted-foreground" />
             )}
             <span className="text-sm">
-              {connected ? deviceName || "Connected" : "Not Connected"}
+              {connected ? deviceName || t("bluetooth.connected") : t("bluetooth.notConnected")}
             </span>
           </div>
           <Badge variant={connected ? "default" : "secondary"} className="text-xs">
-            {connected ? "Online" : "Offline"}
+            {connected ? t("bluetooth.online") : t("bluetooth.offline")}
           </Badge>
         </div>
 
@@ -77,20 +67,20 @@ export function BluetoothPanel() {
 
         {!supported && (
           <p className="text-xs text-muted-foreground">
-            Web Bluetooth not available. Use Chrome/Edge on desktop or Android.
+            {t("bluetooth.webBluetoothNA")}
           </p>
         )}
 
         {!connected && !connecting && supported && (
           <p className="text-xs text-muted-foreground">
-            Make sure no other app (MeshCore, etc.) is connected to your radio. Only one app can use Bluetooth at a time.
+            {t("bluetooth.onlyOneApp")}
           </p>
         )}
 
         {!connected && showReconnect && lastRadioName && (
           <div className="bg-muted/50 rounded-md p-2 space-y-2" data-no-close>
             <p className="text-xs text-muted-foreground">
-              Previously connected to <span className="font-medium text-foreground">{lastRadioName}</span>
+              {t("bluetooth.prevConnected")} <span className="font-medium text-foreground">{lastRadioName}</span>
             </p>
             <div className="flex gap-2">
               <Button
@@ -106,7 +96,7 @@ export function BluetoothPanel() {
                 ) : (
                   <Bluetooth className="h-3 w-3 mr-1" />
                 )}
-                {connecting ? "Connecting..." : "Reconnect"}
+                {connecting ? t("bluetooth.connecting") : t("bluetooth.reconnect")}
               </Button>
               <Button
                 size="sm"
@@ -114,7 +104,7 @@ export function BluetoothPanel() {
                 onClick={dismissReconnect}
                 data-testid="button-dismiss-reconnect"
               >
-                Dismiss
+                {t("bluetooth.dismiss")}
               </Button>
             </div>
           </div>
@@ -134,7 +124,7 @@ export function BluetoothPanel() {
               ) : (
                 <Bluetooth className="h-3 w-3 mr-1" />
               )}
-              {connecting ? "Connecting..." : "Connect"}
+              {connecting ? t("bluetooth.connecting") : t("bluetooth.connect")}
             </Button>
           ) : (
             <>
@@ -146,7 +136,7 @@ export function BluetoothPanel() {
                 data-testid="button-disconnect-bluetooth"
               >
                 <BluetoothOff className="h-3 w-3 mr-1" />
-                Disconnect
+                {t("bluetooth.disconnect")}
               </Button>
               <Button
                 size="sm"
@@ -160,7 +150,7 @@ export function BluetoothPanel() {
                 ) : (
                   <Wifi className="h-3 w-3 mr-1" />
                 )}
-                {isScanning ? "Stop" : "Scan"}
+                {isScanning ? t("bluetooth.stop") : t("bluetooth.scan")}
               </Button>
             </>
           )}
@@ -177,7 +167,13 @@ export function BluetoothPanel() {
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
               )}
               <span className="text-xs" data-testid="text-scan-status">
-                {getScanStatusLabel(scanStatus)}
+                {scanStatus === "advertising" ? t("bluetooth.sendingAdvert") :
+                 scanStatus === "waiting" ? t("bluetooth.waitingResp") :
+                 scanStatus === "querying" ? t("bluetooth.queryingRepeaters") :
+                 scanStatus === "submitting" ? t("bluetooth.savingResults") :
+                 scanStatus === "done" ? t("bluetooth.scanComplete") :
+                 scanStatus === "error" ? t("bluetooth.scanFailed") :
+                 t("bluetooth.idle")}
               </span>
             </div>
 
@@ -186,19 +182,19 @@ export function BluetoothPanel() {
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                   <div className="flex items-center gap-1">
                     <Users className="h-3 w-3 text-muted-foreground" />
-                    <span data-testid="text-contacts-found">{lastScanResult.contactsFound} contacts</span>
+                    <span data-testid="text-contacts-found">{lastScanResult.contactsFound} {t("bluetooth.contacts")}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Radio className="h-3 w-3 text-muted-foreground" />
-                    <span data-testid="text-repeaters-found">{lastScanResult.repeatersFound} repeaters</span>
+                    <span data-testid="text-repeaters-found">{lastScanResult.repeatersFound} {t("bluetooth.repeaters")}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Signal className="h-3 w-3 text-muted-foreground" />
-                    <span data-testid="text-stats-received">{lastScanResult.repeatersWithStats} with signal</span>
+                    <span data-testid="text-stats-received">{lastScanResult.repeatersWithStats} {t("bluetooth.withSignal")}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <CheckCircle2 className="h-3 w-3 text-muted-foreground" />
-                    <span data-testid="text-results-submitted">{lastScanResult.scanResultsSubmitted} saved</span>
+                    <span data-testid="text-results-submitted">{lastScanResult.scanResultsSubmitted} {t("bluetooth.saved")}</span>
                   </div>
                 </div>
                 {lastScanResult.errorMessage && (
@@ -218,36 +214,36 @@ export function BluetoothPanel() {
             <Card className="p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium">Device</span>
+                <span className="text-xs font-medium">{t("bluetooth.device")}</span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 {selfInfo && (
                   <div>
-                    <span className="text-muted-foreground">Name</span>
+                    <span className="text-muted-foreground">{t("bluetooth.name")}</span>
                     <p className="font-medium" data-testid="text-device-name">{selfInfo.name}</p>
                   </div>
                 )}
                 {selfInfo && (
                   <div>
-                    <span className="text-muted-foreground">TX Power</span>
+                    <span className="text-muted-foreground">{t("bluetooth.txPower")}</span>
                     <p className="font-medium">{selfInfo.txPower} / {selfInfo.maxTxPower}</p>
                   </div>
                 )}
                 {deviceInfo && (
                   <div>
-                    <span className="text-muted-foreground">Model</span>
+                    <span className="text-muted-foreground">{t("bluetooth.model")}</span>
                     <p className="font-medium truncate">{deviceInfo.manufacturerModel}</p>
                   </div>
                 )}
                 {deviceInfo && (
                   <div>
-                    <span className="text-muted-foreground">Firmware</span>
+                    <span className="text-muted-foreground">{t("bluetooth.firmware")}</span>
                     <p className="font-medium">{deviceInfo.firmwareVersion || deviceInfo.firmwareBuildDate}</p>
                   </div>
                 )}
                 {batteryPercent !== null && (
                   <div>
-                    <span className="text-muted-foreground">Battery</span>
+                    <span className="text-muted-foreground">{t("bluetooth.battery")}</span>
                     <p className="font-medium flex items-center gap-1">
                       <Battery className="h-3 w-3" />
                       {batteryPercent}%
@@ -256,7 +252,7 @@ export function BluetoothPanel() {
                 )}
                 {selfInfo && selfInfo.radioFreq > 0 && (
                   <div>
-                    <span className="text-muted-foreground">Frequency</span>
+                    <span className="text-muted-foreground">{t("bluetooth.frequency")}</span>
                     <p className="font-medium">{(selfInfo.radioFreq / 1e3).toFixed(3)} MHz</p>
                   </div>
                 )}
@@ -267,39 +263,39 @@ export function BluetoothPanel() {
           <Card className="p-3">
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <span className="text-muted-foreground">Next Scan</span>
+                <span className="text-muted-foreground">{t("bluetooth.nextScan")}</span>
                 <p className="font-medium" data-testid="text-next-scan-countdown">
                   {nextScanCountdown !== null ? `${nextScanCountdown}s` : `${scanInterval}s`}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">Messages</span>
+                <span className="text-muted-foreground">{t("bluetooth.messages")}</span>
                 <p className="font-medium">{messagesReceived}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Last Scan</span>
+                <span className="text-muted-foreground">{t("bluetooth.lastScan")}</span>
                 <p className="font-medium">
-                  {lastScanTime ? lastScanTime.toLocaleTimeString() : "Never"}
+                  {lastScanTime ? lastScanTime.toLocaleTimeString() : t("bluetooth.never")}
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">Wake Lock</span>
+                <span className="text-muted-foreground">{t("bluetooth.wakeLock")}</span>
                 <p className="font-medium flex items-center gap-1">
                   {wakeLockActive ? (
                     <>
                       <Shield className="h-3 w-3 text-chart-3" />
-                      Active
+                      {t("bluetooth.active")}
                     </>
                   ) : (
                     <span className="text-muted-foreground">
-                      {"wakeLock" in navigator ? "Inactive" : "Not supported"}
+                      {"wakeLock" in navigator ? t("bluetooth.inactive") : t("bluetooth.notSupported")}
                     </span>
                   )}
                 </p>
               </div>
               {contacts.length > 0 && (
                 <div>
-                  <span className="text-muted-foreground">Contacts</span>
+                  <span className="text-muted-foreground">{t("bluetooth.contacts")}</span>
                   <p className="font-medium flex items-center gap-1">
                     <Users className="h-3 w-3" />
                     {contacts.length}

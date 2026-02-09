@@ -3,6 +3,7 @@ import { Play, Pause, Radio, Signal, Clock, AlertTriangle, Zap, Cpu, ChevronDown
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useBluetoothContext, type ScanStatus } from "@/lib/bluetooth-context";
+import { useI18n } from "@/lib/i18n";
 
 function formatCountdown(seconds: number | null): string {
   if (seconds === null) return "--";
@@ -11,15 +12,15 @@ function formatCountdown(seconds: number | null): string {
   return m > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${s}s`;
 }
 
-function scanStatusLabel(status: ScanStatus): string {
+function scanStatusLabel(status: ScanStatus, t: (key: string) => string): string {
   switch (status) {
-    case "advertising": return "Discovering";
-    case "waiting": return "Listening";
-    case "querying": return "Querying";
-    case "submitting": return "Saving";
-    case "done": return "Complete";
-    case "error": return "Error";
-    default: return "Idle";
+    case "advertising": return t("hud.discovering");
+    case "waiting": return t("hud.listening");
+    case "querying": return t("hud.querying");
+    case "submitting": return t("hud.saving");
+    case "done": return t("hud.complete");
+    case "error": return t("hud.error");
+    default: return t("hud.idle");
   }
 }
 
@@ -59,9 +60,10 @@ export function MapHud() {
     setAutoCenter,
   } = useBluetoothContext();
 
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(true);
 
-  const radioName = selfInfo?.name || deviceName || "Unknown";
+  const radioName = selfInfo?.name || deviceName || t("time.unknown");
   const batteryV = batteryMilliVolts ? (batteryMilliVolts / 1000).toFixed(2) : null;
   const isActive = scanStatus !== "idle" && scanStatus !== "done" && scanStatus !== "error";
   const wasSmartSkipped = lastScanResult?.errorMessage?.includes("skipped");
@@ -87,7 +89,7 @@ export function MapHud() {
           <>
             {isActive ? (
               <span className={`${scanStatusColor(scanStatus)} font-medium text-xs`} data-testid="text-collapsed-status">
-                {scanStatusLabel(scanStatus)}
+                {scanStatusLabel(scanStatus, t)}
               </span>
             ) : (
               <span className="text-muted-foreground font-medium text-xs" data-testid="text-collapsed-countdown">
@@ -97,10 +99,10 @@ export function MapHud() {
           </>
         )}
         {connected && !isScanning && (
-          <span className="text-muted-foreground text-xs">Paused</span>
+          <span className="text-muted-foreground text-xs">{t("hud.paused")}</span>
         )}
         {!connected && (
-          <span className="text-muted-foreground text-xs">Off</span>
+          <span className="text-muted-foreground text-xs">{t("hud.off")}</span>
         )}
         {wasSmartSkipped && (
           <AlertTriangle className="h-3 w-3 text-yellow-400 shrink-0" data-testid="indicator-smart-skip" />
@@ -126,7 +128,7 @@ export function MapHud() {
             <div className="w-2 h-2 rounded-full bg-muted-foreground shrink-0" data-testid="indicator-connection-status" />
           )}
           <span className="font-semibold truncate" data-testid="text-radio-name">
-            {connected ? radioName : "Disconnected"}
+            {connected ? radioName : t("hud.disconnected")}
           </span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -140,7 +142,7 @@ export function MapHud() {
             variant="ghost"
             className={`toggle-elevate ${autoCenter ? "toggle-elevated" : ""}`}
             onClick={() => setAutoCenter(!autoCenter)}
-            title={autoCenter ? "Auto-center on" : "Auto-center off"}
+            title={autoCenter ? t("hud.autoCenterOn") : t("hud.autoCenterOff")}
             data-testid="button-auto-center"
           >
             <MapPin className={`h-3 w-3 ${autoCenter ? "text-blue-400" : ""}`} />
@@ -181,15 +183,15 @@ export function MapHud() {
               {isScanning ? (
                 isActive ? (
                   <span className={scanStatusColor(scanStatus)} data-testid="text-scan-status">
-                    {scanStatusLabel(scanStatus)}...
+                    {scanStatusLabel(scanStatus, t)}...
                   </span>
                 ) : (
                   <span className="text-muted-foreground" data-testid="text-scan-countdown">
-                    Next: {formatCountdown(nextScanCountdown)}
+                    {t("hud.next")}: {formatCountdown(nextScanCountdown)}
                   </span>
                 )
               ) : (
-                <span className="text-muted-foreground">Scanning paused</span>
+                <span className="text-muted-foreground">{t("hud.scanningPaused")}</span>
               )}
             </div>
             <div className="flex items-center gap-1">
@@ -199,7 +201,7 @@ export function MapHud() {
                 className="h-7 w-7"
                 onClick={forceScan}
                 disabled={isActive || !connected}
-                title="Force scan now"
+                title={t("hud.forceScan")}
                 data-testid="button-force-scan"
               >
                 <Zap className="h-3.5 w-3.5" />
@@ -219,16 +221,16 @@ export function MapHud() {
           {lastScanResult && (
             <div className="border-t border-border pt-2 space-y-1" data-testid="section-last-scan">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Last Scan
+                {t("hud.lastScan")}
               </p>
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-1">
                   <Radio className="h-3 w-3 text-muted-foreground" />
-                  <span data-testid="text-repeaters-found">{lastScanResult.repeatersFound} found</span>
+                  <span data-testid="text-repeaters-found">{lastScanResult.repeatersFound} {t("hud.found")}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Signal className="h-3 w-3 text-muted-foreground" />
-                  <span data-testid="text-stats-submitted">{lastScanResult.repeatersWithStats} with stats</span>
+                  <span data-testid="text-stats-submitted">{lastScanResult.repeatersWithStats} {t("hud.withStats")}</span>
                 </div>
               </div>
               {lastScanResult.errorMessage && (

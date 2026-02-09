@@ -5,22 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
+import { useI18n } from "@/lib/i18n";
 import type { ScanResult } from "@shared/schema";
-
-function getSignalBadge(rssi: number): { label: string; variant: "default" | "secondary" | "destructive" } {
-  if (rssi >= -70) return { label: "Excellent", variant: "default" };
-  if (rssi >= -80) return { label: "Very Good", variant: "default" };
-  if (rssi >= -90) return { label: "Good", variant: "secondary" };
-  if (rssi >= -100) return { label: "Fair", variant: "secondary" };
-  if (rssi >= -110) return { label: "Poor", variant: "destructive" };
-  return { label: "Very Weak", variant: "destructive" };
-}
-
-function formatTime(date: string | Date | null): string {
-  if (!date) return "Unknown";
-  const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleString();
-}
 
 function formatAltitude(meters: number | null, units: "imperial" | "metric"): string | null {
   if (meters == null) return null;
@@ -29,7 +15,23 @@ function formatAltitude(meters: number | null, units: "imperial" | "metric"): st
 }
 
 export default function HistoryPage() {
+  const { t } = useI18n();
+
+  const formatTime = (date: string | Date | null): string => {
+    if (!date) return t("time.unknown");
+    const d = typeof date === "string" ? new Date(date) : date;
+    return d.toLocaleString();
+  };
   const { unitSystem } = useBluetoothContext();
+
+  function getSignalBadge(rssi: number): { label: string; variant: "default" | "secondary" | "destructive" } {
+    if (rssi >= -70) return { label: t("coverage.excellent"), variant: "default" };
+    if (rssi >= -80) return { label: t("nodes.veryGood"), variant: "default" };
+    if (rssi >= -90) return { label: t("coverage.good"), variant: "secondary" };
+    if (rssi >= -100) return { label: t("coverage.fair"), variant: "secondary" };
+    if (rssi >= -110) return { label: t("coverage.poor"), variant: "destructive" };
+    return { label: t("nodes.veryWeak"), variant: "destructive" };
+  }
   const { data: scans = [], isLoading } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan-results"],
   });
@@ -42,12 +44,12 @@ export default function HistoryPage() {
     <div className="p-4 max-w-4xl mx-auto space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold">Scan History</h1>
+          <h1 className="text-xl font-semibold">{t("history.scanHistory")}</h1>
           <p className="text-sm text-muted-foreground">
-            All recorded scan results
+            {t("history.allRecorded")}
           </p>
         </div>
-        <Badge variant="secondary">{scans.length} scans</Badge>
+        <Badge variant="secondary">{scans.length} {t("history.scans")}</Badge>
       </div>
 
       {isLoading ? (
@@ -67,9 +69,9 @@ export default function HistoryPage() {
       ) : sorted.length === 0 ? (
         <Card className="p-8 text-center">
           <Activity className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground">No scan results yet</p>
+          <p className="text-muted-foreground">{t("history.noResults")}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Scan results will appear here after connecting and scanning
+            {t("history.resultsAfterScan")}
           </p>
         </Card>
       ) : (
@@ -90,7 +92,7 @@ export default function HistoryPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium truncate">
-                          Node: {scan.nodeId}
+                          {t("history.node")}: {scan.nodeId}
                         </span>
                         <Badge variant={quality.variant} className="text-xs">
                           {quality.label}
@@ -122,8 +124,8 @@ export default function HistoryPage() {
                       </div>
                       {(scan.senderName || scan.receiverName) && (
                         <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-                          {scan.senderName && <span>Sender: {scan.senderName}</span>}
-                          {scan.receiverName && <span>Observer: {scan.receiverName}</span>}
+                          {scan.senderName && <span>{t("history.sender")}: {scan.senderName}</span>}
+                          {scan.receiverName && <span>{t("history.observer")}: {scan.receiverName}</span>}
                         </div>
                       )}
                     </div>

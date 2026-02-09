@@ -13,6 +13,9 @@ Preferred communication style: Simple, everyday language.
 ### Frontend (React + Vite)
 The frontend is built with React 18, TypeScript, and Vite, utilizing Wouter for routing and TanStack React Query for state management. The UI is designed with shadcn/ui (new-york style) and Tailwind CSS. Interactive maps are rendered using Leaflet via react-leaflet, featuring a hex grid overlay for coverage visualization. Web Bluetooth API is used for radio connectivity, and the browser's Geolocation API tracks observer position. The layout is sidebar-based, and path aliases simplify module imports. It also supports PWA features, including offline-first capabilities with a service worker and IndexedDB for local data storage, and provides a compatibility dialog for unsupported browsers.
 
+### Internationalization (i18n)
+The app uses a custom i18n system in `client/src/lib/i18n.tsx` with I18nProvider context wrapping the app. Supports 8 languages: EN, ES, FR, DE, PT, ZH, JA, KO. Translation keys are organized by component area (nav, settings, bluetooth, hud, coverage, nodes, history, stats, privacy, compat, toast, offline, header, mapPage, notFound). Language preference stored in localStorage as "mesh-language" with auto-detection of browser language. All UI components use `useI18n()` hook to access the `t()` translation function. The Manual page keeps technical content in English, only UI chrome is translated. A language picker dropdown is available in the Settings panel.
+
 ### Backend (Express + Node.js)
 The backend uses Express.js and Node.js with TypeScript, providing a RESTful JSON API. Key functionalities include CRUD operations for mesh nodes, scan results, coverage zones, and observer devices. It implements a precise hex grid system for coverage mapping, ensuring perfect tiling without gaps. The server-side handles grid snapping and dead zone identification.
 

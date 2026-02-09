@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Settings, Timer, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned, Radio, Wrench } from "lucide-react";
+import { Settings, Timer, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned, Radio, Wrench, Globe } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
 import { publicKeyHex } from "@/lib/bluetooth";
 import { useToast } from "@/hooks/use-toast";
@@ -13,9 +14,11 @@ import { apiRequest, isQueuedResponse, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { useOfflineStatus } from "@/lib/use-offline";
 import { usePrivacyContext } from "@/App";
+import { useI18n, LANGUAGES, type Language } from "@/lib/i18n";
 
 export function SettingsPanel() {
   const { toast } = useToast();
+  const { t, language, setLanguage } = useI18n();
   const { requireAcceptance } = usePrivacyContext();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [tileCacheCount, setTileCacheCount] = useState<number | null>(null);
@@ -55,8 +58,8 @@ export function SettingsPanel() {
       setConfirmDelete(false);
       if (data.queued) {
         toast({
-          title: "Delete queued",
-          description: "Data will be deleted when you're back online",
+          title: t("toast.deleteQueued"),
+          description: t("toast.deleteQueuedDesc"),
         });
         return;
       }
@@ -64,12 +67,12 @@ export function SettingsPanel() {
       queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
       queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
       toast({
-        title: "Data deleted",
+        title: t("toast.dataDeleted"),
         description: `Removed ${data.deleted.scanResults} scan results, ${data.deleted.coverageZones} coverage zones, and ${data.deleted.observers || 0} observer records`,
       });
     },
     onError: () => {
-      toast({ title: "Failed to delete data", variant: "destructive" });
+      toast({ title: t("toast.deleteFailed"), variant: "destructive" });
     },
   });
 
@@ -88,15 +91,15 @@ export function SettingsPanel() {
       if (data.success) {
         queryClient.invalidateQueries();
         toast({
-          title: "Sync fixed",
-          description: "Server connections have been reset. Try syncing again.",
+          title: t("toast.syncFixed"),
+          description: t("toast.syncFixedDesc"),
         });
       } else {
-        toast({ title: "Reset failed", description: data.message, variant: "destructive" });
+        toast({ title: t("toast.resetFailed"), description: data.message, variant: "destructive" });
       }
     },
     onError: () => {
-      toast({ title: "Could not reach server", description: "The server may be down. Try again later.", variant: "destructive" });
+      toast({ title: t("toast.cannotReachServer"), description: t("toast.serverDown"), variant: "destructive" });
     },
   });
 
@@ -110,11 +113,11 @@ export function SettingsPanel() {
     },
     onSuccess: (data) => {
       if (data.queued) {
-        toast({ title: "Dead zone queued for sync when back online" });
+        toast({ title: t("toast.deadZoneQueued") });
         return;
       }
       queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
-      toast({ title: "Dead zone marked at your current location" });
+      toast({ title: t("toast.deadZoneMarked") });
     },
   });
 
@@ -144,13 +147,13 @@ export function SettingsPanel() {
   const handleClearTileCache = () => {
     if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: "CLEAR_TILE_CACHE" });
-      toast({ title: "Tile cache cleared" });
+      toast({ title: t("toast.tileCacheCleared") });
     }
   };
 
   const handleMarkDeadZone = () => {
     if (!observerPosition) {
-      toast({ title: "Location not available", variant: "destructive" });
+      toast({ title: t("settings.locationNotAvail"), variant: "destructive" });
       return;
     }
     markDeadZoneMutation.mutate({
@@ -159,18 +162,24 @@ export function SettingsPanel() {
     });
   };
 
+  const statsRadiusValue = statsRadiusMiles === 0
+    ? t("settings.statsRadiusAll")
+    : unitSystem === "metric"
+      ? `${Math.round(statsRadiusMiles * 1.60934)} km`
+      : `${statsRadiusMiles} mi`;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Settings className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Settings</span>
+        <span className="text-sm font-medium">{t("settings.title")}</span>
       </div>
 
       <Card className="p-3 space-y-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Timer className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs">Scan Interval: {scanInterval}s</Label>
+            <Label className="text-xs">{t("settings.scanInterval", { value: scanInterval })}</Label>
           </div>
           <Slider
             value={[scanInterval]}
@@ -181,7 +190,7 @@ export function SettingsPanel() {
             data-testid="slider-scan-interval"
           />
           <p className="text-xs text-muted-foreground">
-            Minimum 20s between scans
+            {t("settings.scanIntervalMin")}
           </p>
         </div>
 
@@ -191,7 +200,7 @@ export function SettingsPanel() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Radio className="h-3.5 w-3.5 text-muted-foreground" />
-              <Label className="text-xs">Update Radio Position</Label>
+              <Label className="text-xs">{t("settings.updateRadioPos")}</Label>
             </div>
             <Switch
               checked={updateRadioPosition}
@@ -201,8 +210,8 @@ export function SettingsPanel() {
           </div>
           <p className="text-xs text-muted-foreground">
             {updateRadioPosition
-              ? "Your GPS coordinates will be sent to the radio during scans, updating its stored position."
-              : "Radio position will not be changed during scans. Enable only if you want the radio to track your location."}
+              ? t("settings.updateRadioPosOn")
+              : t("settings.updateRadioPosOff")}
           </p>
         </div>
 
@@ -212,7 +221,7 @@ export function SettingsPanel() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Download className="h-3.5 w-3.5 text-muted-foreground" />
-              <Label className="text-xs" data-testid="label-offline-tiles">Offline Map Tiles</Label>
+              <Label className="text-xs" data-testid="label-offline-tiles">{t("settings.offlineMapTiles")}</Label>
             </div>
             <Switch
               checked={tileCachingEnabled}
@@ -222,12 +231,12 @@ export function SettingsPanel() {
           </div>
           <p className="text-xs text-muted-foreground">
             {tileCachingEnabled
-              ? "Tiles are cached as you browse for offline use. Download tiles for your current area below."
-              : "Tile caching is off. Previously cached tiles are still available."}
+              ? t("settings.tileCachingOn")
+              : t("settings.tileCachingOff")}
           </p>
           {tileCacheCount !== null && (
             <p className="text-xs text-muted-foreground">
-              {tileCacheCount} tiles cached
+              {t("settings.tilesCached", { count: tileCacheCount })}
             </p>
           )}
           <Button
@@ -235,11 +244,11 @@ export function SettingsPanel() {
             variant="outline"
             onClick={() => {
               if (!observerPosition) {
-                toast({ title: "Location not available", variant: "destructive" });
+                toast({ title: t("settings.locationNotAvail"), variant: "destructive" });
                 return;
               }
               if (!("serviceWorker" in navigator) || !navigator.serviceWorker.controller) {
-                toast({ title: "Service worker not ready. Reload the app.", variant: "destructive" });
+                toast({ title: t("settings.swNotReady"), variant: "destructive" });
                 return;
               }
               setDownloadingTiles(true);
@@ -267,7 +276,7 @@ export function SettingsPanel() {
                 if (e.data?.type === "PREFETCH_COMPLETE") {
                   setDownloadingTiles(false);
                   toast({
-                    title: "Tiles downloaded",
+                    title: t("toast.tilesDownloaded"),
                     description: `Cached ${e.data.count} new tiles (${e.data.total} total requested)`,
                   });
                   navigator.serviceWorker.removeEventListener("message", handler);
@@ -285,12 +294,12 @@ export function SettingsPanel() {
             {downloadingTiles ? (
               <>
                 <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                Downloading...
+                {t("settings.downloading")}
               </>
             ) : (
               <>
                 <MapPinned className="h-3 w-3 mr-1" />
-                Download Area Tiles
+                {t("settings.downloadAreaTiles")}
               </>
             )}
           </Button>
@@ -304,7 +313,7 @@ export function SettingsPanel() {
               data-no-close
             >
               <Trash2 className="h-3 w-3 mr-1" />
-              Clear Tile Cache
+              {t("settings.clearTileCache")}
             </Button>
           )}
         </div>
@@ -314,7 +323,7 @@ export function SettingsPanel() {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Ruler className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs">Units</Label>
+            <Label className="text-xs">{t("settings.units")}</Label>
           </div>
           <div className="flex gap-1">
             <Button
@@ -325,7 +334,7 @@ export function SettingsPanel() {
               data-testid="button-units-imperial"
               data-no-close
             >
-              Imperial
+              {t("settings.imperial")}
             </Button>
             <Button
               size="sm"
@@ -335,9 +344,30 @@ export function SettingsPanel() {
               data-testid="button-units-metric"
               data-no-close
             >
-              Metric
+              {t("settings.metric")}
             </Button>
           </div>
+        </div>
+
+        <Separator />
+
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs">{t("settings.language")}</Label>
+          </div>
+          <Select value={language} onValueChange={(v) => setLanguage(v as Language)}>
+            <SelectTrigger className="w-[130px] h-8 text-xs" data-testid="select-language" data-no-close>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(LANGUAGES).map(([code, name]) => (
+                <SelectItem key={code} value={code} data-testid={`option-lang-${code}`}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <Separator />
@@ -346,7 +376,7 @@ export function SettingsPanel() {
           <div className="flex items-center gap-2">
             <Radar className="h-3.5 w-3.5 text-muted-foreground" />
             <Label className="text-xs">
-              Stats Radius: {statsRadiusMiles === 0 ? "All Data" : unitSystem === "metric" ? `${Math.round(statsRadiusMiles * 1.60934)} km` : `${statsRadiusMiles} mi`}
+              {t("settings.statsRadius", { value: statsRadiusValue })}
             </Label>
           </div>
           <Slider
@@ -359,10 +389,12 @@ export function SettingsPanel() {
           />
           <p className="text-xs text-muted-foreground">
             {statsRadiusMiles === 0
-              ? "Showing averages for all coverage data"
-              : unitSystem === "metric"
-                ? `Showing averages within ${Math.round(statsRadiusMiles * 1.60934)} km of your location`
-                : `Showing averages within ${statsRadiusMiles} miles of your location`}
+              ? t("settings.statsRadiusAllDesc")
+              : t("settings.statsRadiusDesc", {
+                  value: unitSystem === "metric"
+                    ? `${Math.round(statsRadiusMiles * 1.60934)} km`
+                    : `${statsRadiusMiles} miles`
+                })}
           </p>
         </div>
 
@@ -370,7 +402,7 @@ export function SettingsPanel() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <Label className="text-xs">Smart Scanning</Label>
+            <Label className="text-xs">{t("settings.smartScanning")}</Label>
             <Switch
               checked={smartScanEnabled}
               onCheckedChange={setSmartScanEnabled}
@@ -378,12 +410,12 @@ export function SettingsPanel() {
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Skip scanning in areas covered in the last {smartScanDays} days
+            {t("settings.smartScanDesc", { days: smartScanDays })}
           </p>
           {smartScanEnabled && (
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">
-                Coverage freshness: {smartScanDays} days
+                {t("settings.coverageFreshness", { days: smartScanDays })}
               </Label>
               <Slider
                 value={[smartScanDays]}
@@ -402,10 +434,10 @@ export function SettingsPanel() {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs">Dead Zones</Label>
+            <Label className="text-xs">{t("settings.deadZones")}</Label>
           </div>
           <p className="text-xs text-muted-foreground">
-            Mark current location as a dead zone. Dead zones always scan at the set interval.
+            {t("settings.deadZoneDesc")}
           </p>
           <Button
             size="sm"
@@ -416,7 +448,7 @@ export function SettingsPanel() {
             data-no-close
           >
             <AlertTriangle className="h-3 w-3 mr-1" />
-            Mark Dead Zone
+            {t("settings.markDeadZone")}
           </Button>
         </div>
 
@@ -431,7 +463,7 @@ export function SettingsPanel() {
                 <WifiOff className="h-3.5 w-3.5 text-orange-500" />
               )}
               <Label className="text-xs">
-                {online ? "Online" : "Offline Mode"}
+                {online ? t("settings.onlineMode") : t("settings.offlineMode")}
               </Label>
             </div>
             <Switch
@@ -453,15 +485,15 @@ export function SettingsPanel() {
           </div>
           <p className="text-xs text-muted-foreground">
             {forceOffline
-              ? "Forced offline. Scans are saved locally and will sync when you switch back online."
+              ? t("settings.forceOfflineDesc")
               : online
-                ? "Data syncs to the server in real time."
-                : "No network connection. Scans are saved locally and will sync when connectivity returns."}
+                ? t("settings.onlineDesc")
+                : t("settings.noNetworkDesc")}
           </p>
           {pendingSync > 0 && (
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs text-orange-500">
-                {pendingSync} pending {pendingSync === 1 ? "item" : "items"} to sync
+                {t("settings.pendingItems", { count: pendingSync, items: pendingSync === 1 ? t("settings.item") : t("settings.items") })}
               </p>
               {online && (
                 <Button
@@ -474,7 +506,7 @@ export function SettingsPanel() {
                   data-no-close
                 >
                   <RefreshCw className={`h-3 w-3 mr-1 ${syncing ? "animate-spin" : ""}`} />
-                  {syncing ? "Syncing..." : "Sync Now"}
+                  {syncing ? t("settings.syncing") : t("settings.syncNow")}
                 </Button>
               )}
             </div>
@@ -490,7 +522,7 @@ export function SettingsPanel() {
               data-no-close
             >
               <Wrench className={`h-3 w-3 mr-1 ${resetSyncMutation.isPending ? "animate-spin" : ""}`} />
-              {resetSyncMutation.isPending ? "Fixing..." : "Fix Sync Issues"}
+              {resetSyncMutation.isPending ? t("settings.fixing") : t("settings.fixSyncIssues")}
             </Button>
           )}
         </div>
@@ -500,12 +532,12 @@ export function SettingsPanel() {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs">Delete My Data</Label>
+            <Label className="text-xs">{t("settings.deleteMyData")}</Label>
           </div>
           {connected && selfInfo ? (
             <>
               <p className="text-xs text-muted-foreground">
-                Delete all scan results and coverage zones recorded by <span className="font-medium text-foreground">{selfInfo.name}</span>
+                {t("settings.deleteDesc")} <span className="font-medium text-foreground">{selfInfo.name}</span>
               </p>
               {!confirmDelete ? (
                 <Button
@@ -517,7 +549,7 @@ export function SettingsPanel() {
                   data-no-close
                 >
                   <Trash2 className="h-3 w-3 mr-1" />
-                  Delete My Data
+                  {t("settings.deleteData")}
                 </Button>
               ) : (
                 <div className="flex gap-2" data-no-close>
@@ -529,7 +561,7 @@ export function SettingsPanel() {
                     className="flex-1"
                     data-testid="button-confirm-delete"
                   >
-                    {deleteDataMutation.isPending ? "Deleting..." : "Confirm Delete"}
+                    {deleteDataMutation.isPending ? t("settings.deleting") : t("settings.confirmDelete")}
                   </Button>
                   <Button
                     size="sm"
@@ -538,14 +570,14 @@ export function SettingsPanel() {
                     className="flex-1"
                     data-testid="button-cancel-delete"
                   >
-                    Cancel
+                    {t("settings.cancel")}
                   </Button>
                 </div>
               )}
             </>
           ) : (
             <p className="text-xs text-muted-foreground italic">
-              Connect to your radio to delete data recorded by that device
+              {t("settings.connectToDelete")}
             </p>
           )}
         </div>

@@ -2,6 +2,7 @@ import { Map, Radio, Activity, DollarSign, Shield, HelpCircle, Share2 } from "lu
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/lib/i18n";
 import appIconPath from "@assets/app_icon_1770389147147.png";
 import {
   Sidebar,
@@ -17,17 +18,18 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navItems = [
-  { title: "Coverage Map", url: "/", icon: Map },
-  { title: "Nodes", url: "/nodes", icon: Radio },
-  { title: "Scan History", url: "/history", icon: Activity },
-  { title: "How to Use", url: "/manual", icon: HelpCircle },
-];
-
 export function AppSidebar() {
   const [location] = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
   const { toast } = useToast();
+  const { t } = useI18n();
+
+  const navItems = [
+    { title: t("nav.coverageMap"), key: "coverage-map", url: "/", icon: Map },
+    { title: t("nav.nodes"), key: "nodes", url: "/nodes", icon: Radio },
+    { title: t("nav.scanHistory"), key: "scan-history", url: "/history", icon: Activity },
+    { title: t("nav.howToUse"), key: "how-to-use", url: "/manual", icon: HelpCircle },
+  ];
 
   const handleShare = () => {
     const url = window.location.origin;
@@ -40,9 +42,9 @@ export function AppSidebar() {
       navigator.share(shareData).catch(() => {});
     } else if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => {
-        toast({ title: "Link copied to clipboard" });
+        toast({ title: t("toast.linkCopied") });
       }).catch(() => {
-        toast({ title: "Could not copy link", variant: "destructive" });
+        toast({ title: t("toast.couldNotCopy"), variant: "destructive" });
       });
     } else {
       const input = document.createElement("input");
@@ -51,7 +53,7 @@ export function AppSidebar() {
       input.select();
       document.execCommand("copy");
       document.body.removeChild(input);
-      toast({ title: "Link copied to clipboard" });
+      toast({ title: t("toast.linkCopied") });
     }
   };
 
@@ -72,15 +74,15 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("nav.navigation")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton
                     asChild
                     isActive={location === item.url}
-                    data-testid={`nav-${item.title.toLowerCase().replace(/\s/g, "-")}`}
+                    data-testid={`nav-${item.key}`}
                   >
                     <Link
                       href={item.url}
@@ -108,7 +110,7 @@ export function AppSidebar() {
             data-testid="button-share-app"
           >
             <Share2 className="h-3 w-3 mr-1.5" />
-            Share App
+            {t("nav.shareApp")}
           </Button>
           <a
             href="https://cash.app/$yuptm"
@@ -119,7 +121,7 @@ export function AppSidebar() {
           >
             <DollarSign className="h-3 w-3 text-emerald-500" />
             <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-              Support Development
+              {t("nav.supportDev")}
             </span>
           </a>
           <Link
@@ -129,7 +131,7 @@ export function AppSidebar() {
             data-testid="link-privacy-policy"
           >
             <Shield className="h-3 w-3" />
-            <span>Privacy Policy</span>
+            <span>{t("nav.privacyPolicy")}</span>
           </Link>
           <p className="text-[10px] text-muted-foreground text-center">
             Mesh Utility v1.2
