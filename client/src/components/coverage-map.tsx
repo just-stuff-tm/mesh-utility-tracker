@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
-import { ChevronLeft, ChevronRight, Mountain, Filter, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mountain, Filter, X, Search } from "lucide-react";
 import type { CoverageZone, ScanResult, MeshNode } from "@shared/schema";
 import { getHexVertices } from "@shared/grid";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
@@ -156,7 +156,15 @@ interface NodeFilterControlProps {
 function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: NodeFilterControlProps) {
   const map = useMap();
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const { t } = useI18n();
+
+  const filteredNodes = nodes.filter((node) =>
+    node.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    node.nodeId.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   useEffect(() => {
     const topRight = map.getContainer().querySelector(".leaflet-top.leaflet-right");
@@ -170,14 +178,15 @@ function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: 
     wrapper.style.position = "relative";
     wrapper.style.zIndex = "1000";
     L.DomEvent.disableClickPropagation(wrapper);
-    L.DomEvent.disableScrollPropagation(wrapper);
-    const stopAll = (e: Event) => { e.stopPropagation(); };
-    wrapper.addEventListener("pointerdown", stopAll);
-    wrapper.addEventListener("pointerup", stopAll);
-    wrapper.addEventListener("touchstart", stopAll, { passive: false });
-    wrapper.addEventListener("touchend", stopAll);
-    wrapper.addEventListener("mousedown", stopAll);
-    wrapper.addEventListener("mouseup", stopAll);
+    const stopMouse = (e: Event) => { e.stopPropagation(); };
+    wrapper.addEventListener("mousedown", stopMouse);
+    wrapper.addEventListener("mouseup", stopMouse);
+    wrapper.addEventListener("pointerdown", (e: PointerEvent) => {
+      if (e.pointerType === "mouse") e.stopPropagation();
+    });
+    wrapper.addEventListener("pointerup", (e: PointerEvent) => {
+      if (e.pointerType === "mouse") e.stopPropagation();
+    });
     const layersCtrl = topRight.querySelector(".leaflet-control-layers");
     if (layersCtrl) {
       topRight.insertBefore(wrapper, layersCtrl);
@@ -190,12 +199,8 @@ function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: 
     wrapper.insertBefore(filterDiv, wrapper.firstChild);
     setContainer(filterDiv);
     return () => {
-      wrapper.removeEventListener("pointerdown", stopAll);
-      wrapper.removeEventListener("pointerup", stopAll);
-      wrapper.removeEventListener("touchstart", stopAll);
-      wrapper.removeEventListener("touchend", stopAll);
-      wrapper.removeEventListener("mousedown", stopAll);
-      wrapper.removeEventListener("mouseup", stopAll);
+      wrapper.removeEventListener("mousedown", stopMouse);
+      wrapper.removeEventListener("mouseup", stopMouse);
       if (layersCtrl && topRight.contains(wrapper)) {
         topRight.insertBefore(layersCtrl, wrapper);
       }
@@ -203,6 +208,47 @@ function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: 
       setContainer(null);
     };
   }, [map]);
+
+  useEffect(() => {
+    if (!open || !scrollRef.current) return;
+    const el = scrollRef.current;
+    let startY = 0;
+    let startScrollTop = 0;
+    let tracking = false;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (el.scrollHeight > el.clientHeight) {
+        tracking = true;
+        startY = e.touches[0].clientY;
+        startScrollTop = el.scrollTop;
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!tracking) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const dy = startY - e.touches[0].clientY;
+      el.scrollTop = startScrollTop + dy;
+    };
+    const onTouchEnd = () => { tracking = false; };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      setSearchQuery("");
+    } else {
+      setTimeout(() => searchRef.current?.focus(), 100);
+    }
+  }, [open]);
 
   if (!container || nodes.length === 0) return null;
 
@@ -219,7 +265,12 @@ function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: 
       </Button>
 
       {open && (
-        <Card className="p-2 max-w-[220px] flex flex-col" style={{ maxHeight: "min(350px, 50vh)" }}>
+        <Card
+          className="p-2 flex flex-col w-[240px] max-w-[calc(100vw-32px)]"
+          style={{ maxHeight: "min(380px, 50vh)" }}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between mb-1.5 px-1 shrink-0 gap-2">
             <p className="text-xs font-medium text-muted-foreground">
               {t("coverage.filterByNode")}
@@ -227,28 +278,50 @@ function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: 
             {selectedNodeId && (
               <button
                 onClick={() => { onSelect(null); onToggle(); }}
-                className="text-xs text-muted-foreground hover-elevate rounded-md px-1.5 py-0.5 flex items-center gap-1"
+                className="text-xs text-muted-foreground hover-elevate rounded-md px-2 py-1 flex items-center gap-1"
                 data-testid="button-clear-node-filter"
               >
                 <X className="h-3 w-3" />
               </button>
             )}
           </div>
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="space-y-0.5 pr-2">
-              <button
-                className={`w-full text-left text-xs px-2 py-1.5 rounded-md transition-colors ${
-                  !selectedNodeId ? "bg-muted font-medium" : "hover-elevate"
-                }`}
-                onClick={() => { onSelect(null); onToggle(); }}
-                data-testid="button-filter-all-nodes"
-              >
-                {t("coverage.allNodes")}
-              </button>
-              {nodes.map((node) => (
+          <div className="relative mb-1.5 shrink-0">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t("coverage.searchNodes")}
+              className="w-full bg-muted/50 border border-border rounded-md text-sm pl-7 pr-2 py-1.5 outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/60"
+              data-testid="input-search-nodes"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+            />
+          </div>
+          <div
+            ref={scrollRef}
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            <div className="space-y-0.5 pr-1">
+              {!searchQuery && (
+                <button
+                  className={`w-full text-left text-sm px-2 py-2.5 rounded-md transition-colors ${
+                    !selectedNodeId ? "bg-muted font-medium" : "hover-elevate"
+                  }`}
+                  onClick={() => { onSelect(null); onToggle(); }}
+                  data-testid="button-filter-all-nodes"
+                >
+                  {t("coverage.allNodes")}
+                </button>
+              )}
+              {filteredNodes.map((node) => (
                 <button
                   key={node.nodeId}
-                  className={`w-full text-left text-xs px-2 py-1.5 rounded-md truncate transition-colors ${
+                  className={`w-full text-left text-sm px-2 py-2.5 rounded-md truncate transition-colors ${
                     selectedNodeId === node.nodeId ? "bg-muted font-medium" : "hover-elevate"
                   }`}
                   onClick={() => { onSelect(node.nodeId); onToggle(); }}
@@ -257,8 +330,13 @@ function NodeFilterControl({ nodes, selectedNodeId, onSelect, open, onToggle }: 
                   {node.name}
                 </button>
               ))}
+              {filteredNodes.length === 0 && searchQuery && (
+                <p className="text-xs text-muted-foreground px-2 py-2 text-center">
+                  No results
+                </p>
+              )}
             </div>
-          </ScrollArea>
+          </div>
         </Card>
       )}
     </div>,
