@@ -639,11 +639,27 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
           setSelfInfo(info as any);
 
           if (rid) {
+            const observerName = info.name || result.deviceName || "Observer";
             try {
               await apiRequest("POST", "/api/observers", {
-                name: info.name || result.deviceName || "Observer",
+                name: observerName,
                 deviceId: rid,
               });
+            } catch {}
+
+            try {
+              const localScans = await db.scanResults
+                .where("observerId")
+                .equals(rid)
+                .toArray();
+              const stale = localScans.filter(
+                (s) => s.receiverName && s.receiverName !== observerName
+              );
+              if (stale.length > 0) {
+                await db.scanResults.bulkPut(
+                  stale.map((s) => ({ ...s, receiverName: observerName }))
+                );
+              }
             } catch {}
           }
         }

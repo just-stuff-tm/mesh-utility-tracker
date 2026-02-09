@@ -87,10 +87,18 @@ export class DatabaseStorage implements IStorage {
     if (observer.deviceId) {
       const existing = await this.getObserverByDeviceId(observer.deviceId);
       if (existing) {
+        const nameChanged = observer.name && observer.name !== existing.name;
         const [result] = await db.update(observers)
           .set({ name: observer.name, lastSeen: new Date(), latitude: observer.latitude, longitude: observer.longitude })
           .where(eq(observers.id, existing.id))
           .returning();
+
+        if (nameChanged && observer.deviceId) {
+          await db.update(scanResults)
+            .set({ receiverName: observer.name })
+            .where(eq(scanResults.observerId, observer.deviceId));
+        }
+
         return result;
       }
     }
