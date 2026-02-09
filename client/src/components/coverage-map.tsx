@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import { ChevronLeft, ChevronRight, Mountain } from "lucide-react";
@@ -93,6 +93,19 @@ function MapAutoUpdater({ center, autoCenter }: { center: [number, number] | nul
   return null;
 }
 
+function FlyToLocation({ target }: { target: { lat: number; lng: number } | null }) {
+  const map = useMap();
+  const lastTarget = useRef<string | null>(null);
+  useEffect(() => {
+    if (!target) return;
+    const key = `${target.lat},${target.lng}`;
+    if (lastTarget.current === key) return;
+    lastTarget.current = key;
+    map.flyTo([target.lat, target.lng], 17, { duration: 1.2 });
+  }, [target, map]);
+  return null;
+}
+
 const MAP_LAYERS = {
   dark: {
     url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
@@ -124,6 +137,7 @@ interface CoverageMapProps {
   autoCenter: boolean;
   selectedZone: CoverageZone | null;
   onZoneClick: (zone: CoverageZone) => void;
+  flyToTarget: { lat: number; lng: number } | null;
 }
 
 export function CoverageMap({
@@ -132,6 +146,7 @@ export function CoverageMap({
   autoCenter,
   selectedZone,
   onZoneClick,
+  flyToTarget,
 }: CoverageMapProps) {
   const { t } = useI18n();
   const defaultCenter: [number, number] = observerPosition || [37.7749, -122.4194];
@@ -168,6 +183,7 @@ export function CoverageMap({
         </LayersControl>
 
         <MapAutoUpdater center={observerPosition} autoCenter={autoCenter} />
+        <FlyToLocation target={flyToTarget} />
 
         {observerPosition && (
           <Marker position={observerPosition} icon={observerIcon}>

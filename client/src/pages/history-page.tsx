@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Signal, Clock, MapPin, Radio, Mountain } from "lucide-react";
+import { useLocation } from "wouter";
+import { Activity, Signal, Clock, MapPin, Radio, Mountain, Map } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
 import { useI18n } from "@/lib/i18n";
+import { snapToHexGrid } from "@shared/grid";
 import type { ScanResult } from "@shared/schema";
 
 function formatAltitude(meters: number | null, units: "imperial" | "metric"): string | null {
@@ -16,6 +19,7 @@ function formatAltitude(meters: number | null, units: "imperial" | "metric"): st
 
 export default function HistoryPage() {
   const { t } = useI18n();
+  const [, navigate] = useLocation();
 
   const formatTime = (date: string | Date | null): string => {
     if (!date) return t("time.unknown");
@@ -32,6 +36,12 @@ export default function HistoryPage() {
     if (rssi >= -110) return { label: t("coverage.poor"), variant: "destructive" };
     return { label: t("nodes.veryWeak"), variant: "destructive" };
   }
+
+  function handleViewOnMap(scan: ScanResult) {
+    const { snapLat, snapLng } = snapToHexGrid(scan.latitude, scan.longitude);
+    navigate(`/?lat=${snapLat}&lng=${snapLng}`);
+  }
+
   const { data: scans = [], isLoading } = useQuery<ScanResult[]>({
     queryKey: ["/api/scan-results"],
   });
@@ -82,8 +92,9 @@ export default function HistoryPage() {
               return (
                 <Card
                   key={scan.id}
-                  className="p-3 hover-elevate"
+                  className="p-3 hover-elevate cursor-pointer"
                   data-testid={`card-scan-${scan.id}`}
+                  onClick={() => handleViewOnMap(scan)}
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center shrink-0">
@@ -129,6 +140,19 @@ export default function HistoryPage() {
                         </div>
                       )}
                     </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 mt-1"
+                      title={t("coverage.viewOnMap")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewOnMap(scan);
+                      }}
+                      data-testid={`button-view-map-${scan.id}`}
+                    >
+                      <Map className="h-4 w-4" />
+                    </Button>
                   </div>
                 </Card>
               );
