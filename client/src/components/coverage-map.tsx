@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import { ChevronLeft, ChevronRight, Mountain } from "lucide-react";
-import type { CoverageZone, ScanResult } from "@shared/schema";
+import type { CoverageZone, ScanResult, MeshNode } from "@shared/schema";
 import { getHexVertices } from "@shared/grid";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
 import { useI18n } from "@/lib/i18n";
@@ -289,20 +289,43 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
   const { unitSystem } = useBluetoothContext();
   const style = zone.isDeadZone ? null : getSignalStyle(zone.avgRssi, zone.avgSnr);
   const [scans, setScans] = useState<ScanResult[]>([]);
+  const [nodeNames, setNodeNames] = useState<Map<string, string>>(new Map());
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (zone.isDeadZone) { setLoaded(true); return; }
-    fetch(`/api/scan-results/zone?lat=${zone.centerLat}&lng=${zone.centerLng}`)
-      .then((r) => r.json())
-      .then((data) => { setScans(data); setLoaded(true); })
-      .catch(() => setLoaded(true));
+    Promise.all([
+      fetch(`/api/scan-results/zone?lat=${zone.centerLat}&lng=${zone.centerLng}`)
+        .then((r) => r.json())
+        .catch(() => []),
+      fetch("/api/nodes")
+        .then((r) => r.json())
+        .catch(() => []),
+    ]).then(([scanData, nodes]: [ScanResult[], MeshNode[]]) => {
+      setScans(scanData);
+      const names = new Map<string, string>();
+      for (const n of nodes) {
+        if (n.name && !n.name.startsWith("Unknown (")) {
+          names.set(n.nodeId, n.name);
+        }
+      }
+      setNodeNames(names);
+      setLoaded(true);
+    });
   }, [zone.centerLat, zone.centerLng, zone.isDeadZone]);
 
   const observers = zone.isDeadZone ? [] : Array.from(new Set(scans.map((s) => s.receiverName).filter(Boolean)));
   const repeaterMap = new Map<string, string>();
   if (!zone.isDeadZone) {
-    scans.forEach((s) => { if (!repeaterMap.has(s.nodeId)) repeaterMap.set(s.nodeId, s.senderName || s.nodeId); });
+    scans.forEach((s) => {
+      const knownName = nodeNames.get(s.nodeId);
+      const scanName = s.senderName || s.nodeId;
+      const bestName = knownName || (scanName.startsWith("Unknown (") ? s.nodeId : scanName);
+      const current = repeaterMap.get(s.nodeId);
+      if (!current || (current.startsWith("Unknown (") && !bestName.startsWith("Unknown ("))) {
+        repeaterMap.set(s.nodeId, bestName);
+      }
+    });
   }
   const repeaters = Array.from(repeaterMap.entries());
 

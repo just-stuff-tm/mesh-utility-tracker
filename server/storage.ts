@@ -110,10 +110,30 @@ export class DatabaseStorage implements IStorage {
   async upsertNode(node: InsertMeshNode): Promise<MeshNode> {
     const existing = await this.getNode(node.nodeId);
     if (existing) {
+      const incomingIsReal = node.name && !node.name.startsWith("Unknown (");
+      const existingIsReal = existing.name && !existing.name.startsWith("Unknown (");
+
+      const nameToStore = incomingIsReal ? node.name : (existingIsReal ? existing.name : node.name);
+
       const [updated] = await db.update(meshNodes)
-        .set({ ...node, lastSeen: new Date() })
+        .set({ ...node, name: nameToStore, lastSeen: new Date() })
         .where(eq(meshNodes.nodeId, node.nodeId))
         .returning();
+
+      if (incomingIsReal && !existingIsReal) {
+        await db.update(scanResults)
+          .set({ senderName: node.name })
+          .where(
+            and(
+              eq(scanResults.nodeId, node.nodeId),
+              or(
+                sql`${scanResults.senderName} IS NULL`,
+                sql`${scanResults.senderName} LIKE 'Unknown (%'`
+              )
+            )
+          );
+      }
+
       return updated;
     }
     const [created] = await db.insert(meshNodes).values(node).returning();

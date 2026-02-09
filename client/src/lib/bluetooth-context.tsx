@@ -344,14 +344,15 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
           const nodeId = publicKeyHex(rep.contact.publicKey);
           const advName = rep.contact.advName || "";
-          const isUnknown = !advName || advName.startsWith("Unknown (");
-          const repeaterName = isUnknown
-            ? (nodeNameMap.get(nodeId) || advName || nodeId)
-            : advName;
+          const advIsReal = advName && !advName.startsWith("Unknown (");
+          const existingName = nodeNameMap.get(nodeId);
+          const existingIsReal = existingName && !existingName.startsWith("Unknown (");
+          const nodeName = advIsReal ? advName : (existingIsReal ? existingName : null);
+          const displayName = nodeName || `Unknown (${nodeId})`;
 
           const nodeData = {
             nodeId,
-            name: repeaterName,
+            name: nodeName,
             latitude: null as number | null,
             longitude: null as number | null,
           };
@@ -366,7 +367,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
               await db.nodes.put({
                 id: existing?.id || generateLocalId(),
                 nodeId,
-                name: repeaterName,
+                name: nodeName || existing?.name || null,
                 hardwareType: existing?.hardwareType || null,
                 lastSeen: new Date().toISOString(),
                 latitude: null,
@@ -383,7 +384,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
             latitude: pos[0],
             longitude: pos[1],
             altitude: altitudeRef.current,
-            senderName: repeaterName,
+            senderName: displayName,
             receiverName: selfInfoRef.current?.name || "Observer",
             radioId,
           };
