@@ -37,6 +37,13 @@ export default function MapPage() {
     const lng = parseFloat(params.get("lng") || "");
     if (!isNaN(lat) && !isNaN(lng)) {
       setFlyToTarget({ lat, lng });
+      if (autoCenter) {
+        setAutoCenter(false);
+        toast({
+          title: t("toast.autoCenterOff"),
+          description: t("toast.autoCenterOffDesc"),
+        });
+      }
       if (window.history.replaceState) {
         window.history.replaceState(null, "", "/");
       }
