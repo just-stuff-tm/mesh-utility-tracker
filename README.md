@@ -57,12 +57,11 @@ npm run preview
 
 ```
 mesh-utility-tracker/
-├── client/              # React/Vite application
-│   ├── src/            # Application source
-│   ├── public/         # Static assets
-│   └── index.html      # Entry point
+├── src/                # React application source
+├── public/             # Static assets
 ├── shared/             # Shared utilities (hex grid math)
 ├── .github/workflows/  # GitHub Actions deployment
+├── index.html          # Entry point
 └── vite.config.ts      # Vite configuration
 ```
 
@@ -70,7 +69,7 @@ mesh-utility-tracker/
 
 The app is configured to work on GitHub Pages with:
 - Base path: `/mesh-utility-tracker/`
-- Build output: `client/dist/`
+- Build output: `dist/`
 - Service worker enabled
 - Offline support
 
