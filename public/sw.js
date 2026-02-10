@@ -1,5 +1,5 @@
 const CACHE_NAME = "mesh-utility-v2-worker";
-const TILE_CACHE = "map-tiles-v2";
+const TILE_CACHE = "map-tiles-v1"; // Keep stable - don't clear tiles on app updates
 const CDN_CACHE = "cdn-assets-v2";
 const API_CACHE = "api-cache-v2";
 
