@@ -1,0 +1,4 @@
+name = "mesh-utility-ingest"
+compatibility_date = "2026-02-09"
+
+main = "cloudflare/worker.ts"
