@@ -2,9 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: process.env.NODE_ENV === "production" ? "/mesh-utility-tracker/" : "/",
+  base: mode === "production" ? "/mesh-utility-tracker/" : "/",
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
@@ -22,4 +22,4 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
-});
+}));
