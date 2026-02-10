@@ -3,3 +3,4 @@
 {"latitude":40.71,"longitude":-74.01,"rssi":-75,"receivedAt":"2026-02-10T03:16:51.208Z"}
 {"observerId":"BFD65811","nodeId":"718D349F","rssi":-75,"snr":11.5,"latitude":40.89080496549606,"longitude":-77.47785947586962,"altitude":340,"senderName":"CCLRN Millheim","receiverName":"KD3CGK","radioId":"BFD65811","receivedAt":"2026-02-10T04:15:00.427Z"}
 {"observerId":"BFD65811","nodeId":"718D349F","rssi":-75,"snr":11.5,"latitude":40.89080496549606,"longitude":-77.47785947586962,"altitude":340,"senderName":"CCLRN Millheim","receiverName":"KD3CGK","radioId":"BFD65811","receivedAt":"2026-02-10T04:15:01.310Z"}
+{"observerId":"BFD65811","nodeId":"718D349F","rssi":-77,"snr":11.75,"latitude":40.89081626248533,"longitude":-77.47785945056206,"altitude":346,"senderName":"CCLRN Millheim","receiverName":"KD3CGK","radioId":"BFD65811","receivedAt":"2026-02-10T04:16:54.722Z"}
