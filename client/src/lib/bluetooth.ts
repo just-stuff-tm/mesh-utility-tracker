@@ -1,8 +1,5 @@
 import { WebBleConnection, Constants } from "@liamcottle/meshcore.js";
 
-const remoteLogBuffer: { level: string; message: string }[] = [];
-let remoteLogTimer: ReturnType<typeof setTimeout> | null = null;
-
 export function remoteLog(level: string, ...args: any[]) {
   const message = args.map(a => {
     if (a instanceof Uint8Array) return Array.from(a.slice(0, 8)).map(b => b.toString(16).padStart(2, "0")).join("");
@@ -17,20 +14,8 @@ export function remoteLog(level: string, ...args: any[]) {
   } else {
     console.log(`[mesh] ${message}`);
   }
-
-  remoteLogBuffer.push({ level, message: `[mesh] ${message}` });
-
-  if (!remoteLogTimer) {
-    remoteLogTimer = setTimeout(() => {
-      const entries = remoteLogBuffer.splice(0);
-      remoteLogTimer = null;
-      fetch("/api/remote-log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(entries),
-      }).catch(() => {});
-    }, 500);
-  }
+  
+  // Remote logging disabled - no backend endpoint in Cloudflare Worker architecture
 }
 
 export interface MeshContact {
@@ -361,6 +346,7 @@ export function contactLatLon(contact: MeshContact): { lat: number; lon: number 
 export interface RepeaterStats {
   rssi: number;
   snr: number;
+  snrIn: number;
 }
 
 export interface RepeaterDiscoverResult {
@@ -496,7 +482,7 @@ export async function discoverRepeaters(
         if (entry) {
           remoteLog("log", `[DISCOVER] Node "${entry.name}": RSSI=${entry.rssi} SNR=${entry.snr} SNR_in=${entry.snrIn} prefix=${entry.publicKeyPrefix}`);
           discoveredNodes.set(entry.publicKeyPrefix, {
-            stats: { rssi: entry.rssi, snr: entry.snr },
+            stats: { rssi: entry.rssi, snr: entry.snr, snrIn: entry.snrIn },
             name: entry.name,
           });
         } else {

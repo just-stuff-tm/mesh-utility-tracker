@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Radio, Signal, Clock, MapPin, Search } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/lib/i18n";
-import type { MeshNode, ScanResult } from "@shared/schema";
+import { fetchRawScans, extractNodes, convertToScanResults, type MeshNode, type ScanResult } from "@/lib/scan-aggregator";
 
 function getSignalColor(rssi: number): string {
   if (rssi >= -60) return "text-green-500";
@@ -30,13 +30,21 @@ export default function NodesPage() {
   };
   const [search, setSearch] = useState("");
 
-  const { data: nodes = [], isLoading: nodesLoading } = useQuery<MeshNode[]>({
-    queryKey: ["/api/nodes"],
+  const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
+
+  const { data: rawScans = [], isLoading: rawLoading } = useQuery({
+    queryKey: ["raw-scans", workerUrl],
+    queryFn: () => fetchRawScans(workerUrl),
+    refetchInterval: 30000,
   });
 
-  const { data: latestScans = [] } = useQuery<ScanResult[]>({
-    queryKey: ["/api/scan-results", "latest"],
-  });
+  const nodes = useMemo(() => extractNodes(rawScans), [rawScans]);
+  const allScans = useMemo(() => convertToScanResults(rawScans), [rawScans]);
+  const latestScans = useMemo(() => {
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    return allScans.filter((s) => s.timestamp.getTime() > oneDayAgo);
+  }, [allScans]);
+  const nodesLoading = rawLoading;
 
   const scanMap = new Map<string, ScanResult>();
   latestScans.forEach((s) => {

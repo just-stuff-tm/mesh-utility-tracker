@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BluetoothProvider } from "@/lib/bluetooth-context";
-import { Heart, Users } from "lucide-react";
+import { Heart } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 import { CompatibilityDialog } from "@/components/compatibility-dialog";
 import { OfflineIndicator } from "@/components/offline-indicator";
@@ -61,25 +61,7 @@ if (!isPrivacyAccepted() && !getForceOffline()) {
   setForceOffline(true);
 }
 
-function ObserversOnline() {
-  const { data } = useQuery<{ count: number }>({
-    queryKey: ["/api/observers/online"],
-    refetchInterval: 60000,
-  });
-  const { t } = useI18n();
-  const count = data?.count ?? 0;
-  return (
-    <div
-      className="flex items-center gap-1.5 rounded-md bg-muted/50 border border-border px-2.5 py-1"
-      data-testid="stat-observers-online"
-    >
-      <Users className="h-3 w-3 text-muted-foreground" />
-      <span className="text-[11px] font-medium text-muted-foreground">
-        {t("header.online", { count })}
-      </span>
-    </div>
-  );
-}
+// ObserversOnline removed - no longer tracked in Cloudflare Worker architecture
 
 function AppContent() {
   const { accepted, accept, showDialog, closeDialog, requireAcceptance } = usePrivacyAccepted();
@@ -119,7 +101,7 @@ function AppContent() {
               <header className="flex items-center justify-between gap-2 p-2 border-b border-border shrink-0 z-50 bg-background">
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <div className="flex items-center gap-2 flex-wrap">
-                  <ObserversOnline />
+                  {/* ObserversOnline removed - no backend tracking */}
                   <OfflineIndicator />
                   <a
                     href="https://cash.app/$yuptm"

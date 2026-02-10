@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useI18n } from "@/lib/i18n";
-import type { MeshNode, ScanResult } from "@shared/schema";
+import type { MeshNode, ScanResult } from "@/lib/scan-aggregator";
 
 interface NodeListProps {
   nodes: MeshNode[];

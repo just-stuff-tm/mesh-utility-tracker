@@ -2,8 +2,10 @@ import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
-import { ChevronLeft, ChevronRight, Mountain, Filter, X, Search } from "lucide-react";
-import type { CoverageZone, ScanResult, MeshNode } from "@shared/schema";
+import { ChevronLeft, ChevronRight, Mountain, Filter, X, Search, History } from "lucide-react";
+import { useLocation } from "wouter";
+import type { ScanResult, MeshNode } from "@/lib/scan-aggregator";
+import type { CoverageZone } from "@/lib/scan-aggregator";
 import { getHexVertices } from "@shared/grid";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
 import { useI18n } from "@/lib/i18n";
@@ -357,11 +359,15 @@ interface CoverageMapProps {
   onFilterSelect?: (nodeId: string | null) => void;
   filterOpen?: boolean;
   onFilterToggle?: () => void;
+  allScans?: ScanResult[];
+  nodes?: MeshNode[];
 }
 
 export function CoverageMap({
   coverageZones,
   observerPosition,
+  allScans = [],
+  nodes = [],
   autoCenter,
   selectedZone,
   onZoneClick,
@@ -452,7 +458,7 @@ export function CoverageMap({
                 eventHandlers={{ click: () => onZoneClick(zone) }}
               >
                 <Popup>
-                  <ZonePopup zone={zone} />
+                  <ZonePopup zone={zone} allScans={allScans} nodes={nodes} />
                 </Popup>
               </Polygon>
             );
@@ -473,7 +479,7 @@ export function CoverageMap({
               eventHandlers={{ click: () => onZoneClick(zone) }}
             >
               <Popup>
-                <ZonePopup zone={zone} />
+                <ZonePopup zone={zone} allScans={allScans} nodes={nodes} />
               </Popup>
             </Polygon>
           );
@@ -536,35 +542,27 @@ function RssiLegend() {
   );
 }
 
-function ZonePopup({ zone }: { zone: CoverageZone }) {
+function ZonePopup({ zone, allScans = [], nodes = [] }: { zone: CoverageZone; allScans?: ScanResult[]; nodes?: MeshNode[] }) {
   const { t } = useI18n();
   const { unitSystem } = useBluetoothContext();
+  const [, navigate] = useLocation();
   const style = zone.isDeadZone ? null : getSignalStyle(zone.avgRssi, zone.avgSnr);
-  const [scans, setScans] = useState<ScanResult[]>([]);
-  const [nodeNames, setNodeNames] = useState<Map<string, string>>(new Map());
-  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    if (zone.isDeadZone) { setLoaded(true); return; }
-    Promise.all([
-      fetch(`/api/scan-results/zone?lat=${zone.centerLat}&lng=${zone.centerLng}`)
-        .then((r) => r.json())
-        .catch(() => []),
-      fetch("/api/nodes")
-        .then((r) => r.json())
-        .catch(() => []),
-    ]).then(([scanData, nodes]: [ScanResult[], MeshNode[]]) => {
-      setScans(scanData);
-      const names = new Map<string, string>();
-      for (const n of nodes) {
-        if (n.name && !n.name.startsWith("Unknown (")) {
-          names.set(n.nodeId, n.name);
-        }
-      }
-      setNodeNames(names);
-      setLoaded(true);
-    });
-  }, [zone.centerLat, zone.centerLng, zone.isDeadZone]);
+  // Filter scans for this specific zone
+  const scans = allScans.filter((s) => {
+    const distance = Math.sqrt(
+      Math.pow(s.latitude - zone.centerLat, 2) + Math.pow(s.longitude - zone.centerLng, 2)
+    );
+    return distance < 0.002; // Approximately within hex bounds
+  });
+
+  // Build node name map
+  const nodeNames = new Map<string, string>();
+  for (const n of nodes) {
+    if (n.name && !n.name.startsWith("Unknown (")) {
+      nodeNames.set(n.nodeId, n.name);
+    }
+  }
 
   const observers = zone.isDeadZone ? [] : Array.from(new Set(scans.map((s) => s.receiverName).filter(Boolean)));
   const repeaterMap = new Map<string, string>();
@@ -609,7 +607,7 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
         <span className="font-mono text-[10px]">
           {zone.centerLat.toFixed(4)}, {zone.centerLng.toFixed(4)}
         </span>
-        {loaded && (() => {
+        {(() => {
           const scansWithAlt = scans
             .filter((s) => s.altitude != null)
             .sort((a, b) => new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime());
@@ -626,7 +624,7 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
           );
         })()}
       </div>
-      {loaded && scans.length > 0 && (
+      {scans.length > 0 && (
         <div className="border-t border-gray-200 pt-2 space-y-1.5">
           {observers.length > 0 && (
             <div className="text-xs">
@@ -636,17 +634,31 @@ function ZonePopup({ zone }: { zone: CoverageZone }) {
           )}
           {repeaters.length > 0 && (
             <div className="text-xs">
-              <span className="text-gray-500 font-medium">{t("coverage.repeatersObserved")}</span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-gray-500 font-medium">{t("coverage.repeatersObserved")}</span>
+                <button
+                  onClick={() => navigate(`/history?hexLat=${zone.centerLat}&hexLng=${zone.centerLng}`)}
+                  className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-[11px]"
+                  title={t("coverage.viewHistory")}
+                >
+                  <History className="h-3 w-3" />
+                  {t("coverage.viewHistory")}
+                </button>
+              </div>
               {repeaters.map(([nodeId, name]) => {
                 const latest = scans.find((s) => s.nodeId === nodeId);
                 return (
-                  <div key={nodeId} className="flex items-center justify-between gap-2 mt-0.5">
-                    <span className="font-semibold truncate">{name}</span>
-                    {latest && (
-                      <span className="text-gray-400 whitespace-nowrap">
-                        {latest.rssi?.toFixed(0)} dBm / {latest.snr?.toFixed(1)} dB
+                  <div key={nodeId} className="group relative">
+                    <div className="flex items-center justify-between gap-2 mt-0.5">
+                      <span className="font-semibold truncate">
+                        {name}
                       </span>
-                    )}
+                      {latest && (
+                        <span className="text-gray-400 whitespace-nowrap">
+                          {latest.rssi?.toFixed(0)} dBm / {latest.snr?.toFixed(1)} dB
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })}

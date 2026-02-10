@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Activity, Signal, Clock, MapPin, Radio, Mountain, Map, Filter, Search, X, User } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,8 +9,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
 import { useI18n } from "@/lib/i18n";
-import { snapToHexGrid } from "@shared/grid";
-import type { ScanResult } from "@shared/schema";
+import { snapToHexGrid, hexKey } from "@shared/grid";
+import { fetchRawScans, convertToScanResults, type ScanResult } from "@/lib/scan-aggregator";
 
 function formatAltitude(meters: number | null, units: "imperial" | "metric"): string | null {
   if (meters == null) return null;
@@ -21,7 +21,9 @@ function formatAltitude(meters: number | null, units: "imperial" | "metric"): st
 export default function HistoryPage() {
   const { t } = useI18n();
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedHex, setSelectedHex] = useState<{ lat: number; lng: number } | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [nodeSearch, setNodeSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -48,9 +50,16 @@ export default function HistoryPage() {
     navigate(`/?lat=${snapLat}&lng=${snapLng}`);
   }
 
-  const { data: scans = [], isLoading } = useQuery<ScanResult[]>({
-    queryKey: ["/api/scan-results"],
+  const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
+
+  const { data: rawScans = [], isLoading: rawLoading } = useQuery({
+    queryKey: ["raw-scans", workerUrl],
+    queryFn: () => fetchRawScans(workerUrl),
+    refetchInterval: 30000,
   });
+
+  const scans = useMemo(() => convertToScanResults(rawScans), [rawScans]);
+  const isLoading = rawLoading;
 
   interface NodeEntry { nodeId: string; name: string; count: number }
 
@@ -60,6 +69,7 @@ export default function HistoryPage() {
       const existing = nodeMap[scan.nodeId];
       if (existing) {
         existing.count++;
+        // Prefer non-"Unknown" names
         if (scan.senderName && !scan.senderName.startsWith("Unknown (")) {
           existing.name = scan.senderName;
         }
@@ -71,7 +81,11 @@ export default function HistoryPage() {
         };
       }
     }
-    return Object.values(nodeMap).sort((a, b) => b.count - a.count);
+    // Sort by count descending (most scanned first), then alphabetically
+    return Object.values(nodeMap).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name);
+    });
   }, [scans]);
 
   const filteredNodes = nodes.filter(
@@ -85,14 +99,47 @@ export default function HistoryPage() {
     if (selectedNode) {
       results = results.filter((s) => s.nodeId === selectedNode);
     }
+    if (selectedHex) {
+      const targetKey = hexKey(selectedHex.lat, selectedHex.lng);
+      results = results.filter((s) => hexKey(s.latitude, s.longitude) === targetKey);
+    }
     return [...results].sort(
       (a, b) => new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime()
     );
-  }, [scans, selectedNode]);
+  }, [scans, selectedNode, selectedHex]);
 
   const selectedNodeName = selectedNode
     ? nodes.find((n) => n.nodeId === selectedNode)?.name || selectedNode
     : null;
+
+  const hexCoordsDisplay = selectedHex
+    ? `${selectedHex.lat.toFixed(4)}, ${selectedHex.lng.toFixed(4)}`
+    : null;
+
+  // Handle URL query params for pre-filtering
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const nodeId = params.get("nodeId");
+    const hexLat = params.get("hexLat");
+    const hexLng = params.get("hexLng");
+    
+    if (nodeId && nodeId !== selectedNode) {
+      setSelectedNode(nodeId);
+      setSelectedHex(null);
+    } else if (hexLat && hexLng) {
+      const lat = parseFloat(hexLat);
+      const lng = parseFloat(hexLng);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setSelectedHex({ lat, lng });
+        setSelectedNode(null);
+      }
+    }
+    
+    // Clear URL param after applying
+    if ((nodeId || (hexLat && hexLng)) && window.history.replaceState) {
+      window.history.replaceState(null, "", "/history");
+    }
+  }, [searchString]);
 
   useEffect(() => {
     if (filterOpen) {
@@ -120,6 +167,8 @@ export default function HistoryPage() {
           <p className="text-sm text-muted-foreground">
             {selectedNodeName
               ? `${t("coverage.showingNode", { name: selectedNodeName })}`
+              : hexCoordsDisplay
+              ? `Showing scans in hex: ${hexCoordsDisplay}`
               : t("history.allRecorded")}
           </p>
         </div>
@@ -130,7 +179,7 @@ export default function HistoryPage() {
           <div className="relative" ref={dropdownRef}>
             <Button
               size="icon"
-              variant={selectedNode ? "default" : "secondary"}
+              variant={selectedNode || selectedHex ? "default" : "secondary"}
               onClick={() => setFilterOpen(!filterOpen)}
               data-testid="button-node-filter-toggle"
               className="toggle-elevate"
@@ -146,10 +195,11 @@ export default function HistoryPage() {
                   <p className="text-xs font-medium text-muted-foreground">
                     {t("coverage.filterByNode")}
                   </p>
-                  {selectedNode && (
+                  {(selectedNode || selectedHex) && (
                     <button
                       onClick={() => {
                         setSelectedNode(null);
+                        setSelectedHex(null);
                         setFilterOpen(false);
                       }}
                       className="text-xs text-muted-foreground hover-elevate rounded-md px-2 py-1 flex items-center gap-1"

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Activity, Signal, Radio, MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n";
-import type { CoverageZone, ScanResult, MeshNode } from "@shared/schema";
+import type { CoverageZone, ScanResult, MeshNode } from "@/lib/scan-aggregator";
 import type { UnitSystem } from "@/lib/bluetooth-context";
 
 function distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {

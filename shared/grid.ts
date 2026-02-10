@@ -26,3 +26,8 @@ export function getHexVertices(centerLat: number, centerLng: number): [number, n
   }
   return vertices;
 }
+
+export function hexKey(lat: number, lng: number): string {
+  const { snapLat, snapLng } = snapToHexGrid(lat, lng);
+  return `${snapLat.toFixed(6)}:${snapLng.toFixed(6)}`;
+}

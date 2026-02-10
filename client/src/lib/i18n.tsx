@@ -172,6 +172,7 @@ const translations: Record<Language, TranslationMap> = {
     "coverage.allNodes": "All Nodes",
     "coverage.showingNode": "Showing: {name}",
     "coverage.viewOnMap": "View on Map",
+    "coverage.viewHistory": "View History",
 
     "nodes.discoveredNodes": "Discovered Nodes",
     "nodes.noNodesYet": "No nodes discovered yet. Connect a radio and start scanning.",
@@ -410,6 +411,7 @@ const translations: Record<Language, TranslationMap> = {
     "coverage.allNodes": "Todos los Nodos",
     "coverage.showingNode": "Mostrando: {name}",
     "coverage.viewOnMap": "Ver en Mapa",
+    "coverage.viewHistory": "Ver Historial",
 
     "nodes.discoveredNodes": "Nodos Descubiertos",
     "nodes.noNodesYet": "A\u00fan no se han descubierto nodos. Conecta un radio y comienza a escanear.",
@@ -648,6 +650,7 @@ const translations: Record<Language, TranslationMap> = {
     "coverage.allNodes": "Tous les Nœuds",
     "coverage.showingNode": "Affichage: {name}",
     "coverage.viewOnMap": "Voir sur la Carte",
+    "coverage.viewHistory": "Voir l'Historique",
 
     "nodes.discoveredNodes": "N\u0153uds D\u00e9couverts",
     "nodes.noNodesYet": "Aucun n\u0153ud d\u00e9couvert. Connectez une radio et lancez un scan.",
@@ -882,6 +885,7 @@ const translations: Record<Language, TranslationMap> = {
     "coverage.allNodes": "Alle Knoten",
     "coverage.showingNode": "Anzeige: {name}",
     "coverage.viewOnMap": "Auf Karte anzeigen",
+    "coverage.viewHistory": "Verlauf anzeigen",
     "nodes.discoveredNodes": "Entdeckte Knoten",
     "nodes.noNodesYet": "Noch keine Knoten entdeckt. Verbinden Sie ein Radio und starten Sie den Scan.",
     "nodes.meshNodes": "Mesh-Knoten",
@@ -1108,6 +1112,7 @@ const translations: Record<Language, TranslationMap> = {
     "coverage.allNodes": "Todos os Nós",
     "coverage.showingNode": "Mostrando: {name}",
     "coverage.viewOnMap": "Ver no Mapa",
+    "coverage.viewHistory": "Ver Hist\u00f3rico",
     "nodes.discoveredNodes": "N\u00f3s Descobertos",
     "nodes.noNodesYet": "Nenhum n\u00f3 descoberto ainda. Conecte um r\u00e1dio e comece a varrer.",
     "nodes.meshNodes": "N\u00f3s da Malha",

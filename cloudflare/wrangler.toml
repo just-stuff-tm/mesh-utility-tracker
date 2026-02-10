@@ -1,0 +1,9 @@
+name = "mesh-ingest"
+compatibility_date = "2026-02-09"
+main = "worker.ts"
+
+[env.dev.vars]
+GITHUB_OWNER  = "just-stuff-tm"
+GITHUB_REPO   = "mesh-utility-tracker"
+GITHUB_BRANCH = "cloudflare-ingest"
+

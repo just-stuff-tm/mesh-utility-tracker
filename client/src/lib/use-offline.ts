@@ -28,10 +28,7 @@ export function useOfflineStatus() {
         await db.scanResults.where("id").startsWith("local-").delete();
         await db.coverageZones.where("id").startsWith("local-").delete();
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/scan-results/latest"] });
+      // Query invalidation removed - using IndexedDB and Worker directly
     } finally {
       syncingRef.current = false;
       setSyncing(false);

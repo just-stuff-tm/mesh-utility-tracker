@@ -17,7 +17,17 @@ import { useToast } from "@/hooks/use-toast";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
 import { publicKeyHex } from "@/lib/bluetooth";
 import { snapToHexGrid } from "@shared/grid";
-import type { CoverageZone, MeshNode, ScanResult } from "@shared/schema";
+import {
+  fetchRawScans,
+  extractNodes,
+  convertToScanResults,
+  aggregateScansToZones,
+  type CoverageZone,
+  type MeshNode,
+  type ScanResult,
+  type RawScan,
+} from "@/lib/scan-aggregator";
+import { db, type LocalScanResult } from "@/lib/offline-store";
 
 export default function MapPage() {
   const { t } = useI18n();
@@ -52,25 +62,56 @@ export default function MapPage() {
 
   const radioId = selfInfo?.publicKey ? publicKeyHex(selfInfo.publicKey) : null;
 
-  const { data: coverageZones = [] } = useQuery<CoverageZone[]>({
-    queryKey: ["/api/coverage-zones"],
+  // Cloudflare Worker URL - configurable via env or default to localhost
+  const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
+
+  // Fetch raw scans from Worker and IndexedDB
+  const { data: rawScans = [] } = useQuery({
+    queryKey: ["raw-scans", workerUrl],
+    queryFn: async (): Promise<RawScan[]> => {
+      // Fetch from IndexedDB
+      const localScans = await db.scanResults.toArray();
+      const localRawScans: RawScan[] = localScans.map((scan: LocalScanResult) => ({
+        observerId: scan.observerId,
+        nodeId: scan.nodeId,
+        latitude: scan.latitude,
+        longitude: scan.longitude,
+        rssi: scan.rssi,
+        snr: scan.snr,
+        snrIn: scan.snrIn ?? undefined,
+        altitude: scan.altitude ?? undefined,
+        timestamp: scan.timestamp ?? undefined,
+        senderName: scan.senderName ?? undefined,
+        receiverName: scan.receiverName ?? undefined,
+        radioId: scan.radioId ?? undefined,
+      }));
+
+      // Try to fetch from Worker
+      try {
+        const workerScans = await fetchRawScans(workerUrl);
+        // Merge: deduplicate by id if present, otherwise combine all
+        const combined = [...workerScans, ...localRawScans];
+        return combined;
+      } catch (err) {
+        console.log("[Map] Worker offline, using local scans only:", localRawScans.length);
+        return localRawScans;
+      }
+    },
     refetchInterval: 30000,
+    staleTime: 10000,
   });
 
-  const { data: nodes = [], isLoading: nodesLoading } = useQuery<MeshNode[]>({
-    queryKey: ["/api/nodes"],
-    refetchInterval: 15000,
-  });
-
-  const { data: latestScans = [] } = useQuery<ScanResult[]>({
-    queryKey: ["/api/scan-results", "latest"],
-    refetchInterval: 15000,
-  });
-
-  const { data: allScans = [] } = useQuery<ScanResult[]>({
-    queryKey: ["/api/scan-results"],
-    refetchInterval: 30000,
-  });
+  // Derive coverage zones, nodes, and scan results from raw data
+  const coverageZones = useMemo(() => aggregateScansToZones(rawScans), [rawScans]);
+  const nodes = useMemo(() => extractNodes(rawScans), [rawScans]);
+  const allScans = useMemo(() => convertToScanResults(rawScans), [rawScans]);
+  const latestScans = useMemo(() => {
+    // Get scans from last 24 hours
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    return allScans.filter((s) => s.timestamp.getTime() > oneDayAgo);
+  }, [allScans]);
+  
+  const nodesLoading = false;
 
   const myScans = useMemo(() => {
     if (!radioId) return [];
@@ -95,18 +136,36 @@ export default function MapPage() {
   }, [allScans]);
 
   const filterableNodes = useMemo(() => {
-    const nodeIds = new Set<string>();
+    // Build node list with scan counts for sorting
+    const nodeMap = new Map<string, { nodeId: string; name: string; count: number }>();
+    
     for (const scan of allScans) {
-      nodeIds.add(scan.nodeId);
+      const existing = nodeMap.get(scan.nodeId);
+      if (existing) {
+        existing.count++;
+        // Prefer non-"Unknown" names
+        if (scan.senderName && !scan.senderName.startsWith("Unknown (")) {
+          existing.name = scan.senderName;
+        }
+      } else {
+        // Use node name from extractNodes if available, otherwise scan name
+        const node = nodes.find((n) => n.nodeId === scan.nodeId);
+        const nodeName = node?.name && !node.name.startsWith("Unknown (") ? node.name : null;
+        const scanName = scan.senderName && !scan.senderName.startsWith("Unknown (") ? scan.senderName : null;
+        
+        nodeMap.set(scan.nodeId, {
+          nodeId: scan.nodeId,
+          name: nodeName || scanName || scan.nodeId,
+          count: 1,
+        });
+      }
     }
-    return Array.from(nodeIds).map((id) => {
-      const node = nodes.find((n) => n.nodeId === id);
-      const nodeName = node?.name && !node.name.startsWith("Unknown (") ? node.name : null;
-      const scanName = !nodeName
-        ? allScans.find((s) => s.nodeId === id && s.senderName && !s.senderName.startsWith("Unknown ("))?.senderName
-        : null;
-      return { nodeId: id, name: nodeName || scanName || id };
-    }).sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Sort by count descending (most scanned first), then alphabetically
+    return Array.from(nodeMap.values()).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name);
+    });
   }, [allScans, nodes]);
 
   const filteredZones = useMemo(() => {
@@ -173,6 +232,8 @@ export default function MapPage() {
           filterOpen={filterOpen}
           onFilterToggle={() => setFilterOpen(!filterOpen)}
           fitBoundsTarget={fitBoundsTarget}
+          allScans={allScans}
+          nodes={nodes}
           onZoneClick={(zone) => {
             setSelectedZone(zone);
             setSheetOpen(false);

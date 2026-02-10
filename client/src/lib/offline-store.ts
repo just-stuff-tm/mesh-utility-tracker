@@ -16,6 +16,7 @@ export interface LocalScanResult {
   nodeId: string;
   rssi: number;
   snr: number;
+  snrIn: number | null;
   latitude: number;
   longitude: number;
   altitude: number | null;

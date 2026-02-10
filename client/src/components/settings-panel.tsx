@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, isQueuedResponse, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { useOfflineStatus } from "@/lib/use-offline";
+import { db } from "@/lib/offline-store";
 import { usePrivacyContext } from "@/App";
 import { useI18n, LANGUAGES, type Language } from "@/lib/i18n";
 
@@ -44,32 +45,24 @@ export function SettingsPanel() {
     observerPosition,
     connected,
     selfInfo,
+    uploadBatchInterval,
+    setUploadBatchInterval,
+    queuedScansCount,
+    lastUploadTime,
+    manualSync,
   } = useBluetoothContext();
 
   const deleteDataMutation = useMutation({
     mutationFn: async (radioId: string) => {
-      const res = await apiRequest("DELETE", `/api/data/${radioId}`);
-      if (isQueuedResponse(res)) {
-        return { queued: true } as any;
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      setConfirmDelete(false);
-      if (data.queued) {
-        toast({
-          title: t("toast.deleteQueued"),
-          description: t("toast.deleteQueuedDesc"),
-        });
-        return;
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
+      // Data deletion requires manual review - no automated endpoint
       toast({
-        title: t("toast.dataDeleted"),
-        description: `Removed ${data.deleted.scanResults} scan results, ${data.deleted.coverageZones} coverage zones, and ${data.deleted.observers || 0} observer records`,
+        title: "Data Deletion Request",
+        description: "Please create a GitHub issue with your Radio ID to request data deletion. Automated deletion is not available to prevent abuse.",
       });
+      return { success: false };
+    },
+    onSuccess: () => {
+      setConfirmDelete(false);
     },
     onError: () => {
       toast({ title: t("toast.deleteFailed"), variant: "destructive" });
@@ -84,19 +77,16 @@ export function SettingsPanel() {
 
   const resetSyncMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/reset-sync", { method: "POST" });
-      return res.json();
+      // Reset sync by clearing local outbox
+      await db.outbox.clear();
+      return { success: true };
     },
-    onSuccess: (data) => {
-      if (data.success) {
-        queryClient.invalidateQueries();
-        toast({
-          title: t("toast.syncFixed"),
-          description: t("toast.syncFixedDesc"),
-        });
-      } else {
-        toast({ title: t("toast.resetFailed"), description: data.message, variant: "destructive" });
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast({
+        title: t("toast.syncFixed"),
+        description: t("toast.syncFixedDesc"),
+      });
     },
     onError: () => {
       toast({ title: t("toast.cannotReachServer"), description: t("toast.serverDown"), variant: "destructive" });
@@ -192,6 +182,37 @@ export function SettingsPanel() {
           <p className="text-xs text-muted-foreground">
             {t("settings.scanIntervalMin")}
           </p>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Label className="text-xs">{t("settings.smartScanning")}</Label>
+            <Switch
+              checked={smartScanEnabled}
+              onCheckedChange={setSmartScanEnabled}
+              data-testid="switch-smart-scan"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {t("settings.smartScanDesc", { days: smartScanDays })}
+          </p>
+          {smartScanEnabled && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">
+                {t("settings.coverageFreshness", { days: smartScanDays })}
+              </Label>
+              <Slider
+                value={[smartScanDays]}
+                onValueChange={([v]) => setSmartScanDays(v)}
+                min={0}
+                max={14}
+                step={1}
+                data-testid="slider-smart-scan-days"
+              />
+            </div>
+          )}
         </div>
 
         <Separator />
@@ -401,37 +422,6 @@ export function SettingsPanel() {
         <Separator />
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <Label className="text-xs">{t("settings.smartScanning")}</Label>
-            <Switch
-              checked={smartScanEnabled}
-              onCheckedChange={setSmartScanEnabled}
-              data-testid="switch-smart-scan"
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {t("settings.smartScanDesc", { days: smartScanDays })}
-          </p>
-          {smartScanEnabled && (
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">
-                {t("settings.coverageFreshness", { days: smartScanDays })}
-              </Label>
-              <Slider
-                value={[smartScanDays]}
-                onValueChange={([v]) => setSmartScanDays(v)}
-                min={1}
-                max={14}
-                step={1}
-                data-testid="slider-smart-scan-days"
-              />
-            </div>
-          )}
-        </div>
-
-        <Separator />
-
-        <div className="space-y-2">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
             <Label className="text-xs">{t("settings.deadZones")}</Label>
@@ -449,6 +439,43 @@ export function SettingsPanel() {
           >
             <AlertTriangle className="h-3 w-3 mr-1" />
             {t("settings.markDeadZone")}
+          </Button>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs">Upload Interval: {uploadBatchInterval} min</Label>
+          </div>
+          <Slider
+            value={[uploadBatchInterval]}
+            onValueChange={([v]) => setUploadBatchInterval(v)}
+            min={5}
+            max={60}
+            step={5}
+            data-testid="slider-upload-interval"
+          />
+          <p className="text-xs text-muted-foreground">
+            {queuedScansCount} scans queued • Next upload in {Math.max(0, Math.ceil((uploadBatchInterval * 60 * 1000 - (Date.now() - lastUploadTime)) / 60000))} min
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              try {
+                await manualSync();
+                toast({ title: "Scans uploaded successfully" });
+              } catch (err: any) {
+                toast({ title: err.message || "Sync failed", variant: "destructive" });
+              }
+            }}
+            disabled={queuedScansCount === 0}
+            className="w-full"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-2" />
+            Sync Now ({queuedScansCount})
           </Button>
         </div>
 
@@ -525,6 +552,31 @@ export function SettingsPanel() {
               {resetSyncMutation.isPending ? t("settings.fixing") : t("settings.fixSyncIssues")}
             </Button>
           )}
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <Label className="text-xs">Clear Local Data</Label>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={async () => {
+              if (!confirm("Clear all locally cached scans and zones? This cannot be undone and only affects data on this device.")) return;
+              try {
+                await db.scanResults.clear();
+                await db.coverageZones.clear();
+                await db.outbox.clear();
+                toast({ title: "Local cache cleared successfully" });
+              } catch (err) {
+                toast({ title: "Failed to clear cache", variant: "destructive" });
+              }
+            }}
+            className="w-full"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-2" />
+            Clear Scan Cache
+          </Button>
         </div>
 
         <Separator />

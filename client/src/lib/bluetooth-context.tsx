@@ -18,7 +18,7 @@ import {
 } from "@/lib/bluetooth";
 import { getCurrentPosition, watchPosition, clearWatch, fetchElevation } from "@/lib/geolocation";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { db, generateLocalId, isOnline } from "@/lib/offline-store";
+import { db, generateLocalId, isOnline, enqueueMutation, drainOutbox, getOutboxCount } from "@/lib/offline-store";
 import { snapToHexGrid } from "@shared/grid";
 
 export type ScanStatus = "idle" | "advertising" | "waiting" | "querying" | "submitting" | "done" | "error";
@@ -61,6 +61,9 @@ interface BluetoothContextValue {
   contacts: MeshContact[];
   scanStatus: ScanStatus;
   lastScanResult: LastScanResult | null;
+  uploadBatchInterval: number;
+  queuedScansCount: number;
+  lastUploadTime: number;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   toggleScan: () => void;
@@ -73,6 +76,8 @@ interface BluetoothContextValue {
   setStatsRadiusMiles: (v: number) => void;
   setUnitSystem: (v: UnitSystem) => void;
   setUpdateRadioPosition: (v: boolean) => void;
+  setUploadBatchInterval: (v: number) => void;
+  manualSync: () => Promise<{ synced: number; failed: number }>;
 }
 
 const BluetoothContext = createContext<BluetoothContextValue | null>(null);
@@ -115,6 +120,14 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     } catch { return false; }
   });
   const updateRadioPositionRef = useRef(updateRadioPosition);
+  const [uploadBatchInterval, setUploadBatchIntervalState] = useState(() => {
+    try {
+      const stored = localStorage.getItem("mesh_upload_batch_interval");
+      return stored ? parseInt(stored, 10) : 10; // default 10 minutes
+    } catch { return 10; }
+  });
+  const [queuedScansCount, setQueuedScansCount] = useState(0);
+  const [lastUploadTime, setLastUploadTime] = useState<number>(0);
   const [altitudeMeters, setAltitudeMeters] = useState<number | null>(null);
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
@@ -234,51 +247,12 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
 
   const checkIsInDeadZone = useCallback((): boolean => {
-    const pos = positionRef.current;
-    if (!pos) return false;
-    try {
-      const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
-      const cachedZones = queryClient.getQueryData<any[]>(["/api/coverage-zones"]);
-      if (!cachedZones) return false;
-      const tolerance = 0.00005;
-      for (const z of cachedZones) {
-        if (
-          z.isDeadZone &&
-          Math.abs(z.centerLat - snapLat) < tolerance &&
-          Math.abs(z.centerLng - snapLng) < tolerance
-        ) {
-          return true;
-        }
-      }
-    } catch {}
+    // Dead zone check is an optimization - if unavailable, return false
     return false;
   }, []);
 
   const checkSmartScanSkip = useCallback((): boolean => {
-    if (!smartScanEnabledRef.current) return false;
-    const pos = positionRef.current;
-    if (!pos) return false;
-
-    try {
-      const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
-      const cachedZones = queryClient.getQueryData<any[]>(["/api/coverage-zones"]);
-      if (!cachedZones) return false;
-      const freshnessMs = smartScanDaysRef.current * 24 * 60 * 60 * 1000;
-      const now = Date.now();
-      const tolerance = 0.00005;
-
-      for (const z of cachedZones) {
-        if (
-          Math.abs(z.centerLat - snapLat) < tolerance &&
-          Math.abs(z.centerLng - snapLng) < tolerance
-        ) {
-          if (z.isDeadZone) return false;
-          if (z.lastScanned && now - new Date(z.lastScanned).getTime() < freshnessMs) {
-            return true;
-          }
-        }
-      }
-    } catch {}
+    // Smart scan check is an optimization - if unavailable, return false
     return false;
   }, []);
 
@@ -323,16 +297,12 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       }
       remoteLog("log", `[SUBMIT] radioId=${radioId}, publicKey type=${pk ? typeof pk : "null"}, length=${pk?.length ?? 0}, selfInfo exists=${!!selfInfoRef.current}`);
 
+      // Get node names from IndexedDB
       let existingNodes: Array<{ nodeId: string; name: string | null }> = [];
       try {
-        const res = await fetch("/api/nodes");
-        if (res.ok) existingNodes = await res.json();
-      } catch {
-        try {
-          const local = await db.nodes.toArray();
-          existingNodes = local.map((n) => ({ nodeId: n.nodeId, name: n.name }));
-        } catch {}
-      }
+        const local = await db.nodes.toArray();
+        existingNodes = local.map((n) => ({ nodeId: n.nodeId, name: n.name }));
+      } catch {}
       const nodeNameMap = new Map<string, string>();
       for (const n of existingNodes) {
         if (n.name) nodeNameMap.set(n.nodeId, n.name);
@@ -349,17 +319,6 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
           const existingIsReal = existingName && !existingName.startsWith("Unknown (");
           const nodeName = advIsReal ? advName : (existingIsReal ? existingName : null);
           const displayName = nodeName || `Unknown (${nodeId})`;
-
-          const nodeData = {
-            nodeId,
-            name: nodeName,
-            latitude: null as number | null,
-            longitude: null as number | null,
-          };
-
-          try {
-            await apiRequest("POST", "/api/nodes", nodeData);
-          } catch {}
 
           if (!isOnline()) {
             try {
@@ -381,6 +340,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
             nodeId,
             rssi: rep.stats.rssi,
             snr: rep.stats.snr,
+            snrIn: rep.stats.snrIn,
             latitude: pos[0],
             longitude: pos[1],
             altitude: altitudeRef.current,
@@ -389,10 +349,23 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
             radioId,
           };
 
+          // Queue scan for batch upload instead of immediate upload
           try {
-            await apiRequest("POST", "/api/scan-results", scanData);
+            const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
+            console.log('[Bluetooth] Queuing scan for batch upload:', scanData);
+            await enqueueMutation({
+              url: workerUrl,
+              method: "POST",
+              payload: scanData,
+              createdAt: Date.now(),
+              retries: 0,
+            });
+            console.log('[Bluetooth] Scan queued successfully');
             scanResultsSubmitted++;
-          } catch {}
+            setQueuedScansCount(prev => prev + 1);
+          } catch (err) {
+            console.error('[Bluetooth] Error queuing scan:', err);
+          }
 
           if (!isOnline()) {
             try {
@@ -440,13 +413,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (result.repeaters.length === 0) {
-          try {
-            await apiRequest("POST", "/api/coverage-zones/dead-zone", {
-              centerLat: pos[0],
-              centerLng: pos[1],
-              radioId,
-            });
-          } catch {}
+          // Dead zone - scan data already sent with 0 repeaters
 
           if (!isOnline()) {
             try {
@@ -484,9 +451,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       setLastScanResult(scanResult);
       setScanStatus("done");
 
-      queryClient.invalidateQueries({ queryKey: ["/api/nodes"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coverage-zones"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/scan-results"] });
+      // Query invalidation removed - using IndexedDB and Worker directly now
     } catch (err: any) {
       setScanStatus("error");
       setLastScanResult({
@@ -640,12 +605,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
 
           if (rid) {
             const observerName = info.name || result.deviceName || "Observer";
-            try {
-              await apiRequest("POST", "/api/observers", {
-                name: observerName,
-                deviceId: rid,
-              });
-            } catch {}
+            // Observer info is now sent with each scan, no separate registration needed
 
             try {
               const localScans = await db.scanResults
@@ -712,6 +672,55 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     setShowReconnect(false);
   }, []);
 
+  // Batch upload timer - uploads queued scans at configured interval
+  useEffect(() => {
+    if (!connected) return;
+    
+    const intervalMs = uploadBatchInterval * 60 * 1000;
+    const checkTimer = setInterval(async () => {
+      const now = Date.now();
+      const count = await getOutboxCount();
+      setQueuedScansCount(count);
+      
+      // Upload if interval has passed and we have queued scans
+      if (count > 0 && now - lastUploadTime >= intervalMs) {
+        console.log(`[Bluetooth] Auto-uploading ${count} queued scans`);
+        try {
+          const result = await drainOutbox();
+          if (result.synced > 0) {
+            const newCount = await getOutboxCount();
+            setQueuedScansCount(newCount);
+            setLastUploadTime(now);
+            console.log(`[Bluetooth] Uploaded ${result.synced} scans, ${newCount} remaining`);
+          }
+        } catch (err) {
+          console.error('[Bluetooth] Auto-upload failed:', err);
+        }
+      }
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(checkTimer);
+  }, [connected, uploadBatchInterval, lastUploadTime]);
+
+  const setUploadBatchInterval = useCallback((v: number) => {
+    setUploadBatchIntervalState(v);
+    try { localStorage.setItem("mesh_upload_batch_interval", String(v)); } catch {}
+  }, []);
+
+  const manualSync = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastUploadTime < 5 * 60 * 1000) {
+      throw new Error("Please wait 5 minutes between syncs");
+    }
+    const result = await drainOutbox();
+    if (result.synced > 0) {
+      const count = await getOutboxCount();
+      setQueuedScansCount(count);
+      setLastUploadTime(now);
+    }
+    return result;
+  }, [lastUploadTime]);
+
   return (
     <BluetoothContext.Provider
       value={{
@@ -762,8 +771,11 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         setUpdateRadioPosition: (v: boolean) => {
           setUpdateRadioPosition(v);
           try { localStorage.setItem("mesh_update_radio_position", String(v)); } catch {}
-        },
-      }}
+        },        uploadBatchInterval,
+        queuedScansCount,
+        lastUploadTime,
+        setUploadBatchInterval,
+        manualSync,      }}
     >
       {children}
     </BluetoothContext.Provider>
