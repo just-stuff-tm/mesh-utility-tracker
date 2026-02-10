@@ -1,3 +1,4 @@
 {"observerId":"device-002","latitude":40.713,"longitude":-74.0065,"rssi":-68,"snr":6.2,"radioId":"radio-cloudflare","receivedAt":"2026-02-10T02:32:27.149Z"}
 {"observerId":"device-002","latitude":40.713,"longitude":-74.0065,"rssi":-68,"snr":6.2,"radioId":"radio-cloudflare","receivedAt":"2026-02-10T02:33:29.499Z"}
 {"latitude":40.71,"longitude":-74.01,"rssi":-75,"receivedAt":"2026-02-10T03:16:51.208Z"}
+{"observerId":"BFD65811","nodeId":"718D349F","rssi":-75,"snr":11.5,"latitude":40.89080496549606,"longitude":-77.47785947586962,"altitude":340,"senderName":"CCLRN Millheim","receiverName":"KD3CGK","radioId":"BFD65811","receivedAt":"2026-02-10T04:15:00.427Z"}
