@@ -2,20 +2,20 @@
   "name": "Mesh Utility",
   "short_name": "MeshUtil",
   "description": "LoRa MeshCore radio manager with Bluetooth connectivity and RF coverage mapping",
-  "start_url": "/",
+  "start_url": "/mesh-utility-tracker/",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
   "orientation": "any",
   "icons": [
     {
-      "src": "/app-icon.png",
+      "src": "/mesh-utility-tracker/app-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/favicon.png",
+      "src": "/mesh-utility-tracker/favicon.png",
       "sizes": "64x64",
       "type": "image/png"
     }

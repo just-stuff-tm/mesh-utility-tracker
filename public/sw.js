@@ -5,9 +5,11 @@ const API_CACHE = "api-cache-v1";
 
 let tileCachingEnabled = true;
 
+const BASE_PATH = "/mesh-utility-tracker/";
+
 const APP_SHELL_URLS = [
-  "/",
-  "/manifest.json",
+  BASE_PATH,
+  BASE_PATH + "manifest.json",
 ];
 
 self.addEventListener("install", (event) => {

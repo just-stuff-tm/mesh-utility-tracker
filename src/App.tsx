@@ -1,5 +1,5 @@
 import { useState, createContext, useContext } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -45,15 +45,18 @@ export function usePrivacyContext() {
   return useContext(PrivacyContext);
 }
 function Router() {
+  const base = import.meta.env.BASE_URL;
   return (
-    <Switch>
-      <Route path="/" component={MapPage} />
-      <Route path="/nodes" component={NodesPage} />
-      <Route path="/history" component={HistoryPage} />
-      <Route path="/manual" component={ManualPage} />
-      <Route path="/privacy" component={PrivacyPage} />
-      <Route component={NotFound} />
-    </Switch>
+    <WouterRouter base={base}>
+      <Switch>
+        <Route path="/" component={MapPage} />
+        <Route path="/nodes" component={NodesPage} />
+        <Route path="/history" component={HistoryPage} />
+        <Route path="/manual" component={ManualPage} />
+        <Route path="/privacy" component={PrivacyPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </WouterRouter>
   );
 }
 
