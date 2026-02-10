@@ -1,7 +1,7 @@
-const CACHE_NAME = "mesh-utility-v1";
-const TILE_CACHE = "map-tiles-v1";
-const CDN_CACHE = "cdn-assets-v1";
-const API_CACHE = "api-cache-v1";
+const CACHE_NAME = "mesh-utility-v2-worker";
+const TILE_CACHE = "map-tiles-v2";
+const CDN_CACHE = "cdn-assets-v2";
+const API_CACHE = "api-cache-v2";
 
 let tileCachingEnabled = true;
 
