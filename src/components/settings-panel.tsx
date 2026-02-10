@@ -55,9 +55,24 @@ export function SettingsPanel() {
   const deleteDataMutation = useMutation({
     mutationFn: async (radioId: string) => {
       // Data deletion requires manual review - no automated endpoint
+      const issueUrl = `https://github.com/just-stuff-tm/mesh-utility-tracker/issues/new?title=Data%20Deletion%20Request&body=Radio%20ID:%20${encodeURIComponent(radioId)}%0A%0APlease%20delete%20all%20data%20associated%20with%20this%20radio.&labels=data-deletion`;
+      
       toast({
         title: "Data Deletion Request",
-        description: "Please create a GitHub issue with your Radio ID to request data deletion. Automated deletion is not available to prevent abuse.",
+        description: (
+          <div className="space-y-2">
+            <p>Connected Radio ID: <span className="font-mono font-semibold">{radioId}</span></p>
+            <p>Please create a GitHub issue to request deletion. Automated deletion is not available to prevent abuse.</p>
+            <a 
+              href={issueUrl}
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center text-blue-500 hover:text-blue-600 underline"
+            >
+              Create Deletion Request →
+            </a>
+          </div>
+        ),
       });
       return { success: false };
     },
