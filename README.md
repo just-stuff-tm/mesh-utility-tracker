@@ -14,17 +14,6 @@ Progressive Web App for Bluetooth mesh network coverage mapping with cloud data 
 - 🔒 **Privacy First** - User-controlled data sharing with self-service deletion
 
 
-## Documentation
-
-📁 **[docs/](docs/)** - All documentation files
-
-- 📚 [Architecture Overview](docs/ARCHITECTURE.md) - System design and data flow
-- ⚡ [Cloudflare Pages Deployment](docs/CLOUDFLARE_PAGES.md) - **Recommended hosting** (5 min setup)
-- 🚀 [Worker Setup Guide](docs/WORKER_SETUP.md) - Backend deployment instructions
-- ✅ [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md) - Step-by-step backend setup
-- 📊 [CSV Format Reference](docs/CSV_FORMAT.md) - Data structure and filtering examples
-- 📦 [Worker README](worker/README.md) - Cloudflare Worker API documentation
-
 ## Technology Stack
 
 ### Frontend
@@ -80,8 +69,6 @@ Client (PWA)
 **Data Format:** JSON files organized by date:
 - `scans/2024-01-15/batch-1705334400000.json`
 - `deletions/2024-01-15/!abcd1234.json`
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed explanation.
 
 ## Privacy & Data
 
