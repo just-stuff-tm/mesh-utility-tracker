@@ -2,7 +2,7 @@
 
 Progressive Web App for Bluetooth Meshcore network coverage mapping with cloud data collection.
 
-**Live App:** https://243f5d20.mesh-utility-tracker.pages.dev/ (Cloudflare Pages) https://mesh-utility.com coming soon!
+**Live App:** https://af7b37de.mesh-utility-tracker.pages.dev/ (Cloudflare Pages) https://mesh-utility.com coming soon!
 
 ## Features
 
