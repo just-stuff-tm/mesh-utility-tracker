@@ -17,7 +17,7 @@ The mesh-data repository stores scans in **CSV format** (plus JSON) to enable ea
 | `nodeId` | String | Detected node's ID | `!def45678` | 9 characters |
 | `rssi` | Integer | Signal strength in dBm | `-85` | Range: -120 to -30 |
 | `snr` | Float | Signal-to-noise ratio in dB | `8.5` | Optional |
-| `hopLimit` | Integer | Remaining mesh hops | `3` or `0` | **Empty = zero-hop scan** |
+| `hopLimit` | Integer | Mesh hops from source | `3` or `0` | 0 = direct/zero-hop |
 
 ## Example CSV Data
 
@@ -33,7 +33,7 @@ radioId,timestamp,datetime_utc,latitude,longitude,altitude,nodeId,rssi,snr,hopLi
 **What is a zero-hop scan?**
 - Direct Bluetooth connection (no mesh routing)
 - Node is within direct radio range
-- `hopLimit` field is **empty** or `0`
+- `hopLimit` field is `0`
 
 **Why zero-hop?**
 - Most reliable signal measurements
@@ -42,9 +42,9 @@ radioId,timestamp,datetime_utc,latitude,longitude,altitude,nodeId,rssi,snr,hopLi
 
 **Example:**
 ```csv
-!abcd1234,1705334400000,2024-01-15T10:00:00.000Z,37.774900,-122.419400,50.0,!def45678,-65,15.2,
+!abcd1234,1705334400000,2024-01-15T10:00:00.000Z,37.774900,-122.419400,50.0,!def45678,-65,15.2,0
 ```
-The empty `hopLimit` means this is a zero-hop (direct) scan.
+The `hopLimit` of `0` means this is a zero-hop (direct) scan.
 
 ## Filtering Examples
 
@@ -52,10 +52,10 @@ The empty `hopLimit` means this is a zero-hop (direct) scan.
 
 **Find zero-hop scans:**
 ```bash
-# Empty hopLimit (column 10)
-awk -F',' '$10 == ""' scans/**/*.csv
+# hopLimit = 0 (column 10)
+awk -F',' '$10 == "0"' scans/**/*.csv
 
-# Or explicit 0
+# Or using grep
 grep ",0$" scans/**/*.csv
 ```
 
@@ -83,9 +83,8 @@ import pandas as pd
 # Load CSV
 df = pd.read_csv('scans/2024-01-15/batch-1705334400000.csv')
 
-# Zero-hop scans (empty or 0)
-zero_hop = df[df['hopLimit'].fillna('') == '']
-# Or: zero_hop = df[df['hopLimit'].fillna(0) == 0]
+# Zero-hop scans (hopLimit = 0)
+zero_hop = df[df['hopLimit'] == 0]
 
 # Strong signals
 strong = df[df['rssi'] > -70]

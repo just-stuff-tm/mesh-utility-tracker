@@ -366,7 +366,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
                 nodeId,
                 rssi: rep.stats.rssi,
                 snr: rep.stats.snr,
-                hopLimit: undefined,
+                hopLimit: rep.stats.hopLimit,
               }],
             }];
             console.log('[Bluetooth] Queuing scan for batch upload:', workerPayload);

@@ -189,8 +189,8 @@ wc -l scans/*/*.csv
 
 ### Find Zero-Hop Scans
 \`\`\`bash
-# Scans where hopLimit is empty or 0
-awk -F',' '$10 == "" || $10 == "0"' scans/**/*.csv
+# Scans where hopLimit is 0 (direct connection)
+awk -F',' '$10 == "0"' scans/**/*.csv
 \`\`\`
 
 ### Geographic Bounding Box
@@ -218,7 +218,8 @@ hourly = all_data.groupby('hour').size()
 
 ## Data Quality Notes
 
-- **Zero-hop scans:** Some scans may have empty \`hopLimit\` (direct connection, no mesh routing)
+- **Zero-hop scans:** Scans with `hopLimit = 0` indicate direct connection (no mesh routing)
+- **Multi-hop scans:** Higher hopLimit values show mesh routing distances
 - **Missing altitude:** Not all scans include altitude data
 - **Duplicate detection:** Scanner may report same node multiple times per location
 - **Timestamp precision:** Millisecond precision, UTC timezone

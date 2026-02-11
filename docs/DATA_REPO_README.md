@@ -151,8 +151,8 @@ my_scans = all_scans[all_scans['radioId'] == '!abcd1234']
 # Filter by signal strength
 strong_signals = all_scans[all_scans['rssi'] > -80]
 
-# Find zero-hop scans
-zero_hop = all_scans[all_scans['hopLimit'].fillna(0) == 0]
+# Find zero-hop scans (direct connections)
+zero_hop = all_scans[all_scans['hopLimit'] == 0]
 
 # Export filtered data
 my_scans.to_csv('my-filtered-scans.csv', index=False)
@@ -164,8 +164,8 @@ my_scans.to_csv('my-filtered-scans.csv', index=False)
 # Find all scans from a radio
 grep "!abcd1234" scans/**/*.csv
 
-# Find zero-hop scans (empty or 0 in hopLimit column)
-awk -F',' '$10 == "" || $10 == "0"' scans/**/*.csv
+# Find zero-hop scans (hopLimit = 0)
+awk -F',' '$10 == "0"' scans/**/*.csv
 
 # Find strong signals (rssi > -70)
 awk -F',' '$8 > -70' scans/**/*.csv
