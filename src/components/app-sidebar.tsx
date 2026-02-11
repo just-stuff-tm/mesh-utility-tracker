@@ -3,7 +3,6 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
-import appIconPath from "@assets/app_icon_1770389147147.png";
 import {
   Sidebar,
   SidebarContent,
@@ -62,7 +61,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2.5">
           <img
-            src={appIconPath}
+            src="/app-icon.png"
             alt="Mesh Utility"
             className="w-9 h-9 rounded-md object-cover"
           />
