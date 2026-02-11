@@ -11,7 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
-import { fetchRawScans, aggregateScansToZones, type CoverageZone } from "@/lib/scan-aggregator";
+import { fetchRawScans, aggregateScansToZones, type CoverageZone, type RawScan } from "@/lib/scan-aggregator";
+import { db, type LocalScanResult } from "@/lib/offline-store";
+import { useOfflineStatus } from "@/lib/use-offline";
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -25,12 +27,36 @@ export default function SettingsPage() {
     smartScanDays,
     setSmartScanDays,
   } = useBluetoothContext();
+  const { online, forceOffline } = useOfflineStatus();
 
   const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
 
   const { data: rawScans = [] } = useQuery({
-    queryKey: ["raw-scans", workerUrl],
-    queryFn: () => fetchRawScans(workerUrl),
+    queryKey: ["raw-scans", workerUrl, online, forceOffline],
+    queryFn: async (): Promise<RawScan[]> => {
+      const localScans = await db.scanResults.toArray();
+      const localRawScans: RawScan[] = localScans.map((scan: LocalScanResult) => ({
+        observerId: scan.observerId,
+        nodeId: scan.nodeId,
+        latitude: scan.latitude,
+        longitude: scan.longitude,
+        rssi: scan.rssi,
+        snr: scan.snr,
+        snrIn: scan.snrIn ?? undefined,
+        altitude: scan.altitude ?? undefined,
+        timestamp: scan.timestamp ?? undefined,
+        senderName: scan.senderName ?? undefined,
+        receiverName: scan.receiverName ?? undefined,
+        radioId: scan.radioId ?? undefined,
+      }));
+
+      try {
+        const workerScans = await fetchRawScans(workerUrl);
+        return [...workerScans, ...localRawScans];
+      } catch (err) {
+        return localRawScans;
+      }
+    },
     refetchInterval: 30000,
   });
 

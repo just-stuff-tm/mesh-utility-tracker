@@ -28,11 +28,13 @@ import {
   type RawScan,
 } from "@/lib/scan-aggregator";
 import { db, type LocalScanResult } from "@/lib/offline-store";
+import { useOfflineStatus } from "@/lib/use-offline";
 
 export default function MapPage() {
   const { t } = useI18n();
   const { toast } = useToast();
   const { observerPosition, autoCenter, setAutoCenter, connected, selfInfo, statsRadiusMiles, unitSystem } = useBluetoothContext();
+  const { online, forceOffline } = useOfflineStatus();
   const [selectedZone, setSelectedZone] = useState<CoverageZone | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filterNodeId, setFilterNodeId] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export default function MapPage() {
 
   // Fetch raw scans from Worker and IndexedDB
   const { data: rawScans = [] } = useQuery({
-    queryKey: ["raw-scans", workerUrl],
+    queryKey: ["raw-scans", workerUrl, online, forceOffline],
     queryFn: async (): Promise<RawScan[]> => {
       // Fetch from IndexedDB
       const localScans = await db.scanResults.toArray();

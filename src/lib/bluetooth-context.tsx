@@ -246,14 +246,61 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
 
-  const checkIsInDeadZone = useCallback((): boolean => {
-    // Dead zone check is an optimization - if unavailable, return false
-    return false;
+  const checkIsInDeadZone = useCallback(async (): Promise<boolean> => {
+    const pos = positionRef.current;
+    if (!pos) return false;
+
+    const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
+
+    try {
+      // Check if current hex has any dead zone markers in IndexedDB
+      const deadZones = await db.coverageZones
+        .where("isDeadZone")
+        .equals(1)
+        .toArray();
+
+      // Check if any dead zone matches current hex
+      const inDeadZone = deadZones.some((zone) => {
+        return Math.abs(zone.centerLat - snapLat) < 0.000001 && 
+               Math.abs(zone.centerLng - snapLng) < 0.000001;
+      });
+
+      return inDeadZone;
+    } catch (err) {
+      console.error("[DeadZone] Failed to check dead zones:", err);
+      return false;
+    }
   }, []);
 
-  const checkSmartScanSkip = useCallback((): boolean => {
-    // Smart scan check is an optimization - if unavailable, return false
-    return false;
+  const checkSmartScanSkip = useCallback(async (): Promise<boolean> => {
+    if (!smartScanEnabledRef.current) return false;
+    
+    const pos = positionRef.current;
+    if (!pos) return false;
+
+    const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - smartScanDaysRef.current);
+    const cutoffTimestamp = cutoffDate.toISOString();
+
+    try {
+      // Check if any scans exist in this hex within the freshness window
+      const recentScans = await db.scanResults
+        .where("timestamp")
+        .above(cutoffTimestamp)
+        .toArray();
+
+      // Filter to scans in the current hex
+      const hexScans = recentScans.filter((scan) => {
+        const { snapLat: scanLat, snapLng: scanLng } = snapToHexGrid(scan.latitude, scan.longitude);
+        return Math.abs(scanLat - snapLat) < 0.000001 && Math.abs(scanLng - snapLng) < 0.000001;
+      });
+
+      return hexScans.length > 0;
+    } catch (err) {
+      console.error("[SmartScan] Failed to check recent scans:", err);
+      return false;
+    }
   }, []);
 
   const runDiscoverRepeaters = useCallback(async () => {
@@ -499,13 +546,13 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const runAutoScan = () => {
+    const runAutoScan = async () => {
       const pos = positionRef.current;
       if (pos) {
         const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
         lastSnapRef.current = `${snapLat},${snapLng}`;
       }
-      const skip = checkSmartScanSkip();
+      const skip = await checkSmartScanSkip();
       if (skip) {
         setScanStatus("done");
         setLastScanResult((prev) => prev ? { ...prev, errorMessage: "Smart scan: area recently covered, skipped" } : {
@@ -538,15 +585,20 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     if (!connected || !isScanning || !observerPosition) return;
     const { snapLat, snapLng } = snapToHexGrid(observerPosition[0], observerPosition[1]);
     const currentSnap = `${snapLat},${snapLng}`;
-    if (smartScanEnabled && lastSnapRef.current && currentSnap !== lastSnapRef.current && checkIsInDeadZone()) {
-      lastSnapRef.current = currentSnap;
-      if (scanTimerRef.current) {
-        clearInterval(scanTimerRef.current);
-      }
-      runAutoScanRef.current?.();
-      scanTimerRef.current = setInterval(() => {
-        runAutoScanRef.current?.();
-      }, scanInterval * 1000);
+    
+    if (smartScanEnabled && lastSnapRef.current && currentSnap !== lastSnapRef.current) {
+      checkIsInDeadZone().then((isDeadZone) => {
+        if (isDeadZone) {
+          lastSnapRef.current = currentSnap;
+          if (scanTimerRef.current) {
+            clearInterval(scanTimerRef.current);
+          }
+          runAutoScanRef.current?.();
+          scanTimerRef.current = setInterval(() => {
+            runAutoScanRef.current?.();
+          }, scanInterval * 1000);
+        }
+      });
     }
   }, [connected, isScanning, observerPosition, scanInterval, smartScanEnabled, checkIsInDeadZone]);
 

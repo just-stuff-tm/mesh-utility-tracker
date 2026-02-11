@@ -6,7 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/lib/i18n";
-import { fetchRawScans, extractNodes, convertToScanResults, type MeshNode, type ScanResult } from "@/lib/scan-aggregator";
+import { fetchRawScans, extractNodes, convertToScanResults, type MeshNode, type ScanResult, type RawScan } from "@/lib/scan-aggregator";
+import { db, type LocalScanResult } from "@/lib/offline-store";
+import { useOfflineStatus } from "@/lib/use-offline";
+import { snapToHexGrid } from "@shared/grid";
+import { useLocation } from "wouter";
 
 function getSignalColor(rssi: number): string {
   if (rssi >= -60) return "text-green-500";
@@ -18,6 +22,8 @@ function getSignalColor(rssi: number): string {
 
 export default function NodesPage() {
   const { t } = useI18n();
+  const [, navigate] = useLocation();
+  const { online, forceOffline } = useOfflineStatus();
 
   const getTimeSince = (date: Date | string | null): string => {
     if (!date) return t("time.unknown");
@@ -33,8 +39,31 @@ export default function NodesPage() {
   const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
 
   const { data: rawScans = [], isLoading: rawLoading } = useQuery({
-    queryKey: ["raw-scans", workerUrl],
-    queryFn: () => fetchRawScans(workerUrl),
+    queryKey: ["raw-scans", workerUrl, online, forceOffline],
+    queryFn: async (): Promise<RawScan[]> => {
+      const localScans = await db.scanResults.toArray();
+      const localRawScans: RawScan[] = localScans.map((scan: LocalScanResult) => ({
+        observerId: scan.observerId,
+        nodeId: scan.nodeId,
+        latitude: scan.latitude,
+        longitude: scan.longitude,
+        rssi: scan.rssi,
+        snr: scan.snr,
+        snrIn: scan.snrIn ?? undefined,
+        altitude: scan.altitude ?? undefined,
+        timestamp: scan.timestamp ?? undefined,
+        senderName: scan.senderName ?? undefined,
+        receiverName: scan.receiverName ?? undefined,
+        radioId: scan.radioId ?? undefined,
+      }));
+
+      try {
+        const workerScans = await fetchRawScans(workerUrl);
+        return [...workerScans, ...localRawScans];
+      } catch (err) {
+        return localRawScans;
+      }
+    },
     refetchInterval: 30000,
   });
 
