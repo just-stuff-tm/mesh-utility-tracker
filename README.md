@@ -2,7 +2,7 @@
 
 Progressive Web App for LoRa Meshcore network coverage mapping with cloud data collection.
 
-**Live App:** https://af7b37de.mesh-utility-tracker.pages.dev/ (Cloudflare Pages) https://mesh-utility.com coming soon!
+**Live App:** https://mesh-utility-tracker.pages.dev/ (Cloudflare Pages) https://mesh-utility.com coming soon!
 
 ## Features
 
@@ -96,7 +96,7 @@ MIT - See [LICENSE](LICENSE) file for details
 
 - 🐛 **Bug Reports:** [GitHub Issues](https://github.com/just-stuff-tm/mesh-utility-tracker/issues)
 - 💡 **Feature Requests:** [GitHub Issues](https://github.com/just-stuff-tm/mesh-utility-tracker/issues)
-- 🗑️ **Data Deletion:** [Settings Page](https://243f5d20.mesh-utility-tracker.pages.dev/settings) or [GitHub Issue](https://github.com/just-stuff-tm/mesh-data/issues/new?labels=data-deletion)
+- 🗑️ **Data Deletion:** [Settings Page](https://mesh-utility-tracker.pages.dev/settings) or [GitHub Issue](https://github.com/just-stuff-tm/mesh-data/issues/new?labels=data-deletion)
 
 ## Acknowledgments
 
