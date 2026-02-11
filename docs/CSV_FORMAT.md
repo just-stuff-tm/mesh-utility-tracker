@@ -17,7 +17,7 @@ The mesh-data repository stores scans in **CSV format** (plus JSON) to enable ea
 | `nodeId` | String | Detected node's ID | `!def45678` | 9 characters |
 | `rssi` | Integer | Signal strength in dBm | `-85` | Range: -120 to -30 |
 | `snr` | Float | Signal-to-noise ratio in dB | `8.5` | Optional |
-| `hopLimit` | Integer | Mesh hops from source | `3` or `0` | 0 = direct/zero-hop |
+| `hopLimit` | Integer | Mesh hops from source | `0` | Always 0 (tool only scans direct connections) |
 
 ## Example CSV Data
 
@@ -28,17 +28,18 @@ radioId,timestamp,datetime_utc,latitude,longitude,altitude,nodeId,rssi,snr,hopLi
 !xyz98765,1705334520000,2024-01-15T10:02:00.000Z,37.780000,-122.420000,45.5,!def45678,-78,12.3,3
 ```
 
-## Zero-Hop Scans
+## Zero-Hop Scans Only
 
-**What is a zero-hop scan?**
+**This tool only performs zero-hop (direct) scans:**
 - Direct Bluetooth connection (no mesh routing)
-- Node is within direct radio range
-- `hopLimit` field is `0`
+- Only nodes within direct radio range are detected
+- `hopLimit` field is always `0`
 
-**Why zero-hop?**
-- Most reliable signal measurements
-- Indicates proximity to node
-- No multi-hop degradation
+**Why zero-hop only?**
+- Most reliable signal measurements for coverage mapping
+- Accurate proximity detection
+- No multi-hop signal degradation
+- Direct connection quality data
 
 **Example:**
 ```csv

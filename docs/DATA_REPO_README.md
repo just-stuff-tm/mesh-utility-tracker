@@ -87,7 +87,7 @@ Each batch file contains an array of scan records:
   - `nodeId`: Unique identifier of detected node
   - `rssi`: Received Signal Strength Indicator (dBm)
   - `snr`: Signal-to-Noise Ratio (dB)
-  - `hopLimit`: Remaining hops in packet (optional)
+  - `hopLimit`: Always 0 (tool only scans direct connections)
 
 ## Data Privacy
 
