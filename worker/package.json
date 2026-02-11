@@ -11,7 +11,7 @@
     "db:query": "wrangler d1 execute mesh-utility-db --command",
     "secret:github": "wrangler secret put GITHUB_TOKEN"
   },
-  "keywords": ["cloudflare", "worker", "meshtastic", "github"],
+  "keywords": ["cloudflare", "worker", "meshcore", "github"],
   "author": "",
   "license": "MIT",
   "devDependencies": {

@@ -1,6 +1,6 @@
 # mesh-data
 
-Public dataset of Meshtastic network scans collected via [mesh-utility-tracker](https://github.com/just-stuff-tm/mesh-utility-tracker).
+Public dataset of MeshCore network scans collected via [mesh-utility-tracker](https://github.com/just-stuff-tm/mesh-utility-tracker).
 
 ## Data Structure
 
@@ -77,7 +77,7 @@ Each batch file contains an array of scan records:
 
 ### Field Descriptions
 
-- **radioId**: Unique identifier for the scanning device (Meshtastic node ID)
+- **radioId**: Unique identifier for the scanning device (MeshCore node ID)
 - **timestamp**: Unix timestamp in milliseconds (UTC)
 - **location**: GPS coordinates of the scan
   - `lat`: Latitude in decimal degrees
@@ -259,8 +259,8 @@ You are free to:
 Data is automatically collected from mesh-utility-tracker users who opt-in to sharing.
 
 To contribute scans:
-1. Install [mesh-utility-tracker](https://just-stuff-tm.github.io/mesh-utility-tracker/)
-2. Connect your Meshtastic device
+1. Install [mesh-utility-tracker](https://243f5d20.mesh-utility-tracker.pages.dev/)
+2. Connect your MeshCore device
 3. Enable "Share scan data" in Settings
 4. Scans are automatically uploaded to this repository
 

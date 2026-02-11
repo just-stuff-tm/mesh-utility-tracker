@@ -56,8 +56,6 @@ export interface ScanResult {
   radioId: string | null;
 }
 
-const DEAD_ZONE_THRESHOLD = -100; // RSSI below this = dead zone
-
 /**
  * Aggregates raw scans into hexagonal coverage zones.
  * Uses "best signal wins" approach - keeps the strongest RSSI and SNR for each zone.
@@ -83,6 +81,10 @@ export function aggregateScansToZones(scans: RawScan[]): CoverageZone[] {
       cellScans[0].longitude
     );
 
+    // Check if any scans in this hex found actual nodes
+    const scansWithNodes = cellScans.filter((s: RawScan) => s.nodeId != null && s.nodeId !== "");
+    const isDeadZone = scansWithNodes.length === 0;
+
     // Find the best (strongest/least negative) RSSI
     const bestRssi = Math.max(...cellScans.map((s: RawScan) => s.rssi));
 
@@ -101,8 +103,6 @@ export function aggregateScansToZones(scans: RawScan[]): CoverageZone[] {
       timestamps.length > 0
         ? new Date(Math.max(...timestamps.map((d: Date) => d.getTime())))
         : new Date();
-
-    const isDeadZone = bestRssi < DEAD_ZONE_THRESHOLD;
 
     zones.push({
       id: key,

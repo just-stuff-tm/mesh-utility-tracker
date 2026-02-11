@@ -2,12 +2,13 @@
 
 Progressive Web App for Bluetooth mesh network coverage mapping with cloud data collection.
 
-**Live App:** https://just-stuff-tm.github.io/mesh-utility-tracker/
+**Live App:** https://243f5d20.mesh-utility-tracker.pages.dev/ (Cloudflare Pages)  
+**Backup:** https://just-stuff-tm.github.io/mesh-utility-tracker/ (GitHub Pages)
 
 ## Features
 
 - 🗺️ **Real-time Coverage Mapping** - Visualize mesh network coverage on interactive maps
-- 📡 **Bluetooth Integration** - Connect directly to Meshtastic devices via Web Bluetooth
+- 📡 **Bluetooth Integration** - Connect directly to MeshCore devices via Web Bluetooth
 - 📊 **Node Discovery** - Track and analyze detected mesh nodes
 - 💾 **Offline Support** - Full PWA with offline capabilities
 - ☁️ **Cloud Backup** - Optional scan data upload to public GitHub repository
@@ -24,23 +25,25 @@ npm run build   # Build for production
 npm run preview # Preview production build
 ```
 
-GitHub Actions automatically deploys to Pages on push to `mesh-utility` branch.
+### Full Stack Deployment
 
-### With Backend (Data Collection)
+To deploy the complete application:
 
-To enable cloud data collection and storage:
+1. **Deploy to Cloudflare Pages** - See [docs/CLOUDFLARE_PAGES.md](docs/CLOUDFLARE_PAGES.md) **(Recommended)**
+2. **Deploy Cloudflare Worker** - See [docs/WORKER_SETUP.md](docs/WORKER_SETUP.md)
+3. **Create Data Repository** - Follow [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)
 
-1. **Deploy Cloudflare Worker** - See [WORKER_SETUP.md](WORKER_SETUP.md)
-2. **Create Data Repository** - Follow [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)
-3. **Configure Environment** - Set `VITE_WORKER_URL` in `.env.production`
+Alternatively, GitHub Actions auto-deploys to GitHub Pages on push to `mesh-utility` branch.
 
 ## Documentation
 
-- 📚 [Architecture Overview](ARCHITECTURE.md) - System design and data flow
-- 🚀 [Worker Setup Guide](WORKER_SETUP.md) - Complete deployment instructions
-- ✅ [Deployment Checklist](DEPLOYMENT_CHECKLIST.md) - Step-by-step deployment
-- � [CSV Format Reference](CSV_FORMAT.md) - Data structure and filtering examples
-- �📖 [Development Guide](DEVELOPMENT.md) - Local development setup
+📁 **[docs/](docs/)** - All documentation files
+
+- 📚 [Architecture Overview](docs/ARCHITECTURE.md) - System design and data flow
+- ⚡ [Cloudflare Pages Deployment](docs/CLOUDFLARE_PAGES.md) - **Recommended hosting** (5 min setup)
+- 🚀 [Worker Setup Guide](docs/WORKER_SETUP.md) - Backend deployment instructions
+- ✅ [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md) - Step-by-step backend setup
+- 📊 [CSV Format Reference](docs/CSV_FORMAT.md) - Data structure and filtering examples
 - 📦 [Worker README](worker/README.md) - Cloudflare Worker API documentation
 
 ## Technology Stack
@@ -99,7 +102,7 @@ Client (PWA)
 - `scans/2024-01-15/batch-1705334400000.json`
 - `deletions/2024-01-15/!abcd1234.json`
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed explanation.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed explanation.
 
 ## Privacy & Data
 
@@ -149,21 +152,37 @@ npm run preview
 
 The app requires:
 - HTTPS or localhost (for Web Bluetooth)
-- Meshtastic device with Bluetooth enabled
+- MeshCore device with Bluetooth enabled
 - Modern browser (Chrome/Edge recommended)
 
 ## Deployment
 
-### GitHub Pages (Frontend)
+### Cloudflare Pages (Recommended)
+
+**5-minute deployment** with optimal performance:
+```bash
+npm run deploy:pages
+```
+
+See [docs/CLOUDFLARE_PAGES.md](docs/CLOUDFLARE_PAGES.md) for complete guide.
+
+**Benefits:**
+- ✅ Co-located with Worker (lower latency)
+- ✅ 300+ global CDN locations
+- ✅ Simpler CORS setup
+- ✅ Free SSL + custom domains
+- ✅ Still 100% free
+
+### GitHub Pages (Alternative)
 
 Automatic deployment via GitHub Actions:
 1. Push to `mesh-utility` branch
 2. Actions builds and deploys to `gh-pages` branch
 3. Available at: https://just-stuff-tm.github.io/mesh-utility-tracker/
 
-### Cloudflare Workers (Backend)
+### Cloudflare Worker (Backend)
 
-See [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) for complete guide:
+See [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md) for complete guide:
 1. Create D1 database
 2. Create GitHub data repository
 3. Generate GitHub token
@@ -195,7 +214,7 @@ Contributions welcome! Please:
 - Unregister service worker in DevTools
 - Clear browser cache
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for more troubleshooting.
+For more troubleshooting and known fixes, see [docs/CLOUDFLARE_PAGES.md](docs/CLOUDFLARE_PAGES.md#known-fixes--solutions-reference).
 
 ## License
 
@@ -205,11 +224,11 @@ MIT - See [LICENSE](LICENSE) file for details
 
 - 🐛 **Bug Reports:** [GitHub Issues](https://github.com/just-stuff-tm/mesh-utility-tracker/issues)
 - 💡 **Feature Requests:** [GitHub Issues](https://github.com/just-stuff-tm/mesh-utility-tracker/issues)
-- 🗑️ **Data Deletion:** [Settings Page](https://just-stuff-tm.github.io/mesh-utility-tracker/settings) or [GitHub Issue](https://github.com/just-stuff-tm/mesh-utility-tracker/issues/new?labels=data-deletion)
+- 🗑️ **Data Deletion:** [Settings Page](https://243f5d20.mesh-utility-tracker.pages.dev/settings) or [GitHub Issue](https://github.com/just-stuff-tm/mesh-utility-tracker/issues/new?labels=data-deletion)
 
 ## Acknowledgments
 
-- Meshtastic project for the mesh protocol
+- MeshCore protocol for the mesh networking
 - shadcn for the beautiful UI components
 - Cloudflare for free edge computing
 - GitHub for free static hosting and data storage

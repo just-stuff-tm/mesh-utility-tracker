@@ -4,7 +4,8 @@ import path from "path";
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: mode === "production" ? "/mesh-utility-tracker/" : "/",
+  // Use root path for Cloudflare Pages, subpath for GitHub Pages
+  base: mode === "github" ? "/mesh-utility-tracker/" : "/",
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),

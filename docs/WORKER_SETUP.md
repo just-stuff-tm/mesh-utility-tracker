@@ -80,7 +80,7 @@ curl http://127.0.0.1:8787/health
 
 1. Go to https://github.com/new
 2. Repository name: `mesh-data`
-3. Description: "Public Meshtastic scan data"
+3. Description: "Public MeshCore scan data"
 4. **Public** visibility
 5. Create repository
 
@@ -199,7 +199,7 @@ npm run preview
 
 2. Open browser to `http://localhost:4173/mesh-utility-tracker/`
 
-3. Connect Meshtastic device
+3. Connect MeshCore device
 
 4. Go to Settings → Enable data sharing
 
@@ -352,7 +352,7 @@ npx wrangler tail
 
 ## Support
 
-- Worker issues: Check [worker/README.md](worker/README.md)
+- Worker issues: Check [worker/README.md](../worker/README.md)
 - Frontend issues: Check main repository issues
 - Data deletion: GitHub issue with `data-deletion` label
 

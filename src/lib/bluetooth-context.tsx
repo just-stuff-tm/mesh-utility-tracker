@@ -349,14 +349,31 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
             radioId,
           };
 
-          // Queue scan for batch upload instead of immediate upload
+          // Queue scan for batch upload to worker/GitHub
+          // NOTE: Only successful scans (with discovered nodes) are uploaded
+          // Dead zones are stored locally only and never synced to cloud
           try {
             const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
-            console.log('[Bluetooth] Queuing scan for batch upload:', scanData);
+            const workerPayload = [{
+              radioId: radioId || "local-observer",
+              timestamp: Date.now(),
+              location: {
+                lat: pos[0],
+                lon: pos[1],
+                altitude: altitudeRef.current || undefined,
+              },
+              nodes: [{
+                nodeId,
+                rssi: rep.stats.rssi,
+                snr: rep.stats.snr,
+                hopLimit: undefined,
+              }],
+            }];
+            console.log('[Bluetooth] Queuing scan for batch upload:', workerPayload);
             await enqueueMutation({
-              url: workerUrl,
+              url: `${workerUrl}/scans`,
               method: "POST",
-              payload: scanData,
+              payload: workerPayload,
               createdAt: Date.now(),
               retries: 0,
             });
@@ -380,7 +397,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
               const existing = await db.coverageZones
                 .filter((z) => Math.abs(z.centerLat - snapLat) < 0.0001 && Math.abs(z.centerLng - snapLng) < 0.0001)
                 .first();
+              
               if (existing) {
+                // Update existing zone with successful scan
+                // This automatically converts dead zones to active zones
                 const newCount = (existing.scanCount || 0) + 1;
                 const newAvgRssi = ((existing.avgRssi || 0) * (existing.scanCount || 0) + rep.stats.rssi) / newCount;
                 const newAvgSnr = ((existing.avgSnr || 0) * (existing.scanCount || 0) + rep.stats.snr) / newCount;
@@ -389,7 +409,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
                   avgRssi: newAvgRssi,
                   avgSnr: newAvgSnr,
                   scanCount: newCount,
-                  isDeadZone: false,
+                  isDeadZone: false, // Clear dead zone flag on successful scan
                   lastScanned: new Date().toISOString(),
                 });
               } else {
@@ -421,7 +441,12 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
               const existing = await db.coverageZones
                 .filter((z) => Math.abs(z.centerLat - snapLat) < 0.0001 && Math.abs(z.centerLng - snapLng) < 0.0001)
                 .first();
-              if (!existing || (existing.scanCount === 0 || existing.isDeadZone)) {
+              
+              // Only mark as dead zone if:
+              // 1. No existing zone, OR
+              // 2. Existing zone is already a dead zone
+              // Never overwrite successful scan zones
+              if (!existing || existing.isDeadZone) {
                 await db.coverageZones.put({
                   id: existing?.id || generateLocalId(),
                   centerLat: snapLat,
@@ -682,8 +707,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       const count = await getOutboxCount();
       setQueuedScansCount(count);
       
-      // Upload if interval has passed and we have queued scans
-      if (count > 0 && now - lastUploadTime >= intervalMs) {
+      // Upload if interval has passed, we have queued scans, and we're online
+      if (count > 0 && now - lastUploadTime >= intervalMs && isOnline()) {
         console.log(`[Bluetooth] Auto-uploading ${count} queued scans`);
         try {
           const result = await drainOutbox();
@@ -708,6 +733,9 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const manualSync = useCallback(async () => {
+    if (!isOnline()) {
+      throw new Error("Cannot sync while offline");
+    }
     const now = Date.now();
     if (now - lastUploadTime < 5 * 60 * 1000) {
       throw new Error("Please wait 5 minutes between syncs");

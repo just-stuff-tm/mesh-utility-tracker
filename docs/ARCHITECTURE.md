@@ -105,6 +105,25 @@ The mesh utility tracker now includes a complete data pipeline for collecting, b
 }
 ```
 
+**Important:** Only successful scans (with discovered nodes) are uploaded. Dead zones (failed scans with no nodes found) are stored locally in IndexedDB only and never synchronized to the cloud.
+
+### 1a. Dead Zone Handling (Local Only)
+
+**Dead zones are device-local only:**
+- Scans that find no nodes are marked as dead zones
+- Stored in browser IndexedDB, never uploaded to worker
+- Never appear in D1 database or GitHub repository
+- Useful for field mapping but not relevant for public mesh data
+
+**Protection Rules:**
+1. Dead zones never overwrite successful scan zones
+2. Successful scans in dead zone areas automatically clear the dead zone flag
+3. Dead zones are excluded from sync/upload operations
+
+**Code Location:** `src/lib/bluetooth-context.tsx` lines 435-458
+
+**Why:** Dead zones are device-specific, temporary, and would pollute public mesh data with non-data.
+
 ### 2. Batching (Durable Object)
 
 **Strategy:** Whichever comes first
@@ -300,6 +319,8 @@ Health check
 - Only mesh network metadata collected
 - No personal information stored
 - GPS coordinates are user-provided
+- **Dead zones stored locally only** - Never uploaded to cloud
+- Only successful scans (with node discoveries) are shared publicly
 
 ### Right to Deletion
 - Self-service deletion via Settings
@@ -310,6 +331,14 @@ Health check
 - All data public by default
 - Open-source implementation
 - GitHub provides audit trail
+
+### Local-Only Data
+The following data is stored in browser IndexedDB and never synchronized:
+- **Dead zones** - Areas where no nodes were discovered
+- **Failed scan attempts** - Scans that timeout or error
+- **Cached coverage zones** - Temporary aggregated view
+
+This ensures device-specific or incomplete data doesn't pollute the public mesh dataset.
 
 ## Monitoring
 

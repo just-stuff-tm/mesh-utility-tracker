@@ -65,7 +65,7 @@ export function generateDataReadme(summaries: ScanSummary[]): string {
   
   return `# Mesh Data - Searchable CSV Dataset
 
-Public dataset of Meshtastic network scans collected via [mesh-utility-tracker](https://github.com/just-stuff-tm/mesh-utility-tracker).
+Public dataset of MeshCore network scans collected via [mesh-utility-tracker](https://github.com/just-stuff-tm/mesh-utility-tracker).
 
 ## Quick Stats
 
@@ -226,7 +226,7 @@ hourly = all_data.groupby('hour').size()
 ## Privacy & Deletion
 
 - All data is public and anonymized
-- Radio IDs are Meshtastic public node identifiers
+- Radio IDs are MeshCore public node identifiers
 - Users can request deletion via [deletion form](https://github.com/just-stuff-tm/mesh-utility-tracker/issues/new?labels=data-deletion)
 - Deletions are processed within 24 hours
 - Deletion records stored in \`deletions/\` folder
@@ -241,8 +241,8 @@ hourly = all_data.groupby('hour').size()
 Data is automatically collected from mesh-utility-tracker users who opt-in.
 
 To contribute:
-1. Visit [mesh-utility-tracker](https://just-stuff-tm.github.io/mesh-utility-tracker/)
-2. Connect your Meshtastic device
+1. Visit [mesh-utility-tracker](https://243f5d20.mesh-utility-tracker.pages.dev/)
+2. Connect your MeshCore device
 3. Enable "Share scan data" in Settings
 4. Scans upload automatically
 

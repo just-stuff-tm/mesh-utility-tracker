@@ -8,7 +8,7 @@ The mesh-data repository stores scans in **CSV format** (plus JSON) to enable ea
 
 | Column | Type | Description | Example | Notes |
 |--------|------|-------------|---------|-------|
-| `radioId` | String | Scanner's Meshtastic node ID | `!abcd1234` | 9 characters, starts with `!` |
+| `radioId` | String | Scanner's MeshCore node ID | `!abcd1234` | 9 characters, starts with `!` |
 | `timestamp` | Integer | Unix timestamp in milliseconds | `1705334400000` | UTC timezone |
 | `datetime_utc` | String | ISO 8601 timestamp | `2024-01-15T10:00:00.000Z` | Human-readable |
 | `latitude` | Float | Latitude in decimal degrees | `37.774900` | 6 decimal places |

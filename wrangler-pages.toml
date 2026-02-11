@@ -1,0 +1,14 @@
+# Cloudflare Pages Configuration for mesh-utility-tracker
+# Deploy with: wrangler pages deploy dist --config wrangler-pages.toml
+
+name = "mesh-utility-tracker"
+compatibility_date = "2024-10-01"
+
+# Production deployment
+pages_build_output_dir = "dist"
+
+# Redirects to handle SPA routing
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200

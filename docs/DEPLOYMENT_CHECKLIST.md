@@ -123,8 +123,8 @@ Use this checklist to deploy the mesh-utility-worker from scratch.
 
 ## Part 8: End-to-End Testing (15 minutes)
 
-- [ ] Open app: `https://just-stuff-tm.github.io/mesh-utility-tracker/`
-- [ ] Connect Meshtastic device via Bluetooth
+- [ ] Open app: `https://243f5d20.mesh-utility-tracker.pages.dev/`
+- [ ] Connect MeshCore device via Bluetooth
 - [ ] Navigate to Settings
 - [ ] Check "Enable data sharing" (if implemented)
 - [ ] Navigate to Map page

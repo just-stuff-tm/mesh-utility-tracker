@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Timer, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned, Radio, Wrench, Globe } from "lucide-react";
+import { Settings, Timer, AlertTriangle, Trash2, Radar, Ruler, Wifi, WifiOff, Download, RefreshCw, MapPinned, Radio, Globe } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -89,24 +89,6 @@ export function SettingsPanel() {
     const radioId = publicKeyHex(selfInfo.publicKey);
     deleteDataMutation.mutate(radioId);
   };
-
-  const resetSyncMutation = useMutation({
-    mutationFn: async () => {
-      // Reset sync by clearing local outbox
-      await db.outbox.clear();
-      return { success: true };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toast({
-        title: t("toast.syncFixed"),
-        description: t("toast.syncFixedDesc"),
-      });
-    },
-    onError: () => {
-      toast({ title: t("toast.cannotReachServer"), description: t("toast.serverDown"), variant: "destructive" });
-    },
-  });
 
   const markDeadZoneMutation = useMutation({
     mutationFn: async (data: { centerLat: number; centerLng: number }) => {
@@ -460,43 +442,6 @@ export function SettingsPanel() {
         <Separator />
 
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs">Upload Interval: {uploadBatchInterval} min</Label>
-          </div>
-          <Slider
-            value={[uploadBatchInterval]}
-            onValueChange={([v]) => setUploadBatchInterval(v)}
-            min={5}
-            max={60}
-            step={5}
-            data-testid="slider-upload-interval"
-          />
-          <p className="text-xs text-muted-foreground">
-            {queuedScansCount} scans queued • Next upload in {Math.max(0, Math.ceil((uploadBatchInterval * 60 * 1000 - (Date.now() - lastUploadTime)) / 60000))} min
-          </p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={async () => {
-              try {
-                await manualSync();
-                toast({ title: "Scans uploaded successfully" });
-              } catch (err: any) {
-                toast({ title: err.message || "Sync failed", variant: "destructive" });
-              }
-            }}
-            disabled={queuedScansCount === 0}
-            className="w-full"
-          >
-            <RefreshCw className="h-3.5 w-3.5 mr-2" />
-            Sync Now ({queuedScansCount})
-          </Button>
-        </div>
-
-        <Separator />
-
-        <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               {online ? (
@@ -553,20 +498,43 @@ export function SettingsPanel() {
               )}
             </div>
           )}
-          {!forceOffline && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => resetSyncMutation.mutate()}
-              disabled={resetSyncMutation.isPending}
-              className="w-full"
-              data-testid="button-fix-sync"
-              data-no-close
-            >
-              <Wrench className={`h-3 w-3 mr-1 ${resetSyncMutation.isPending ? "animate-spin" : ""}`} />
-              {resetSyncMutation.isPending ? t("settings.fixing") : t("settings.fixSyncIssues")}
-            </Button>
-          )}
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs">Upload Interval: {uploadBatchInterval} min</Label>
+          </div>
+          <Slider
+            value={[uploadBatchInterval]}
+            onValueChange={([v]) => setUploadBatchInterval(v)}
+            min={5}
+            max={60}
+            step={5}
+            data-testid="slider-upload-interval"
+          />
+          <p className="text-xs text-muted-foreground">
+            {queuedScansCount} scans queued • Next upload in {Math.max(0, Math.ceil((uploadBatchInterval * 60 * 1000 - (Date.now() - lastUploadTime)) / 60000))} min
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              try {
+                await manualSync();
+                toast({ title: "Scans uploaded successfully" });
+              } catch (err: any) {
+                toast({ title: err.message || "Sync failed", variant: "destructive" });
+              }
+            }}
+            disabled={queuedScansCount === 0 || !online}
+            className="w-full"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-2" />
+            Sync Now ({queuedScansCount})
+          </Button>
         </div>
 
         <Separator />
