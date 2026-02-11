@@ -54,16 +54,6 @@ mesh-utility-tracker/tree/mesh-utility/
     └── schema.ts           # Data validation
 ```
 
-## Data Pipeline
-
-```
-Client (PWA) 
-  → Cloudflare Worker 
-    → Durable Object (batching)
-      → D1 Database (temp storage)
-      → GitHub Repository (permanent storage)
-```
-
 **Batching Strategy:** 20 scans OR 5 minutes (whichever first)
 
 **Data Format:** JSON files organized by date:
