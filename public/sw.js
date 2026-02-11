@@ -5,7 +5,8 @@ const API_CACHE = "api-cache-v2";
 
 let tileCachingEnabled = true;
 
-const BASE_PATH = "/mesh-utility-tracker/";
+// Detect base path from where the SW is hosted
+const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '') + '/';
 
 const APP_SHELL_URLS = [
   BASE_PATH,
@@ -14,7 +15,13 @@ const APP_SHELL_URLS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_URLS))
+    caches.open(CACHE_NAME).then((cache) => 
+      cache.addAll(APP_SHELL_URLS).catch((err) => {
+        console.warn('[SW] Failed to cache app shell:', err);
+        // Don't fail installation if caching fails
+        return Promise.resolve();
+      })
+    )
   );
   self.skipWaiting();
 });
