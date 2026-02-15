@@ -1,139 +1,66 @@
 # Mesh Utility Worker
 
-Cloudflare Worker that handles mesh scan data ingestion and commits batched data to GitHub.
+Cloudflare Worker for ingesting scan data, batching writes, and committing scan files to GitHub.
 
-## Features
-
-- **Data Ingestion**: Accepts scan data from mesh utility clients
-- **Batching**: Groups scans before committing (20 scans or 5 minutes)
-- **GitHub Integration**: Commits scan data to separate data repository
-- **CORS Support**: Configured for GitHub Pages and localhost
-- **D1 Storage**: Temporary storage with automatic cleanup
-- **Durable Objects**: Reliable batch processing
+## What It Does
+- Accepts scan batches from the client (`POST /scans`)
+- Stores scans in D1 immediately
+- Batches commits to GitHub (20 scans or 5 minutes)
+- Serves scan history (`/history`, `/history/:day.ndjson`)
+- Supports radio data deletion endpoint (`DELETE /delete/:radioId`)
 
 ## Setup
 
-### 1. Install Dependencies
+### 1. Install and authenticate
 
 ```bash
 cd worker
 npm install
+npx wrangler login
 ```
 
-### 2. Create D1 Database
+### 2. Create and initialize D1
 
 ```bash
 npm run db:create
-```
-
-Copy the `database_id` from the output and update it in `wrangler.toml`:
-
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "mesh-utility-db"
-database_id = "your-database-id-here"
-```
-
-### 3. Initialize Database Schema
-
-```bash
 npm run db:init
 ```
 
-### 4. Create GitHub Token
+Update `wrangler.toml` with the returned `database_id`.
 
-1. Go to https://github.com/settings/tokens?type=beta
-2. Click "Generate new token" (Fine-grained token)
-3. Set repository access to `just-stuff-tm/mesh-data`
-4. Grant permissions:
-   - **Contents**: Read and Write
-   - **Metadata**: Read-only (automatic)
-5. Generate token and copy it
+### 3. Configure GitHub token
 
-### 5. Set GitHub Token Secret
+Create a fine-grained token with repository `contents:write`, then:
 
 ```bash
 npm run secret:github
-# Paste your token when prompted
 ```
 
-### 6. Create Data Repository
+### 4. Configure worker vars
 
-Create a new repository at `just-stuff-tm/mesh-data` with:
+In `wrangler.toml`:
 
-```
-mesh-data/
-├── scans/
-│   ├── 2024-01-15/
-│   │   ├── batch-1705334400000.csv   ⭐ Searchable in GitHub
-│   │   ├── batch-1705334400000.json
-│   │   ├── batch-1705338000000.csv
-│   │   └── batch-1705338000000.json
-│   └── 2024-01-16/
-│       ├── batch-1705420800000.csv
-│       └── batch-1705420800000.json
-├── deletions/
-│   └── 2024-01-15/
-│       └── !abcd1234.json
-└── README.md
+```toml
+[vars]
+GITHUB_REPO = "owner/mesh-data"
+GITHUB_BRANCH = "main"
+ALLOWED_ORIGINS = "https://mesh-utility-tracker.pages.dev,http://localhost:5173"
 ```
 
-**CSV Format:** Each CSV file contains these columns:
-- `radioId,timestamp,datetime_utc,latitude,longitude,altitude,nodeId,rssi,snr,hopLimit`
-
-CSV files enable:
-- GitHub's built-in table viewer and search
-- Easy filtering by radio ID, signal strength, location
-- Command-line processing (grep/awk/cut)
-- Direct import to spreadsheets
-
-## Development
-
-### Local Development
+### 5. Run locally or deploy
 
 ```bash
 npm run dev
-```
-
-Worker will be available at `http://127.0.0.1:8787`
-
-### Deploy to Production
-
-```bash
 npm run deploy
 ```
 
-## API Endpoints
+## API
 
-### POST /scans
+### `POST /scans`
+Accepts an array of scan payloads.
 
-Upload scan data. Accepts array of scan payloads.
+Response example:
 
-**Request Body:**
-```json
-[
-  {
-    "radioId": "!abcd1234",
-    "timestamp": 1705334400000,
-    "location": {
-      "lat": 37.7749,
-      "lon": -122.4194,
-      "altitude": 50
-    },
-    "nodes": [
-      {
-        "nodeId": "!def45678",
-        "rssi": -85,
-        "snr": 8.5,
-        "hopLimit": 3
-      }
-    ]
-  }
-]
-```
-
-**Response:**
 ```json
 {
   "success": true,
@@ -142,106 +69,48 @@ Upload scan data. Accepts array of scan payloads.
 }
 ```
 
-### GET /history?radioId=!abcd1234
+### `GET /history`
+Returns available scan days.
 
-Retrieve scan history for a radio.
+Example response:
 
-**Response:**
 ```json
-[
-  {
-    "id": 1,
-    "radioId": "!abcd1234",
-    "timestamp": 1705334400000,
-    "latitude": 37.7749,
-    "longitude": -122.4194,
-    "nodes": "[{...}]",
-    "committed": 1
-  }
-]
+["2026-02-15", "2026-02-14"]
 ```
 
-### DELETE /delete/:radioId
+### `GET /history/:day.ndjson`
+Returns newline-delimited scan rows for a day (`YYYY-MM-DD`).
 
-Delete all data for a specific radio ID.
+### `DELETE /delete/:radioId`
+Deletes scans for a radio in D1 and writes a deletion record to GitHub.
 
-**Response:**
-```json
-{
-  "success": true
-}
-```
+### `GET /health`
+Health check.
 
-### GET /health
+## Batching Behavior
+- Batch size trigger: 20 scans
+- Time trigger: 5 minutes
+- Commit output: JSON and CSV files under `scans/YYYY-MM-DD/`
 
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "status": "ok"
-}
-```
-
-## Batching Logic
-
-- **Batch Size**: 20 scans (configurable in `batch.ts`)
-- **Batch Timeout**: 5 minutes (configurable in `batch.ts`)
-- **Commit Strategy**: Whichever comes first
-
-Scans are grouped by date in the GitHub repository:
-- `scans/YYYY-MM-DD/batch-<timestamp>.json`
-
-## Database Queries
-
-Query the D1 database:
+## Useful Commands
 
 ```bash
-# View pending scans
+# pending scans
 wrangler d1 execute mesh-utility-db --command "SELECT COUNT(*) FROM scans WHERE committed = 0"
 
-# View commit history
+# recent commits table rows
 wrangler d1 execute mesh-utility-db --command "SELECT * FROM commits ORDER BY committedAt DESC LIMIT 10"
-
-# Delete test data
-wrangler d1 execute mesh-utility-db --command "DELETE FROM scans WHERE radioId = '!test1234'"
 ```
-
-## Troubleshooting
-
-### "Invalid binding" error
-- Ensure `database_id` is set in `wrangler.toml`
-- Run `npm run db:create` to create the database
-
-### GitHub API rate limits
-- Fine-grained tokens have higher limits
-- Batch commits reduce API calls significantly
-
-### CORS errors
-- Update `ALLOWED_ORIGINS` in `wrangler.toml`
-- Redeploy worker after changes
 
 ## Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `GITHUB_TOKEN` | GitHub fine-grained token (secret) | `ghp_xxxx` |
-| `GITHUB_REPO` | Target repository | `just-stuff-tm/mesh-data` |
-| `GITHUB_BRANCH` | Target branch | `main` |
-| `ALLOWED_ORIGINS` | CORS origins (comma-separated) | `https://example.com` |
-
-## Architecture
-
-```
-Client --> Worker (POST /scans) --> Durable Object (Batcher)
-                                         |
-                                         v
-                                    D1 Database (temp storage)
-                                         |
-                                         v (batch ready)
-                                    GitHub API (batch commit)
-```
+| Variable | Description |
+|---|---|
+| `GITHUB_TOKEN` | GitHub fine-grained token (secret) |
+| `GITHUB_REPO` | Target repository (`owner/repo`) |
+| `GITHUB_BRANCH` | Target branch |
+| `ALLOWED_ORIGINS` | Comma-separated allowed origins |
 
 ## License
-
 MIT
+

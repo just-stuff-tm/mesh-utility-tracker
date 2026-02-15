@@ -218,7 +218,7 @@ hourly = all_data.groupby('hour').size()
 
 ## Data Quality Notes
 
-- **Zero-hop only:** All scans have `hopLimit = 0` (this tool only performs direct connection scans, no mesh routing)
+- **Zero-hop only:** All scans have \`hopLimit = 0\` (this tool only performs direct connection scans, no mesh routing)
 - **Missing altitude:** Not all scans include altitude data
 - **Duplicate detection:** Scanner may report same node multiple times per location
 - **Timestamp precision:** Millisecond precision, UTC timezone

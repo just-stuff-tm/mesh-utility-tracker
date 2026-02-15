@@ -35,7 +35,7 @@ export async function commitToGitHub(env: Env, data: CommitData): Promise<void> 
     throw new Error(`Failed to get branch ref: ${refResponse.statusText}`);
   }
 
-  const refData = await refResponse.json();
+  const refData = await refResponse.json() as { object: { sha: string } };
   const latestCommitSha = refData.object.sha;
 
   // 2. Get the commit to find the tree
@@ -52,7 +52,7 @@ export async function commitToGitHub(env: Env, data: CommitData): Promise<void> 
     throw new Error(`Failed to get commit: ${commitResponse.statusText}`);
   }
 
-  const commitData = await commitResponse.json();
+  const commitData = await commitResponse.json() as { tree: { sha: string } };
   const baseTreeSha = commitData.tree.sha;
 
   // 3. Create blob for the file content
@@ -75,7 +75,7 @@ export async function commitToGitHub(env: Env, data: CommitData): Promise<void> 
     throw new Error(`Failed to create blob: ${blobResponse.statusText}`);
   }
 
-  const blobData = await blobResponse.json();
+  const blobData = await blobResponse.json() as { sha: string };
 
   // 4. Create new tree with the blob
   const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees`;
@@ -104,7 +104,7 @@ export async function commitToGitHub(env: Env, data: CommitData): Promise<void> 
     throw new Error(`Failed to create tree: ${treeResponse.statusText}`);
   }
 
-  const treeData = await treeResponse.json();
+  const treeData = await treeResponse.json() as { sha: string };
 
   // 5. Create new commit
   const newCommitUrl = `https://api.github.com/repos/${owner}/${repo}/git/commits`;
@@ -127,7 +127,7 @@ export async function commitToGitHub(env: Env, data: CommitData): Promise<void> 
     throw new Error(`Failed to create commit: ${newCommitResponse.statusText}`);
   }
 
-  const newCommitData = await newCommitResponse.json();
+  const newCommitData = await newCommitResponse.json() as { sha: string };
 
   // 6. Update branch reference
   const updateRefUrl = `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branch}`;
@@ -174,7 +174,7 @@ export async function batchCommitToGitHub(
     throw new Error(`Failed to get branch ref: ${refResponse.statusText}`);
   }
 
-  const refData = await refResponse.json();
+  const refData = await refResponse.json() as { object: { sha: string } };
   const latestCommitSha = refData.object.sha;
 
   // Get base tree
@@ -191,7 +191,7 @@ export async function batchCommitToGitHub(
     throw new Error(`Failed to get commit: ${commitResponse.statusText}`);
   }
 
-  const commitData = await commitResponse.json();
+  const commitData = await commitResponse.json() as { tree: { sha: string } };
   const baseTreeSha = commitData.tree.sha;
 
   // Create blobs for all files in parallel
@@ -215,7 +215,7 @@ export async function batchCommitToGitHub(
       throw new Error(`Failed to create blob: ${blobResponse.statusText}`);
     }
 
-    const blobData = await blobResponse.json();
+    const blobData = await blobResponse.json() as { sha: string };
     return {
       path: file.path,
       mode: '100644',
@@ -246,7 +246,7 @@ export async function batchCommitToGitHub(
     throw new Error(`Failed to create tree: ${treeResponse.statusText}`);
   }
 
-  const treeData = await treeResponse.json();
+  const treeData = await treeResponse.json() as { sha: string };
 
   // Create commit
   const newCommitUrl = `https://api.github.com/repos/${owner}/${repo}/git/commits`;
@@ -269,7 +269,7 @@ export async function batchCommitToGitHub(
     throw new Error(`Failed to create commit: ${newCommitResponse.statusText}`);
   }
 
-  const newCommitData = await newCommitResponse.json();
+  const newCommitData = await newCommitResponse.json() as { sha: string };
 
   // Update branch reference
   const updateRefUrl = `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branch}`;
