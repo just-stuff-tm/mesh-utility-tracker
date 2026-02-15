@@ -270,12 +270,6 @@ npm run deploy
 - 🐛 **Bug Reports:** [GitHub Issues](https://github.com/just-stuff-tm/mesh-utility-tracker/issues)
 - 📖 **Documentation:** See deployment docs in repository (local only)
 
-## Code of Conduct
-
-- Be respectful and constructive
-- Welcome newcomers
-- Focus on collaboration
-- Keep discussions on-topic
 
 ## License
 
