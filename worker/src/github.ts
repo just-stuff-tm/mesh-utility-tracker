@@ -15,6 +15,43 @@ interface Env {
 }
 
 /**
+ * Read raw file content from GitHub at the target branch.
+ * Returns null when the file does not exist.
+ */
+export async function getGitHubFileContent(
+  env: Env,
+  path: string
+): Promise<string | null> {
+  const [owner, repo] = env.GITHUB_REPO.split('/');
+  const branch = env.GITHUB_BRANCH || 'main';
+  const encodedPath = path
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  const fileUrl =
+    `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}` +
+    `?ref=${encodeURIComponent(branch)}`;
+
+  const response = await fetch(fileUrl, {
+    headers: {
+      Authorization: `token ${env.GITHUB_TOKEN}`,
+      'User-Agent': 'mesh-utility-worker',
+      Accept: 'application/vnd.github.raw+json',
+    },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch file content: ${response.statusText}`);
+  }
+
+  return await response.text();
+}
+
+/**
  * Commit a file to GitHub repository
  */
 export async function commitToGitHub(env: Env, data: CommitData): Promise<void> {

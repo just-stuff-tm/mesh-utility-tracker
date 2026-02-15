@@ -3,8 +3,7 @@
  * Accumulates scans and commits them to GitHub in batches to reduce API calls
  */
 
-import { batchCommitToGitHub } from './github';
-import { generateDataReadme } from './index-generator';
+import { batchCommitToGitHub, getGitHubFileContent } from './github';
 
 interface ScanPayload {
   radioId: string;
@@ -21,6 +20,23 @@ interface ScanPayload {
     hopLimit?: number;
   }>;
 }
+
+const MASTER_CSV_PATH = 'scans.csv';
+const MASTER_CSV_HEADERS = [
+  'row_id',
+  'radioId',
+  'timestamp',
+  'datetime_utc',
+  'latitude',
+  'longitude',
+  'altitude',
+  'nodeId',
+  'rssi',
+  'snr',
+  'hopLimit',
+];
+const LEGACY_CSV_HEADERS = MASTER_CSV_HEADERS.slice(1);
+const MAX_MASTER_CSV_BYTES = 95 * 1024 * 1024;
 
 export class ScanBatcher {
   private state: DurableObjectState;
@@ -148,57 +164,52 @@ export class ScanBatcher {
     }
 
     try {
-      // Group scans by date
-      const scansByDate = new Map<string, ScanPayload[]>();
-      
-      for (const scan of this.scans) {
-        const date = new Date(scan.timestamp).toISOString().split('T')[0];
-        if (!scansByDate.has(date)) {
-          scansByDate.set(date, []);
-        }
-        scansByDate.get(date)!.push(scan);
-      }
-
-      // Create files for each date (both JSON and CSV)
-      const files: { path: string; content: string }[] = [];
-      
-      for (const [date, scans] of Array.from(scansByDate.entries())) {
-        const timestamp = Date.now();
-        
-        // JSON file for API consumption
-        files.push({
-          path: `scans/${date}/batch-${timestamp}.json`,
-          content: JSON.stringify(scans, null, 2)
-        });
-        
-        // CSV file for GitHub browsing and filtering
-        const csvContent = this.convertToCSV(scans);
-        files.push({
-          path: `scans/${date}/batch-${timestamp}.csv`,
-          content: csvContent
-        });
-      }
-
-      // Generate index/README (optional, could be done periodically)
-      // Uncomment to update README with each commit (adds overhead)
-      // const readme = generateDataReadme([]);
-      // files.push({ path: 'README.md', content: readme });
-
-      // Commit to GitHub
       const env = {
         GITHUB_TOKEN: githubToken,
         GITHUB_REPO: githubRepo,
         GITHUB_BRANCH: githubBranch,
       };
 
-      const uniqueRadios = new Set(this.scans.map(s => s.radioId)).size;
-      await batchCommitToGitHub(
-        env,
-        files,
-        `Add ${this.scans.length} scans from ${uniqueRadios} radios (JSON + CSV)`
-      );
+      const scansToCommit = [...this.scans].sort((a, b) => a.timestamp - b.timestamp);
+      const uniqueRadios = new Set(scansToCommit.map((scan) => scan.radioId)).size;
+      let rowsAppended = 0;
 
-      console.log(`Successfully committed ${this.scans.length} scans to GitHub`);
+      const maxAttempts = 3;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const existingCsv = await getGitHubFileContent(env, MASTER_CSV_PATH);
+          const updatedCsv = this.buildUpdatedMasterCsv(existingCsv, scansToCommit);
+          rowsAppended = updatedCsv.rowsAdded;
+          const csvSizeBytes = new TextEncoder().encode(updatedCsv.content).length;
+
+          if (csvSizeBytes > MAX_MASTER_CSV_BYTES) {
+            throw new Error(
+              `${MASTER_CSV_PATH} exceeded ${(MAX_MASTER_CSV_BYTES / (1024 * 1024)).toFixed(0)}MB; rotate to yearly/monthly CSV before appending more rows`
+            );
+          }
+
+          await batchCommitToGitHub(
+            env,
+            [{ path: MASTER_CSV_PATH, content: updatedCsv.content }],
+            `Append ${rowsAppended} rows from ${scansToCommit.length} scans (${uniqueRadios} radios) to ${MASTER_CSV_PATH}`
+          );
+          break;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const shouldRetry = message.includes('Failed to update ref') && attempt < maxAttempts;
+          if (!shouldRetry) {
+            throw error;
+          }
+          console.warn(
+            `Retrying GitHub commit after branch ref moved (attempt ${attempt}/${maxAttempts})`
+          );
+        }
+      }
+
+      console.log(
+        `Successfully committed ${scansToCommit.length} scans to GitHub (${rowsAppended} rows appended to ${MASTER_CSV_PATH})`
+      );
 
       // Mark scans as committed in D1
       const db = this.env.DB;
@@ -218,7 +229,11 @@ export class ScanBatcher {
             INSERT INTO commits (commitSha, commitMessage, scanCount)
             VALUES (?, ?, ?)
           `)
-            .bind('unknown', `Batch commit: ${this.scans.length} scans`, this.scans.length)
+            .bind(
+              'unknown',
+              `Batch commit: ${this.scans.length} scans, ${rowsAppended} rows appended to ${MASTER_CSV_PATH}`,
+              this.scans.length
+            )
             .run();
         } catch (error) {
           console.error('Failed to update D1 after GitHub commit:', error);
@@ -241,42 +256,103 @@ export class ScanBatcher {
   }
 
   /**
-   * Convert scans to CSV format for GitHub searchability
+   * Build updated CSV content by appending rows to the master CSV.
+   * Migrates legacy header format (without row_id) on first write.
    */
-  private convertToCSV(scans: ScanPayload[]): string {
-    const headers = [
-      'radioId',
-      'timestamp',
-      'datetime_utc',
-      'latitude',
-      'longitude',
-      'altitude',
-      'nodeId',
-      'rssi',
-      'snr',
-      'hopLimit'
-    ];
-    
-    const rows: string[] = [headers.join(',')];
-    
+  private buildUpdatedMasterCsv(
+    existingContent: string | null,
+    scans: ScanPayload[]
+  ): { content: string; rowsAdded: number } {
+    let csv = existingContent ? existingContent.replace(/\r\n/g, '\n').trimEnd() : '';
+    let nextRowId = 1;
+
+    if (csv.length > 0) {
+      const headerEnd = csv.indexOf('\n');
+      const header = headerEnd === -1 ? csv : csv.slice(0, headerEnd);
+      const body = headerEnd === -1 ? '' : csv.slice(headerEnd + 1);
+
+      if (header === LEGACY_CSV_HEADERS.join(',')) {
+        const migratedRows = body
+          .split('\n')
+          .filter((line) => line.trim().length > 0)
+          .map((line, index) => `${index + 1},${line}`);
+        csv = [MASTER_CSV_HEADERS.join(','), ...migratedRows].join('\n');
+        nextRowId = migratedRows.length + 1;
+      } else if (header === MASTER_CSV_HEADERS.join(',')) {
+        nextRowId = this.countDataRows(csv) + 1;
+      } else {
+        throw new Error(`Unexpected CSV header in ${MASTER_CSV_PATH}`);
+      }
+    } else {
+      csv = MASTER_CSV_HEADERS.join(',');
+    }
+
+    const newRows = this.convertToCSVRows(scans, nextRowId);
+    if (newRows.length === 0) {
+      return {
+        content: `${csv}\n`,
+        rowsAdded: 0,
+      };
+    }
+
+    return {
+      content: `${csv}\n${newRows.join('\n')}\n`,
+      rowsAdded: newRows.length,
+    };
+  }
+
+  private convertToCSVRows(scans: ScanPayload[], startRowId: number): string[] {
+    const rows: string[] = [];
+    let rowId = startRowId;
+
     for (const scan of scans) {
-      for (const node of scan.nodes) {
-        const row = [
-          scan.radioId,
-          scan.timestamp.toString(),
-          new Date(scan.timestamp).toISOString(),
-          scan.location.lat.toFixed(6),
-          scan.location.lon.toFixed(6),
-          scan.location.altitude?.toFixed(1) || '',
-          node.nodeId,
-          node.rssi.toString(),
-          node.snr?.toString() || '',
-          node.hopLimit?.toString() || ''
-        ];
-        rows.push(row.join(','));
+      const nodes = scan.nodes.length > 0 ? scan.nodes : [null];
+      for (const node of nodes) {
+        rows.push(
+          this.toCsvLine([
+            rowId++,
+            scan.radioId,
+            scan.timestamp,
+            new Date(scan.timestamp).toISOString(),
+            scan.location.lat.toFixed(6),
+            scan.location.lon.toFixed(6),
+            scan.location.altitude != null ? scan.location.altitude.toFixed(1) : '',
+            node?.nodeId ?? '',
+            node?.rssi ?? '',
+            node?.snr ?? '',
+            node?.hopLimit ?? '',
+          ])
+        );
       }
     }
-    
-    return rows.join('\n');
+
+    return rows;
+  }
+
+  private countDataRows(csv: string): number {
+    if (!csv) {
+      return 0;
+    }
+
+    let lineCount = 1;
+    for (let i = 0; i < csv.length; i++) {
+      if (csv[i] === '\n') {
+        lineCount++;
+      }
+    }
+
+    return Math.max(0, lineCount - 1);
+  }
+
+  private toCsvLine(values: Array<string | number>): string {
+    return values.map((value) => this.escapeCsvValue(String(value))).join(',');
+  }
+
+  private escapeCsvValue(value: string): string {
+    const escaped = value.replace(/"/g, '""');
+    if (/[",\n\r]/.test(escaped)) {
+      return `"${escaped}"`;
+    }
+    return escaped;
   }
 }

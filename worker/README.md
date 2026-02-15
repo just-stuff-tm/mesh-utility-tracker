@@ -6,6 +6,7 @@ Cloudflare Worker for ingesting scan data, batching writes, and committing scan 
 - Accepts scan batches from the client (`POST /scans`)
 - Stores scans in D1 immediately
 - Batches commits to GitHub (20 scans or 5 minutes)
+- Appends committed rows into a single master CSV file (`scans.csv`)
 - Serves scan history (`/history`, `/history/:day.ndjson`)
 - Supports radio data deletion endpoint (`DELETE /delete/:radioId`)
 
@@ -90,7 +91,8 @@ Health check.
 ## Batching Behavior
 - Batch size trigger: 20 scans
 - Time trigger: 5 minutes
-- Commit output: JSON and CSV files under `scans/YYYY-MM-DD/`
+- Commit output: append-only updates to `scans.csv`
+- CSV columns: `row_id,radioId,timestamp,datetime_utc,latitude,longitude,altitude,nodeId,rssi,snr,hopLimit`
 
 ## Useful Commands
 
