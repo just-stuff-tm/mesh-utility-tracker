@@ -68,8 +68,7 @@ public/     Static assets
 
 - Data sharing is **opt-in**  
 - Dead zones remain local and are not uploaded  
-- Public mesh data repository:  
-  https://github.com/just-stuff-tm/mesh-data  
+- [Public mesh data repository:](https://github.com/just-stuff-tm/mesh-data) 
 - Deletion requests can be initiated from Settings  
 
 ---
