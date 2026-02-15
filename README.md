@@ -1,4 +1,5 @@
 # Mesh Utility Tracker
+[![Discord](https://img.shields.io/badge/Discord-Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/Xyhjz7CtuW)
 
 Progressive Web App for mapping MeshCore LoRa coverage with optional cloud ingestion.
 
