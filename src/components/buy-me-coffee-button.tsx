@@ -3,9 +3,10 @@ import { cn } from "@/lib/utils";
 interface BuyMeCoffeeButtonProps {
   className?: string;
   dataTestId?: string;
+  size?: "default" | "header";
 }
 
-export function BuyMeCoffeeButton({ className, dataTestId }: BuyMeCoffeeButtonProps) {
+export function BuyMeCoffeeButton({ className, dataTestId, size = "default" }: BuyMeCoffeeButtonProps) {
   return (
     <a
       href="https://www.buymeacoffee.com/Just_Stuff_TM"
@@ -20,7 +21,10 @@ export function BuyMeCoffeeButton({ className, dataTestId }: BuyMeCoffeeButtonPr
         alt="Buy Me A Coffee"
         width={217}
         height={60}
-        style={{ width: "217px", height: "60px" }}
+        className={cn(
+          "w-auto",
+          size === "header" ? "h-5" : "h-[60px]"
+        )}
       />
     </a>
   );

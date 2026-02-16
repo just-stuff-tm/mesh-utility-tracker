@@ -109,6 +109,7 @@ function AppContent() {
                   <BuyMeCoffeeButton
                     className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 hover-elevate"
                     dataTestId="link-support-header"
+                    size="header"
                   />
                   <a
                     href="https://discord.gg/Xyhjz7CtuW"
