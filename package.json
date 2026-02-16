@@ -10,7 +10,7 @@
     "build:pages": "vite build",
     "preview": "vite preview",
     "check": "tsc",
-    "deploy:pages": "npm run build:pages && wrangler pages deploy dist --project-name=mesh-utility-tracker --branch=production --commit-dirty=true"
+    "deploy:pages": "npm run build:pages && wrangler pages deploy dist --project-name=mesh-utility-tracker --branch=mesh-utility --commit-dirty=true"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
