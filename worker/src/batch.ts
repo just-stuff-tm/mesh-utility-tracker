@@ -7,6 +7,7 @@ import { batchCommitToGitHub, getGitHubFileContent } from './github';
 
 interface ScanPayload {
   radioId: string;
+  observerName?: string;
   timestamp: number;
   location: {
     lat: number;
@@ -16,8 +17,10 @@ interface ScanPayload {
   nodes: Array<{
     nodeId: string;
     name?: string;
+    observerName?: string;
     rssi: number;
     snr: number;
+    snrIn?: number;
   }>;
 }
 
@@ -41,11 +44,11 @@ const MASTER_CSV_HEADERS = [
   'nodeId',
   'rssi',
   'snr',
+  'observerName',
+  'nodeName',
+  'snr_repeater_to_observer',
+  'snr_observer_to_repeater',
 ];
-// Legacy header compatibility for existing repositories that still include hopLimit.
-const MASTER_CSV_HEADERS_WITH_HOP_LIMIT = [...MASTER_CSV_HEADERS, 'hopLimit'];
-const LEGACY_CSV_HEADERS = MASTER_CSV_HEADERS.slice(1);
-const LEGACY_CSV_HEADERS_WITH_HOP_LIMIT = MASTER_CSV_HEADERS_WITH_HOP_LIMIT.slice(1);
 const MAX_MASTER_CSV_BYTES = 95 * 1024 * 1024;
 
 export class ScanBatcher {
@@ -337,12 +340,20 @@ export class ScanBatcher {
             '',
             DEAD_ZONE_RSSI,
             DEAD_ZONE_SNR,
+            scan.observerName ?? '',
+            '',
+            '',
+            '',
           ])
         );
         continue;
       }
 
       for (const node of scan.nodes) {
+        const observerName = node.observerName ?? scan.observerName ?? '';
+        const nodeName = node.name ?? '';
+        const snrRepeaterToObserver = node.snr;
+        const snrObserverToRepeater = node.snrIn ?? '';
         rows.push(
           this.toCsvLine([
             rowId++,
@@ -355,6 +366,10 @@ export class ScanBatcher {
             node.nodeId,
             node.rssi,
             node.snr,
+            observerName,
+            nodeName,
+            snrRepeaterToObserver,
+            snrObserverToRepeater,
           ])
         );
       }
@@ -374,12 +389,14 @@ export class ScanBatcher {
     const dataLines = lines.slice(1).filter((line) => line.trim().length > 0);
 
     const headerText = header.trim();
+    const headerColumns = this.parseCsvLine(headerText);
+    const headerIndexes = this.resolveHeaderIndexes(headerColumns);
     const rows: string[] = [];
 
     for (let index = 0; index < dataLines.length; index++) {
       const line = dataLines[index];
       const values = this.parseCsvLine(line);
-      const row = this.normalizeCsvRow(headerText, values, index + 1);
+      const row = this.normalizeCsvRow(values, index + 1, headerIndexes);
       if (row) {
         rows.push(row);
       }
@@ -412,36 +429,107 @@ export class ScanBatcher {
     });
   }
 
-  private normalizeCsvRow(header: string, values: string[], legacyRowId: number): string | null {
-    if (header === MASTER_CSV_HEADERS.join(',')) {
-      if (values.length < MASTER_CSV_HEADERS.length) {
-        return null;
-      }
-      return this.toCsvLine(values.slice(0, MASTER_CSV_HEADERS.length));
+  private normalizeCsvRow(
+    values: string[],
+    legacyRowId: number,
+    headerIndexes: ReturnType<ScanBatcher['resolveHeaderIndexes']>
+  ): string | null {
+    const getValue = (index: number, fallback = ''): string => {
+      if (index < 0) return fallback;
+      return values[index] ?? fallback;
+    };
+
+    const rowId = headerIndexes.rowId >= 0 ? getValue(headerIndexes.rowId, String(legacyRowId)) : String(legacyRowId);
+    const radioId = getValue(headerIndexes.radioId);
+    const timestamp = getValue(headerIndexes.timestamp);
+    const datetimeUtc = getValue(headerIndexes.datetimeUtc);
+    const latitude = getValue(headerIndexes.latitude);
+    const longitude = getValue(headerIndexes.longitude);
+    const altitude = getValue(headerIndexes.altitude);
+    const nodeId = getValue(headerIndexes.nodeId);
+    const rssi = getValue(headerIndexes.rssi);
+    const snr = getValue(headerIndexes.snr);
+
+    if (!radioId || !timestamp || !datetimeUtc || !latitude || !longitude || rssi.length === 0 || snr.length === 0) {
+      return null;
     }
 
-    if (header === MASTER_CSV_HEADERS_WITH_HOP_LIMIT.join(',')) {
-      if (values.length < MASTER_CSV_HEADERS_WITH_HOP_LIMIT.length) {
-        return null;
+    const observerName = getValue(headerIndexes.observerName);
+    const nodeName = getValue(headerIndexes.nodeName);
+    const snrRepeaterToObserver = getValue(headerIndexes.snrRepeaterToObserver, snr);
+    const snrObserverToRepeater = getValue(headerIndexes.snrObserverToRepeater);
+
+    return this.toCsvLine([
+      rowId,
+      radioId,
+      timestamp,
+      datetimeUtc,
+      latitude,
+      longitude,
+      altitude,
+      nodeId,
+      rssi,
+      snr,
+      observerName,
+      nodeName,
+      snrRepeaterToObserver,
+      snrObserverToRepeater,
+    ]);
+  }
+
+  private resolveHeaderIndexes(headerColumns: string[]) {
+    const idx = (name: string) => headerColumns.indexOf(name);
+    const required = {
+      radioId: idx('radioId'),
+      timestamp: idx('timestamp'),
+      datetimeUtc: idx('datetime_utc'),
+      latitude: idx('latitude'),
+      longitude: idx('longitude'),
+      altitude: idx('altitude'),
+      nodeId: idx('nodeId'),
+      rssi: idx('rssi'),
+      snr: idx('snr'),
+    };
+
+    for (const [name, index] of Object.entries(required)) {
+      if (index === -1) {
+        throw new Error(`Unexpected CSV header in ${MASTER_CSV_PATH}: missing "${name}"`);
       }
-      return this.toCsvLine(values.slice(0, MASTER_CSV_HEADERS.length));
     }
 
-    if (header === LEGACY_CSV_HEADERS.join(',')) {
-      if (values.length < LEGACY_CSV_HEADERS.length) {
-        return null;
-      }
-      return this.toCsvLine([String(legacyRowId), ...values.slice(0, LEGACY_CSV_HEADERS.length)]);
-    }
-
-    if (header === LEGACY_CSV_HEADERS_WITH_HOP_LIMIT.join(',')) {
-      if (values.length < LEGACY_CSV_HEADERS_WITH_HOP_LIMIT.length) {
-        return null;
-      }
-      return this.toCsvLine([String(legacyRowId), ...values.slice(0, LEGACY_CSV_HEADERS.length)]);
-    }
-
-    throw new Error(`Unexpected CSV header in ${MASTER_CSV_PATH}`);
+    return {
+      rowId: idx('row_id'),
+      radioId: required.radioId,
+      timestamp: required.timestamp,
+      datetimeUtc: required.datetimeUtc,
+      latitude: required.latitude,
+      longitude: required.longitude,
+      altitude: required.altitude,
+      nodeId: required.nodeId,
+      rssi: required.rssi,
+      snr: required.snr,
+      observerName: (() => {
+        const observerIdx = idx('observerName');
+        if (observerIdx !== -1) return observerIdx;
+        const receiverIdx = idx('receiverName');
+        return receiverIdx;
+      })(),
+      nodeName: (() => {
+        const nodeNameIdx = idx('nodeName');
+        if (nodeNameIdx !== -1) return nodeNameIdx;
+        const senderNameIdx = idx('senderName');
+        return senderNameIdx;
+      })(),
+      snrRepeaterToObserver: (() => {
+        const explicit = idx('snr_repeater_to_observer');
+        return explicit !== -1 ? explicit : required.snr;
+      })(),
+      snrObserverToRepeater: (() => {
+        const explicit = idx('snr_observer_to_repeater');
+        if (explicit !== -1) return explicit;
+        return idx('snrIn');
+      })(),
+    };
   }
 
   private collectSuccessfulScanHexes(scans: ScanPayload[]): Set<string> {

@@ -81,6 +81,7 @@ interface BluetoothContextValue {
   setUpdateRadioPosition: (v: boolean) => void;
   setUploadBatchInterval: (v: number) => void;
   manualSync: () => Promise<{ synced: number; failed: number }>;
+  refreshQueuedScansCount: () => Promise<void>;
 }
 
 const BluetoothContext = createContext<BluetoothContextValue | null>(null);
@@ -402,6 +403,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
             const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
             const workerPayload = [{
               radioId: radioId || "local-observer",
+              observerName: selfInfoRef.current?.name || "Observer",
               timestamp: Date.now(),
               location: {
                 lat: pos[0],
@@ -411,8 +413,10 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
               nodes: [{
                 nodeId,
                 name: displayName,
+                observerName: selfInfoRef.current?.name || "Observer",
                 rssi: rep.stats.rssi,
                 snr: rep.stats.snr,
+                snrIn: rep.stats.snrIn,
               }],
             }];
             console.log('[Bluetooth] Queuing scan for batch upload:', workerPayload);
@@ -487,6 +491,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
           try {
             const deadZonePayload = [{
               radioId: radioId || "local-observer",
+              observerName: selfInfoRef.current?.name || "Observer",
               timestamp: Date.now(),
               location: {
                 lat: pos[0],
@@ -830,6 +835,15 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem("mesh_upload_batch_interval", String(v)); } catch {}
   }, []);
 
+  const refreshQueuedScansCount = useCallback(async () => {
+    const count = await getOutboxCount();
+    setQueuedScansCount(count);
+  }, []);
+
+  useEffect(() => {
+    refreshQueuedScansCount();
+  }, [refreshQueuedScansCount]);
+
   const manualSync = useCallback(async () => {
     if (!isOnline()) {
       throw new Error("Cannot sync while offline");
@@ -839,9 +853,9 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Please wait 5 minutes between syncs");
     }
     const result = await drainOutbox();
+    const count = await getOutboxCount();
+    setQueuedScansCount(count);
     if (result.synced > 0) {
-      const count = await getOutboxCount();
-      setQueuedScansCount(count);
       setLastUploadTime(now);
     }
     return result;
@@ -909,11 +923,14 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         setUpdateRadioPosition: (v: boolean) => {
           setUpdateRadioPosition(v);
           try { localStorage.setItem("mesh_update_radio_position", String(v)); } catch {}
-        },        uploadBatchInterval,
+        },
+        uploadBatchInterval,
         queuedScansCount,
         lastUploadTime,
         setUploadBatchInterval,
-        manualSync,      }}
+        manualSync,
+        refreshQueuedScansCount,
+      }}
     >
       {children}
     </BluetoothContext.Provider>

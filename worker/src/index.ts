@@ -17,6 +17,7 @@ export interface Env {
 
 export interface ScanPayload {
   radioId: string;
+  observerName?: string;
   timestamp: number;
   location: {
     lat: number;
@@ -26,8 +27,10 @@ export interface ScanPayload {
   nodes: Array<{
     nodeId: string;
     name?: string;
+    observerName?: string;
     rssi: number;
     snr: number;
+    snrIn?: number;
   }>;
 }
 
@@ -159,8 +162,10 @@ export default {
                 altitude: row.altitude,
                 nodeId: '',
                 senderName: null,
+                receiverName: null,
                 rssi: DEAD_ZONE_RSSI,
                 snr: DEAD_ZONE_SNR,
+                snrIn: null,
                 receivedAt: new Date(row.timestamp).toISOString(),
               }),
             ];
@@ -175,8 +180,10 @@ export default {
               altitude: row.altitude,
               nodeId: typeof node?.nodeId === 'string' ? node.nodeId : '',
               senderName: typeof node?.name === 'string' ? node.name : null,
+              receiverName: typeof node?.observerName === 'string' ? node.observerName : null,
               rssi: typeof node?.rssi === 'number' ? node.rssi : DEAD_ZONE_RSSI,
               snr: typeof node?.snr === 'number' ? node.snr : DEAD_ZONE_SNR,
+              snrIn: typeof node?.snrIn === 'number' ? node.snrIn : null,
               receivedAt: new Date(row.timestamp).toISOString(),
             })
           );

@@ -28,7 +28,7 @@ export function SettingsPanel() {
     const stored = localStorage.getItem("mesh-tile-caching");
     return stored === null ? false : stored === "true";
   });
-  const { online, pendingSync, syncing, syncNow, forceOffline, toggleForceOffline } = useOfflineStatus();
+  const { online, pendingSync, syncing, syncNow, refreshPendingCount, forceOffline, toggleForceOffline } = useOfflineStatus();
   const {
     scanInterval,
     setScanInterval,
@@ -50,6 +50,7 @@ export function SettingsPanel() {
     queuedScansCount,
     lastUploadTime,
     manualSync,
+    refreshQueuedScansCount,
   } = useBluetoothContext();
 
   const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
@@ -613,6 +614,10 @@ export function SettingsPanel() {
                 await db.scanResults.clear();
                 await db.coverageZones.clear();
                 await db.outbox.clear();
+                await refreshPendingCount();
+                await refreshQueuedScansCount();
+                await queryClient.invalidateQueries({ queryKey: ["raw-scans"] });
+                await queryClient.refetchQueries({ queryKey: ["raw-scans"], type: "active" });
                 toast({ title: "Local cache cleared successfully" });
               } catch (err) {
                 toast({ title: "Failed to clear cache", variant: "destructive" });

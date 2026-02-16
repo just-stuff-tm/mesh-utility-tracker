@@ -577,7 +577,12 @@ function ZonePopup({ zone, allScans = [], nodes = [] }: { zone: CoverageZone; al
       }
     });
   }
-  const repeaters = Array.from(repeaterMap.entries());
+  const repeaters = Array.from(repeaterMap.entries()).map(([nodeId, name]) => {
+    const latest = scans
+      .filter((s) => s.nodeId === nodeId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0] || null;
+    return { nodeId, name, latest };
+  });
 
   return (
     <div className="min-w-[220px] text-sm space-y-2.5">
@@ -645,18 +650,31 @@ function ZonePopup({ zone, allScans = [], nodes = [] }: { zone: CoverageZone; al
                   {t("coverage.viewHistory")}
                 </button>
               </div>
-              {repeaters.map(([nodeId, name]) => {
-                const latest = scans.find((s) => s.nodeId === nodeId);
+              {repeaters.map(({ nodeId, name, latest }) => {
                 return (
                   <div key={nodeId} className="group relative">
-                    <div className="flex items-center justify-between gap-2 mt-0.5">
-                      <span className="font-semibold truncate">
-                        {name}
-                      </span>
-                      {latest && (
-                        <span className="text-gray-400 whitespace-nowrap">
-                          {latest.rssi?.toFixed(0)} dBm / {latest.snr?.toFixed(1)} dB
+                    <div className="flex items-start justify-between gap-2 mt-0.5">
+                      <div className="min-w-0">
+                        <span className="font-semibold truncate block">
+                          {name}
                         </span>
+                        <span className="text-[11px] text-gray-500 font-mono block">
+                          {nodeId}
+                        </span>
+                        {latest?.receiverName && (
+                          <span className="text-[11px] text-gray-500 block">
+                            {t("coverage.observerLabel")}: {latest.receiverName}
+                          </span>
+                        )}
+                      </div>
+                      {latest && (
+                        <div className="text-gray-400 text-right whitespace-nowrap text-[11px]">
+                          <div>{latest.rssi?.toFixed(0)} dBm</div>
+                          <div>SNR r-&gt;o {latest.snr?.toFixed(1)} dB</div>
+                          <div>
+                            SNR o-&gt;r {latest.snrIn != null ? `${latest.snrIn.toFixed(1)} dB` : "N/A"}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
