@@ -1,8 +1,9 @@
-import { Map, Radio, Activity, DollarSign, Shield, HelpCircle, Share2 } from "lucide-react";
+import { Map, Radio, Activity, Shield, HelpCircle, Share2 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
+import { BuyMeCoffeeButton } from "@/components/buy-me-coffee-button";
 import {
   Sidebar,
   SidebarContent,
@@ -111,18 +112,10 @@ export function AppSidebar() {
             <Share2 className="h-3 w-3 mr-1.5" />
             {t("nav.shareApp")}
           </Button>
-          <a
-            href="https://cash.app/$yuptm"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-500/10 to-green-500/10 dark:from-emerald-500/15 dark:to-green-500/15 border border-emerald-500/20 px-3 py-1.5 transition-all duration-200 hover:from-emerald-500/20 hover:to-green-500/20 hover:border-emerald-500/40"
-            data-testid="link-cashapp-support"
-          >
-            <DollarSign className="h-3 w-3 text-emerald-500" />
-            <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-              {t("nav.supportDev")}
-            </span>
-          </a>
+          <BuyMeCoffeeButton
+            className="w-full"
+            dataTestId="link-support-footer"
+          />
           <Link
             href="/privacy"
             onClick={() => { if (isMobile) setOpenMobile(false); }}

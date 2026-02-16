@@ -9,13 +9,13 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BluetoothProvider } from "@/lib/bluetooth-context";
-import { Heart } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 import { CompatibilityDialog } from "@/components/compatibility-dialog";
 import { OfflineIndicator } from "@/components/offline-indicator";
 import { PrivacyAcceptanceDialog, usePrivacyAccepted, isPrivacyAccepted } from "@/components/privacy-acceptance-dialog";
 import { setForceOffline, getForceOffline } from "@/lib/offline-store";
 import { I18nProvider, useI18n } from "@/lib/i18n";
+import { BuyMeCoffeeButton } from "@/components/buy-me-coffee-button";
 import NotFound from "@/pages/not-found";
 import MapPage from "@/pages/map-page";
 import NodesPage from "@/pages/nodes-page";
@@ -106,18 +106,10 @@ function AppContent() {
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* ObserversOnline removed - no backend tracking */}
                   <OfflineIndicator />
-                  <a
-                    href="https://cash.app/$yuptm"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 hover-elevate"
-                    data-testid="link-support-header"
-                  >
-                    <Heart className="h-3 w-3 text-emerald-500" />
-                    <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                      {t("header.support")}
-                    </span>
-                  </a>
+                  <BuyMeCoffeeButton
+                    className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 hover-elevate"
+                    dataTestId="link-support-header"
+                  />
                   <a
                     href="https://discord.gg/Xyhjz7CtuW"
                     target="_blank"
