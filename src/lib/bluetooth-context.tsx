@@ -188,8 +188,13 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   }, [altitudeMeters]);
 
   const lastElevationFetch = useRef<string | null>(null);
+  const locationWatchIdRef = useRef<number | null>(null);
+  const locationTrackingStartedRef = useRef(false);
 
-  useEffect(() => {
+  const startLocationTracking = useCallback(() => {
+    if (locationTrackingStartedRef.current) return;
+    locationTrackingStartedRef.current = true;
+
     const handlePosition = (pos: { latitude: number; longitude: number; altitude: number | null }) => {
       setObserverPosition([pos.latitude, pos.longitude]);
       if (pos.altitude !== null) {
@@ -209,8 +214,27 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       .then(handlePosition)
       .catch(() => {});
 
-    const watchId = watchPosition(handlePosition, () => {});
-    return () => clearWatch(watchId);
+    locationWatchIdRef.current = watchPosition(handlePosition, () => {});
+  }, []);
+
+  useEffect(() => {
+    const onFirstGesture = () => {
+      startLocationTracking();
+    };
+
+    window.addEventListener("pointerdown", onFirstGesture, { once: true, passive: true });
+    window.addEventListener("keydown", onFirstGesture, { once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", onFirstGesture);
+      window.removeEventListener("keydown", onFirstGesture);
+    };
+  }, [startLocationTracking]);
+
+  useEffect(() => {
+    return () => {
+      clearWatch(locationWatchIdRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -714,6 +738,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   }, [connected, isScanning, acquireWakeLock]);
 
   const connectHandler = useCallback(async () => {
+    startLocationTracking();
     setConnecting(true);
     setError(null);
     const result = await connectToRadio();
