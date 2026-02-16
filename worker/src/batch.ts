@@ -73,6 +73,36 @@ export class ScanBatcher {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname.startsWith('/delete/') && request.method === 'POST') {
+      const radioId = (url.pathname.split('/')[2] || '').trim().toUpperCase();
+      if (!radioId) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'radioId required' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const before = this.scans.length;
+      this.scans = this.scans.filter((scan) => (scan.radioId || '').toUpperCase() !== radioId);
+      const removed = before - this.scans.length;
+
+      await this.state.storage.put('pending_scans', this.scans);
+
+      return new Response(
+        JSON.stringify({ success: true, removed, pending: this.scans.length }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (url.pathname === '/flush' && request.method === 'POST') {
+      // Force commit current batch
+      await this.commitBatch(request.headers);
+      return new Response(
+        JSON.stringify({ success: true, message: 'Batch committed' }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (request.method === 'POST') {
       const newScans: ScanPayload[] = await request.json();
       
@@ -121,15 +151,6 @@ export class ScanBatcher {
           queued: this.scans.length,
           message: `${newScans.length} scans queued, ${this.scans.length} total pending`,
         }),
-        { headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (url.pathname === '/flush' && request.method === 'POST') {
-      // Force commit current batch
-      await this.commitBatch(request.headers);
-      return new Response(
-        JSON.stringify({ success: true, message: 'Batch committed' }),
         { headers: { 'Content-Type': 'application/json' } }
       );
     }

@@ -226,8 +226,8 @@ hourly = all_data.groupby('hour').size()
 
 - All data is public and anonymized
 - Radio IDs are MeshCore public node identifiers
-- Users can request deletion via [deletion form](https://github.com/just-stuff-tm/mesh-utility-tracker/issues/new?labels=data-deletion)
-- Deletions are processed within 24 hours
+- Users can delete data from the app Settings ("Delete My Data")
+- Deletion is ownership-verified using a radio-signed challenge
 - Deletion records stored in \`deletions/\` folder
 
 ## Index Files
@@ -267,6 +267,6 @@ CC0 1.0 Universal - Public Domain
 ## Support
 
 - Issues: [mesh-utility-tracker/issues](https://github.com/just-stuff-tm/mesh-utility-tracker/issues)
-- Data deletion: [Create issue](https://github.com/just-stuff-tm/mesh-utility-tracker/issues/new?labels=data-deletion)
+- Data deletion: from app Settings ("Delete My Data")
 `;
 }

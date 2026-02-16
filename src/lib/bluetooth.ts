@@ -599,6 +599,26 @@ export async function checkConnectionAlive(): Promise<boolean> {
   }
 }
 
+export async function signWithRadio(data: Uint8Array): Promise<Uint8Array | null> {
+  if (!connection || typeof connection.sign !== "function") return null;
+  try {
+    const signature = await connection.sign(data);
+    if (signature instanceof Uint8Array) {
+      return signature;
+    }
+    if (signature instanceof ArrayBuffer) {
+      return new Uint8Array(signature);
+    }
+    if (Array.isArray(signature)) {
+      return new Uint8Array(signature);
+    }
+    return null;
+  } catch (err) {
+    remoteLog("error", "signWithRadio error:", err);
+    return null;
+  }
+}
+
 export function publicKeyHex(key: Uint8Array | number[]): string {
   const arr = key instanceof Uint8Array ? key : new Uint8Array(key);
   return Array.from(arr.slice(0, 4))

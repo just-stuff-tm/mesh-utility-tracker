@@ -8,7 +8,7 @@ Cloudflare Worker for ingesting scan data, batching writes, and committing scan 
 - Batches commits to GitHub (20 scans or 5 minutes)
 - Appends committed rows into a single master CSV file (`scans.csv`)
 - Serves scan history (`/history`, `/history/:day.ndjson`)
-- Supports radio data deletion endpoint (`DELETE /delete/:radioId`)
+- Supports signed radio-owned deletion (`POST /delete/challenge`, `POST /delete/:radioId`)
 
 ## Setup
 
@@ -82,8 +82,25 @@ Example response:
 ### `GET /history/:day.ndjson`
 Returns newline-delimited scan rows for a day (`YYYY-MM-DD`).
 
-### `DELETE /delete/:radioId`
-Deletes scans for a radio in D1 and writes a deletion record to GitHub.
+### `POST /delete/challenge`
+Returns a short-lived challenge string for signed ownership verification.
+
+Request body:
+```json
+{ "radioId": "BFD65811", "publicKey": "..." }
+```
+
+### `POST /delete/:radioId`
+Deletes scans for a radio after verifying a radio-generated Ed25519 signature.
+
+Request body:
+```json
+{
+  "publicKey": "...",
+  "challenge": "mesh-delete-v1:...",
+  "signature": "..."
+}
+```
 
 ### `GET /health`
 Health check.

@@ -64,7 +64,7 @@ export default function PrivacyPage() {
           <section className="space-y-2" data-testid="section-storage-deletion">
             <h2 className="text-base font-medium">Data Storage and Deletion</h2>
             <p className="text-sm text-muted-foreground">
-              All scan data is stored in a PostgreSQL database on the server. You can delete all data associated with your radio from the Settings panel using the "Delete My Data" option. This permanently removes all scan results, coverage zones, and node records linked to your radio's identifier.
+              Scan data is stored in Cloudflare D1 and committed to the public mesh-data GitHub repository. You can delete data associated with your connected radio from Settings using "Delete My Data". Deletion is verified with a radio-generated signature tied to your radio ID and permanently removes matching server records.
             </p>
           </section>
 

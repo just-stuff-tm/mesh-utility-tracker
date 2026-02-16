@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBluetoothContext } from "@/lib/bluetooth-context";
-import { publicKeyHex } from "@/lib/bluetooth";
+import { publicKeyHex, signWithRadio } from "@/lib/bluetooth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, isQueuedResponse, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
@@ -52,42 +52,100 @@ export function SettingsPanel() {
     manualSync,
   } = useBluetoothContext();
 
+  const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
+
+  const bytesToHex = (bytes: Uint8Array): string =>
+    Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+      .toUpperCase();
+
   const deleteDataMutation = useMutation({
-    mutationFn: async (radioId: string) => {
-      // Data deletion requires manual review - no automated endpoint
-      const issueUrl = `https://github.com/just-stuff-tm/mesh-utility-tracker/issues/new?title=Data%20Deletion%20Request&body=Radio%20ID:%20${encodeURIComponent(radioId)}%0A%0APlease%20delete%20all%20data%20associated%20with%20this%20radio.&labels=data-deletion`;
-      
-      toast({
-        title: "Data Deletion Request",
-        description: (
-          <div className="space-y-2">
-            <p>Connected Radio ID: <span className="font-mono font-semibold">{radioId}</span></p>
-            <p>Please create a GitHub issue to request deletion. Automated deletion is not available to prevent abuse.</p>
-            <a 
-              href={issueUrl}
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="inline-flex items-center text-blue-500 hover:text-blue-600 underline"
-            >
-              Create Deletion Request →
-            </a>
-          </div>
-        ),
+    mutationFn: async ({ radioId, publicKey }: { radioId: string; publicKey: string }) => {
+      const challengeRes = await fetch(`${workerUrl}/delete/challenge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ radioId, publicKey }),
       });
-      return { success: false };
+
+      if (!challengeRes.ok) {
+        const text = await challengeRes.text();
+        throw new Error(text || "Failed to request delete challenge");
+      }
+
+      const challengeData = await challengeRes.json() as { challenge: string; expiresAt: number };
+      if (!challengeData?.challenge) {
+        throw new Error("Delete challenge missing from server");
+      }
+
+      const signature = await signWithRadio(new TextEncoder().encode(challengeData.challenge));
+      if (!signature) {
+        throw new Error("Radio could not sign delete challenge");
+      }
+
+      const verifyRes = await fetch(`${workerUrl}/delete/${encodeURIComponent(radioId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicKey,
+          challenge: challengeData.challenge,
+          signature: bytesToHex(signature),
+        }),
+      });
+
+      if (!verifyRes.ok) {
+        const text = await verifyRes.text();
+        throw new Error(text || "Delete verification failed");
+      }
+
+      return await verifyRes.json() as {
+        success: boolean;
+        d1Deleted: number;
+        pendingRemoved: number;
+        csvRowsRemoved: number;
+      };
     },
-    onSuccess: () => {
+    onSuccess: async (_, vars) => {
+      await db.scanResults.where("radioId").equals(vars.radioId).delete();
+      await db.coverageZones.where("radioId").equals(vars.radioId).delete();
+
+      const outboxEntries = await db.outbox.toArray();
+      for (const entry of outboxEntries) {
+        const payload = entry.payload as any;
+        if (
+          Array.isArray(payload) &&
+          payload.some((scan) => scan?.radioId === vars.radioId)
+        ) {
+          await db.outbox.delete(entry.id!);
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["raw-scans"] });
+      toast({ title: t("toast.dataDeleted") });
       setConfirmDelete(false);
     },
-    onError: () => {
-      toast({ title: t("toast.deleteFailed"), variant: "destructive" });
+    onError: (err: any) => {
+      toast({
+        title: t("toast.deleteFailed"),
+        description: err?.message || undefined,
+        variant: "destructive",
+      });
     },
   });
 
   const handleDeleteData = () => {
     if (!selfInfo?.publicKey) return;
+    if (!online) {
+      toast({
+        title: t("toast.deleteFailed"),
+        description: t("settings.noNetworkDesc"),
+        variant: "destructive",
+      });
+      return;
+    }
     const radioId = publicKeyHex(selfInfo.publicKey);
-    deleteDataMutation.mutate(radioId);
+    const fullPublicKey = bytesToHex(selfInfo.publicKey);
+    deleteDataMutation.mutate({ radioId, publicKey: fullPublicKey });
   };
 
   const markDeadZoneMutation = useMutation({
@@ -597,7 +655,7 @@ export function SettingsPanel() {
                     size="sm"
                     variant="destructive"
                     onClick={handleDeleteData}
-                    disabled={deleteDataMutation.isPending}
+                    disabled={deleteDataMutation.isPending || !online}
                     className="flex-1"
                     data-testid="button-confirm-delete"
                   >
