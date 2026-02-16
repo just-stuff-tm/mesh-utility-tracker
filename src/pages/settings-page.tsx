@@ -115,6 +115,11 @@ export default function SettingsPage() {
               data-testid="switch-settings-smart-scan"
             />
           </div>
+          <p className="text-xs text-muted-foreground">
+            {smartScanEnabled
+              ? `On: scans are skipped in hexes with successful coverage in the last ${smartScanDays} day${smartScanDays === 1 ? "" : "s"}.`
+              : "Off: every scan interval will run, even in recently covered hexes."}
+          </p>
 
           {smartScanEnabled && (
             <div className="space-y-2 pl-1">

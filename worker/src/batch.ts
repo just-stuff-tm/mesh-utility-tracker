@@ -15,11 +15,19 @@ interface ScanPayload {
   };
   nodes: Array<{
     nodeId: string;
+    name?: string;
     rssi: number;
     snr: number;
-    hopLimit?: number;
   }>;
 }
+
+const DEAD_ZONE_RSSI = -130;
+const DEAD_ZONE_SNR = 0;
+
+const HEX_SIZE = 0.0007;
+const LNG_SCALE = 1.2;
+const ROW_SPACING = HEX_SIZE * 1.5;
+const COL_SPACING = HEX_SIZE * Math.sqrt(3) * LNG_SCALE;
 
 const MASTER_CSV_PATH = 'scans.csv';
 const MASTER_CSV_HEADERS = [
@@ -33,9 +41,11 @@ const MASTER_CSV_HEADERS = [
   'nodeId',
   'rssi',
   'snr',
-  'hopLimit',
 ];
+// Legacy header compatibility for existing repositories that still include hopLimit.
+const MASTER_CSV_HEADERS_WITH_HOP_LIMIT = [...MASTER_CSV_HEADERS, 'hopLimit'];
 const LEGACY_CSV_HEADERS = MASTER_CSV_HEADERS.slice(1);
+const LEGACY_CSV_HEADERS_WITH_HOP_LIMIT = MASTER_CSV_HEADERS_WITH_HOP_LIMIT.slice(1);
 const MAX_MASTER_CSV_BYTES = 95 * 1024 * 1024;
 
 export class ScanBatcher {
@@ -263,51 +273,37 @@ export class ScanBatcher {
     existingContent: string | null,
     scans: ScanPayload[]
   ): { content: string; rowsAdded: number } {
-    let csv = existingContent ? existingContent.replace(/\r\n/g, '\n').trimEnd() : '';
-    let nextRowId = 1;
+    const successfulHexes = this.collectSuccessfulScanHexes(scans);
+    const existingRows = this.normalizeExistingRows(existingContent, successfulHexes);
+    const nextRowId = existingRows.length + 1;
 
-    if (csv.length > 0) {
-      const headerEnd = csv.indexOf('\n');
-      const header = headerEnd === -1 ? csv : csv.slice(0, headerEnd);
-      const body = headerEnd === -1 ? '' : csv.slice(headerEnd + 1);
-
-      if (header === LEGACY_CSV_HEADERS.join(',')) {
-        const migratedRows = body
-          .split('\n')
-          .filter((line) => line.trim().length > 0)
-          .map((line, index) => `${index + 1},${line}`);
-        csv = [MASTER_CSV_HEADERS.join(','), ...migratedRows].join('\n');
-        nextRowId = migratedRows.length + 1;
-      } else if (header === MASTER_CSV_HEADERS.join(',')) {
-        nextRowId = this.countDataRows(csv) + 1;
-      } else {
-        throw new Error(`Unexpected CSV header in ${MASTER_CSV_PATH}`);
-      }
-    } else {
-      csv = MASTER_CSV_HEADERS.join(',');
-    }
-
-    const newRows = this.convertToCSVRows(scans, nextRowId);
-    if (newRows.length === 0) {
-      return {
-        content: `${csv}\n`,
-        rowsAdded: 0,
-      };
-    }
+    const newRows = this.convertToCSVRows(scans, nextRowId, successfulHexes);
+    const allRows = [...existingRows, ...newRows];
 
     return {
-      content: `${csv}\n${newRows.join('\n')}\n`,
+      content: `${MASTER_CSV_HEADERS.join(',')}\n${allRows.join('\n')}\n`,
       rowsAdded: newRows.length,
     };
   }
 
-  private convertToCSVRows(scans: ScanPayload[], startRowId: number): string[] {
+  private convertToCSVRows(
+    scans: ScanPayload[],
+    startRowId: number,
+    successfulHexes: Set<string>
+  ): string[] {
     const rows: string[] = [];
     let rowId = startRowId;
 
     for (const scan of scans) {
-      const nodes = scan.nodes.length > 0 ? scan.nodes : [null];
-      for (const node of nodes) {
+      const scanHexKey = this.hexKey(scan.location.lat, scan.location.lon);
+      const hasDetectedNodes = scan.nodes.length > 0;
+
+      // If the same batch contains successful scans in this hex, skip dead-zone rows for that hex.
+      if (!hasDetectedNodes) {
+        if (successfulHexes.has(scanHexKey)) {
+          continue;
+        }
+
         rows.push(
           this.toCsvLine([
             rowId++,
@@ -317,10 +313,27 @@ export class ScanBatcher {
             scan.location.lat.toFixed(6),
             scan.location.lon.toFixed(6),
             scan.location.altitude != null ? scan.location.altitude.toFixed(1) : '',
-            node?.nodeId ?? '',
-            node?.rssi ?? '',
-            node?.snr ?? '',
-            node?.hopLimit ?? '',
+            '',
+            DEAD_ZONE_RSSI,
+            DEAD_ZONE_SNR,
+          ])
+        );
+        continue;
+      }
+
+      for (const node of scan.nodes) {
+        rows.push(
+          this.toCsvLine([
+            rowId++,
+            scan.radioId,
+            scan.timestamp,
+            new Date(scan.timestamp).toISOString(),
+            scan.location.lat.toFixed(6),
+            scan.location.lon.toFixed(6),
+            scan.location.altitude != null ? scan.location.altitude.toFixed(1) : '',
+            node.nodeId,
+            node.rssi,
+            node.snr,
           ])
         );
       }
@@ -329,19 +342,143 @@ export class ScanBatcher {
     return rows;
   }
 
-  private countDataRows(csv: string): number {
+  private normalizeExistingRows(existingContent: string | null, successfulHexes: Set<string>): string[] {
+    const csv = existingContent ? existingContent.replace(/\r\n/g, '\n').trimEnd() : '';
     if (!csv) {
-      return 0;
+      return [];
     }
 
-    let lineCount = 1;
-    for (let i = 0; i < csv.length; i++) {
-      if (csv[i] === '\n') {
-        lineCount++;
+    const lines = csv.split('\n');
+    const header = lines[0] ?? '';
+    const dataLines = lines.slice(1).filter((line) => line.trim().length > 0);
+
+    const headerText = header.trim();
+    const rows: string[] = [];
+
+    for (let index = 0; index < dataLines.length; index++) {
+      const line = dataLines[index];
+      const values = this.parseCsvLine(line);
+      const row = this.normalizeCsvRow(headerText, values, index + 1);
+      if (row) {
+        rows.push(row);
       }
     }
 
-    return Math.max(0, lineCount - 1);
+    let filtered = rows;
+    if (successfulHexes.size > 0) {
+      filtered = rows.filter((line) => {
+        const values = this.parseCsvLine(line);
+        const nodeId = values[7] ?? '';
+        if (nodeId.trim().length > 0) {
+          return true;
+        }
+
+        const lat = Number.parseFloat(values[4] ?? '');
+        const lon = Number.parseFloat(values[5] ?? '');
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          return true;
+        }
+
+        return !successfulHexes.has(this.hexKey(lat, lon));
+      });
+    }
+
+    // Keep row_id dense and stable after dead-zone cleanup.
+    return filtered.map((line, index) => {
+      const values = this.parseCsvLine(line);
+      values[0] = String(index + 1);
+      return this.toCsvLine(values.slice(0, MASTER_CSV_HEADERS.length));
+    });
+  }
+
+  private normalizeCsvRow(header: string, values: string[], legacyRowId: number): string | null {
+    if (header === MASTER_CSV_HEADERS.join(',')) {
+      if (values.length < MASTER_CSV_HEADERS.length) {
+        return null;
+      }
+      return this.toCsvLine(values.slice(0, MASTER_CSV_HEADERS.length));
+    }
+
+    if (header === MASTER_CSV_HEADERS_WITH_HOP_LIMIT.join(',')) {
+      if (values.length < MASTER_CSV_HEADERS_WITH_HOP_LIMIT.length) {
+        return null;
+      }
+      return this.toCsvLine(values.slice(0, MASTER_CSV_HEADERS.length));
+    }
+
+    if (header === LEGACY_CSV_HEADERS.join(',')) {
+      if (values.length < LEGACY_CSV_HEADERS.length) {
+        return null;
+      }
+      return this.toCsvLine([String(legacyRowId), ...values.slice(0, LEGACY_CSV_HEADERS.length)]);
+    }
+
+    if (header === LEGACY_CSV_HEADERS_WITH_HOP_LIMIT.join(',')) {
+      if (values.length < LEGACY_CSV_HEADERS_WITH_HOP_LIMIT.length) {
+        return null;
+      }
+      return this.toCsvLine([String(legacyRowId), ...values.slice(0, LEGACY_CSV_HEADERS.length)]);
+    }
+
+    throw new Error(`Unexpected CSV header in ${MASTER_CSV_PATH}`);
+  }
+
+  private collectSuccessfulScanHexes(scans: ScanPayload[]): Set<string> {
+    const hexes = new Set<string>();
+    for (const scan of scans) {
+      if (scan.nodes.length > 0) {
+        hexes.add(this.hexKey(scan.location.lat, scan.location.lon));
+      }
+    }
+    return hexes;
+  }
+
+  private snapToHexGrid(lat: number, lon: number): { snapLat: number; snapLon: number } {
+    const row = Math.round(lat / ROW_SPACING);
+    const isOddRow = Math.abs(row) % 2 === 1;
+    const offset = isOddRow ? COL_SPACING / 2 : 0;
+    const col = Math.round((lon - offset) / COL_SPACING);
+    return {
+      snapLat: row * ROW_SPACING,
+      snapLon: col * COL_SPACING + offset,
+    };
+  }
+
+  private hexKey(lat: number, lon: number): string {
+    const { snapLat, snapLon } = this.snapToHexGrid(lat, lon);
+    return `${snapLat.toFixed(6)}:${snapLon.toFixed(6)}`;
+  }
+
+  private parseCsvLine(line: string): string[] {
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (char === '"') {
+        const nextChar = line[i + 1];
+        if (inQuotes && nextChar === '"') {
+          current += '"';
+          i++;
+          continue;
+        }
+        inQuotes = !inQuotes;
+        continue;
+      }
+
+      if (char === ',' && !inQuotes) {
+        values.push(current);
+        current = '';
+        continue;
+      }
+
+      current += char;
+    }
+
+    values.push(current);
+    return values;
   }
 
   private toCsvLine(values: Array<string | number>): string {

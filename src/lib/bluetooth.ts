@@ -347,7 +347,6 @@ export interface RepeaterStats {
   rssi: number;
   snr: number;
   snrIn: number;
-  hopLimit?: number;
 }
 
 export interface RepeaterDiscoverResult {
@@ -374,7 +373,6 @@ interface NodeDiscoverEntry {
   snr: number;
   rssi: number;
   snrIn: number;
-  hopLimit: number;
   name: string;
   publicKeyPrefix: string;
 }
@@ -400,10 +398,8 @@ function parseControlDataFrame(frame: Uint8Array): NodeDiscoverEntry | null {
   const snrRaw = view.getInt8(1);
   const snr = snrRaw / 4;
   const rssi = view.getInt8(2);
-  const pathLen = frame[3];
-
   const payload = frame.slice(4);
-  remoteLog("log", `ControlData raw: snr=${snr} rssi=${rssi} pathLen=${pathLen} payload(${payload.length}b)=${Array.from(payload).map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
+  remoteLog("log", `ControlData raw: snr=${snr} rssi=${rssi} payload(${payload.length}b)=${Array.from(payload).map(b => b.toString(16).padStart(2, "0")).join(" ")}`);
 
   if (payload.length < 1) {
     remoteLog("log", `ControlData: empty payload`);
@@ -445,9 +441,9 @@ function parseControlDataFrame(frame: Uint8Array): NodeDiscoverEntry | null {
     name = new TextDecoder().decode(pubkeyData.slice(32)).replace(/\0/g, "").trim();
   }
 
-  remoteLog("log", `NodeDiscoverResp: snr=${snr} rssi=${rssi} snrIn=${snrIn} hopLimit=${pathLen} nodeType=${nodeType} tag=${tag} prefix=${publicKeyPrefix} name="${name}"`);
+  remoteLog("log", `NodeDiscoverResp: snr=${snr} rssi=${rssi} snrIn=${snrIn} nodeType=${nodeType} tag=${tag} prefix=${publicKeyPrefix} name="${name}"`);
 
-  return { snr, rssi, snrIn, hopLimit: pathLen, name, publicKeyPrefix };
+  return { snr, rssi, snrIn, name, publicKeyPrefix };
 }
 
 export async function discoverRepeaters(
@@ -482,9 +478,9 @@ export async function discoverRepeaters(
         remoteLog("log", `[DISCOVER] Got CONTROL_DATA frame, parsing...`);
         const entry = parseControlDataFrame(frame);
         if (entry) {
-          remoteLog("log", `[DISCOVER] Node "${entry.name}": RSSI=${entry.rssi} SNR=${entry.snr} SNR_in=${entry.snrIn} hopLimit=${entry.hopLimit} prefix=${entry.publicKeyPrefix}`);
+          remoteLog("log", `[DISCOVER] Node "${entry.name}": RSSI=${entry.rssi} SNR=${entry.snr} SNR_in=${entry.snrIn} prefix=${entry.publicKeyPrefix}`);
           discoveredNodes.set(entry.publicKeyPrefix, {
-            stats: { rssi: entry.rssi, snr: entry.snr, snrIn: entry.snrIn, hopLimit: entry.hopLimit },
+            stats: { rssi: entry.rssi, snr: entry.snr, snrIn: entry.snrIn },
             name: entry.name,
           });
         } else {
@@ -495,7 +491,7 @@ export async function discoverRepeaters(
 
     const onNewAdvert = (data: any) => {
       const key = pubKeyPrefixHex(data.publicKey.slice(0, 8));
-      remoteLog("log", `NewAdvert: "${data.advName}" type=${data.type} pathLen=${data.outPathLen} prefix=${key}`);
+      remoteLog("log", `NewAdvert: "${data.advName}" type=${data.type} prefix=${key}`);
       discoveredAdverts.set(key, {
         publicKey: data.publicKey,
         type: data.type,

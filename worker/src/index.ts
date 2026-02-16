@@ -25,11 +25,14 @@ export interface ScanPayload {
   };
   nodes: Array<{
     nodeId: string;
+    name?: string;
     rssi: number;
     snr: number;
-    hopLimit?: number;
   }>;
 }
+
+const DEAD_ZONE_RSSI = -130;
+const DEAD_ZONE_SNR = 0;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -133,24 +136,49 @@ export default {
           .all();
 
         // Convert to NDJSON format
-        const ndjson = scans.results
-          .map((row: any) => {
-            const nodes = JSON.parse(row.nodes);
-            return nodes.map((node: any) => JSON.stringify({
+        const ndjsonLines = scans.results.flatMap((row: any) => {
+          let nodes: any[] = [];
+          try {
+            const parsed = JSON.parse(row.nodes);
+            if (Array.isArray(parsed)) {
+              nodes = parsed;
+            }
+          } catch {}
+
+          if (nodes.length === 0) {
+            return [
+              JSON.stringify({
+                radioId: row.radioId,
+                timestamp: row.timestamp,
+                latitude: row.latitude,
+                longitude: row.longitude,
+                altitude: row.altitude,
+                nodeId: '',
+                senderName: null,
+                rssi: DEAD_ZONE_RSSI,
+                snr: DEAD_ZONE_SNR,
+                receivedAt: new Date(row.timestamp).toISOString(),
+              }),
+            ];
+          }
+
+          return nodes.map((node: any) =>
+            JSON.stringify({
               radioId: row.radioId,
               timestamp: row.timestamp,
               latitude: row.latitude,
               longitude: row.longitude,
               altitude: row.altitude,
-              nodeId: node.nodeId,
-              rssi: node.rssi,
-              snr: node.snr,
-              hopLimit: node.hopLimit,
+              nodeId: typeof node?.nodeId === 'string' ? node.nodeId : '',
+              senderName: typeof node?.name === 'string' ? node.name : null,
+              rssi: typeof node?.rssi === 'number' ? node.rssi : DEAD_ZONE_RSSI,
+              snr: typeof node?.snr === 'number' ? node.snr : DEAD_ZONE_SNR,
               receivedAt: new Date(row.timestamp).toISOString(),
-            })).join('\n');
-          })
-          .filter(Boolean)
-          .join('\n');
+            })
+          );
+        });
+
+        const ndjson = ndjsonLines.join('\n');
 
         return new Response(ndjson, {
           headers: { 

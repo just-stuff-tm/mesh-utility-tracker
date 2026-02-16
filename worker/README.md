@@ -92,7 +92,7 @@ Health check.
 - Batch size trigger: 20 scans
 - Time trigger: 5 minutes
 - Commit output: append-only updates to `scans.csv`
-- CSV columns: `row_id,radioId,timestamp,datetime_utc,latitude,longitude,altitude,nodeId,rssi,snr,hopLimit`
+- CSV columns: `row_id,radioId,timestamp,datetime_utc,latitude,longitude,altitude,nodeId,rssi,snr`
 
 ## Useful Commands
 

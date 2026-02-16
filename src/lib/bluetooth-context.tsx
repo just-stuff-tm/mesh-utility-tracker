@@ -21,6 +21,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { db, generateLocalId, isOnline, enqueueMutation, drainOutbox, getOutboxCount } from "@/lib/offline-store";
 import { snapToHexGrid } from "@shared/grid";
 
+const DEAD_ZONE_RSSI = -130;
+const DEAD_ZONE_SNR = 0;
+
 export type ScanStatus = "idle" | "advertising" | "waiting" | "querying" | "submitting" | "done" | "error";
 export type UnitSystem = "imperial" | "metric";
 
@@ -273,7 +276,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const checkSmartScanSkip = useCallback(async (): Promise<boolean> => {
-    if (!smartScanEnabledRef.current) return false;
+    if (!smartScanEnabledRef.current || smartScanDaysRef.current < 1) return false;
     
     const pos = positionRef.current;
     if (!pos) return false;
@@ -284,19 +287,17 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     const cutoffTimestamp = cutoffDate.toISOString();
 
     try {
-      // Check if any scans exist in this hex within the freshness window
-      const recentScans = await db.scanResults
-        .where("timestamp")
-        .above(cutoffTimestamp)
-        .toArray();
+      // Smart scan should rely on persisted local zone state, not transient outbox rows.
+      const zones = await db.coverageZones.toArray();
 
-      // Filter to scans in the current hex
-      const hexScans = recentScans.filter((scan) => {
-        const { snapLat: scanLat, snapLng: scanLng } = snapToHexGrid(scan.latitude, scan.longitude);
-        return Math.abs(scanLat - snapLat) < 0.000001 && Math.abs(scanLng - snapLng) < 0.000001;
+      const hasRecentCoverage = zones.some((zone) => {
+        if (zone.isDeadZone) return false;
+        if (!zone.lastScanned) return false;
+        if (zone.lastScanned <= cutoffTimestamp) return false;
+        return Math.abs(zone.centerLat - snapLat) < 0.000001 && Math.abs(zone.centerLng - snapLng) < 0.000001;
       });
 
-      return hexScans.length > 0;
+      return hasRecentCoverage;
     } catch (err) {
       console.error("[SmartScan] Failed to check recent scans:", err);
       return false;
@@ -396,9 +397,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
             radioId,
           };
 
-          // Queue scan for batch upload to worker/GitHub
-          // NOTE: Only successful scans (with discovered nodes) are uploaded
-          // Dead zones are stored locally only and never synced to cloud
+          // Queue successful scan for batch upload to worker/GitHub
           try {
             const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
             const workerPayload = [{
@@ -411,9 +410,9 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
               },
               nodes: [{
                 nodeId,
+                name: displayName,
                 rssi: rep.stats.rssi,
                 snr: rep.stats.snr,
-                hopLimit: rep.stats.hopLimit,
               }],
             }];
             console.log('[Bluetooth] Queuing scan for batch upload:', workerPayload);
@@ -439,77 +438,124 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
                 ...scanData,
                 timestamp: new Date().toISOString(),
               });
-
-              const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
-              const existing = await db.coverageZones
-                .filter((z) => Math.abs(z.centerLat - snapLat) < 0.0001 && Math.abs(z.centerLng - snapLng) < 0.0001)
-                .first();
-              
-              if (existing) {
-                // Update existing zone with successful scan
-                // This automatically converts dead zones to active zones
-                const newCount = (existing.scanCount || 0) + 1;
-                const newAvgRssi = ((existing.avgRssi || 0) * (existing.scanCount || 0) + rep.stats.rssi) / newCount;
-                const newAvgSnr = ((existing.avgSnr || 0) * (existing.scanCount || 0) + rep.stats.snr) / newCount;
-                await db.coverageZones.put({
-                  ...existing,
-                  avgRssi: newAvgRssi,
-                  avgSnr: newAvgSnr,
-                  scanCount: newCount,
-                  isDeadZone: false, // Clear dead zone flag on successful scan
-                  lastScanned: new Date().toISOString(),
-                });
-              } else {
-                await db.coverageZones.put({
-                  id: generateLocalId(),
-                  centerLat: snapLat,
-                  centerLng: snapLng,
-                  radiusMeters: 80,
-                  avgRssi: rep.stats.rssi,
-                  avgSnr: rep.stats.snr,
-                  scanCount: 1,
-                  lastScanned: new Date().toISOString(),
-                  isDeadZone: false,
-                  polygon: null,
-                  radioId,
-                });
-              }
               scanResultsSubmitted++;
             } catch {}
           }
+
+          // Keep local coverage zones up-to-date in both online and offline modes.
+          // Smart scan checks this table, and successful scans clear dead-zone state.
+          try {
+            const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
+            const existing = await db.coverageZones
+              .filter((z) => Math.abs(z.centerLat - snapLat) < 0.0001 && Math.abs(z.centerLng - snapLng) < 0.0001)
+              .first();
+
+            if (existing) {
+              const newCount = (existing.scanCount || 0) + 1;
+              const newAvgRssi = ((existing.avgRssi || 0) * (existing.scanCount || 0) + rep.stats.rssi) / newCount;
+              const newAvgSnr = ((existing.avgSnr || 0) * (existing.scanCount || 0) + rep.stats.snr) / newCount;
+              await db.coverageZones.put({
+                ...existing,
+                avgRssi: newAvgRssi,
+                avgSnr: newAvgSnr,
+                scanCount: newCount,
+                isDeadZone: false,
+                lastScanned: new Date().toISOString(),
+              });
+            } else {
+              await db.coverageZones.put({
+                id: generateLocalId(),
+                centerLat: snapLat,
+                centerLng: snapLng,
+                radiusMeters: 80,
+                avgRssi: rep.stats.rssi,
+                avgSnr: rep.stats.snr,
+                scanCount: 1,
+                lastScanned: new Date().toISOString(),
+                isDeadZone: false,
+                polygon: null,
+                radioId,
+              });
+            }
+          } catch {}
         }
 
         if (result.repeaters.length === 0) {
-          // Dead zone - scan data already sent with 0 repeaters
+          const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
 
+          // Dead-zone scans are now synced to worker/GitHub with an empty node list.
+          try {
+            const deadZonePayload = [{
+              radioId: radioId || "local-observer",
+              timestamp: Date.now(),
+              location: {
+                lat: pos[0],
+                lon: pos[1],
+                altitude: altitudeRef.current || undefined,
+              },
+              nodes: [],
+            }];
+
+            console.log("[Bluetooth] Queuing dead-zone scan for batch upload:", deadZonePayload);
+            await enqueueMutation({
+              url: `${workerUrl}/scans`,
+              method: "POST",
+              payload: deadZonePayload,
+              createdAt: Date.now(),
+              retries: 0,
+            });
+            scanResultsSubmitted++;
+            setQueuedScansCount((prev) => prev + 1);
+          } catch (err) {
+            console.error("[Bluetooth] Error queuing dead-zone scan:", err);
+          }
+
+          // Save dead-zone scans locally when offline for immediate offline rendering.
           if (!isOnline()) {
             try {
-              const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
-              const existing = await db.coverageZones
-                .filter((z) => Math.abs(z.centerLat - snapLat) < 0.0001 && Math.abs(z.centerLng - snapLng) < 0.0001)
-                .first();
-              
-              // Only mark as dead zone if:
-              // 1. No existing zone, OR
-              // 2. Existing zone is already a dead zone
-              // Never overwrite successful scan zones
-              if (!existing || existing.isDeadZone) {
-                await db.coverageZones.put({
-                  id: existing?.id || generateLocalId(),
-                  centerLat: snapLat,
-                  centerLng: snapLng,
-                  radiusMeters: 80,
-                  avgRssi: null,
-                  avgSnr: null,
-                  scanCount: 0,
-                  lastScanned: new Date().toISOString(),
-                  isDeadZone: true,
-                  polygon: null,
-                  radioId,
-                });
-              }
+              await db.scanResults.put({
+                id: generateLocalId(),
+                observerId: radioId || "local-observer",
+                nodeId: "",
+                rssi: DEAD_ZONE_RSSI,
+                snr: DEAD_ZONE_SNR,
+                snrIn: null,
+                latitude: pos[0],
+                longitude: pos[1],
+                altitude: altitudeRef.current,
+                timestamp: new Date().toISOString(),
+                senderName: null,
+                receiverName: selfInfoRef.current?.name || "Observer",
+                radioId,
+              });
+              scanResultsSubmitted++;
             } catch {}
           }
+
+          // Track dead zones locally in both online and offline modes.
+          try {
+            const { snapLat, snapLng } = snapToHexGrid(pos[0], pos[1]);
+            const existing = await db.coverageZones
+              .filter((z) => Math.abs(z.centerLat - snapLat) < 0.0001 && Math.abs(z.centerLng - snapLng) < 0.0001)
+              .first();
+
+            // Never overwrite successful coverage with dead-zone state.
+            if (!existing || existing.isDeadZone) {
+              await db.coverageZones.put({
+                id: existing?.id || generateLocalId(),
+                centerLat: snapLat,
+                centerLng: snapLng,
+                radiusMeters: 80,
+                avgRssi: null,
+                avgSnr: null,
+                scanCount: 0,
+                lastScanned: new Date().toISOString(),
+                isDeadZone: true,
+                polygon: null,
+                radioId,
+              });
+            }
+          } catch {}
         }
       }
 
@@ -838,8 +884,20 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         dismissReconnect,
         setScanInterval,
         setAutoCenter,
-        setSmartScanEnabled,
-        setSmartScanDays,
+        setSmartScanEnabled: (value: boolean) => {
+          setSmartScanEnabled(value);
+          if (value && smartScanDaysRef.current < 1) {
+            setSmartScanDays(1);
+          }
+        },
+        setSmartScanDays: (value: number) => {
+          if (value <= 0) {
+            setSmartScanEnabled(false);
+            setSmartScanDays(1);
+            return;
+          }
+          setSmartScanDays(value);
+        },
         setStatsRadiusMiles: (v: number) => {
           setStatsRadiusMiles(v);
           try { localStorage.setItem("mesh_stats_radius", String(v)); } catch {}

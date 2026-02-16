@@ -92,7 +92,6 @@ Each \`batch-*.csv\` file contains scan records with these columns:
 | \`nodeId\` | Detected node ID | \`!def45678\` |
 | \`rssi\` | Signal strength (dBm) | \`-85\` |
 | \`snr\` | Signal-to-noise ratio (dB) | \`8.5\` |
-| \`hopLimit\` | Remaining hops | \`3\` |
 
 ### JSON Files (For API Integration)
 
@@ -187,10 +186,10 @@ wc -l scans/*/*.csv
 
 ## Advanced Filtering Examples
 
-### Find Zero-Hop Scans
+### Find Dead-Zone Rows
 \`\`\`bash
-# Scans where hopLimit is 0 (direct connection)
-awk -F',' '$10 == "0"' scans/**/*.csv
+# Rows where no repeater node was discovered
+awk -F',' '$8 == ""' scans/**/*.csv
 \`\`\`
 
 ### Geographic Bounding Box
@@ -218,7 +217,7 @@ hourly = all_data.groupby('hour').size()
 
 ## Data Quality Notes
 
-- **Zero-hop only:** All scans have \`hopLimit = 0\` (this tool only performs direct connection scans, no mesh routing)
+- **Direct scans only:** Data comes from direct discovery scans (no mesh routing metrics stored)
 - **Missing altitude:** Not all scans include altitude data
 - **Duplicate detection:** Scanner may report same node multiple times per location
 - **Timestamp precision:** Millisecond precision, UTC timezone

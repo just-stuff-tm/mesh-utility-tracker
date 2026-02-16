@@ -62,6 +62,8 @@ const translations: Record<Language, TranslationMap> = {
     "settings.smartScanning": "Smart Scanning",
     "settings.smartScanDesc": "Skip scanning in areas covered in the last {days} days",
     "settings.coverageFreshness": "Coverage freshness: {days} days",
+    "settings.smartScanOnHelp": "On: skip scans in hexes with successful coverage from the last {days} days.",
+    "settings.smartScanOffHelp": "Off: scan every interval, including recently covered hexes.",
     "settings.deadZones": "Dead Zones",
     "settings.deadZoneDesc": "Mark current location as a dead zone. Dead zones always scan at the set interval.",
     "settings.markDeadZone": "Mark Dead Zone",

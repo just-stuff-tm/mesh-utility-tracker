@@ -203,13 +203,18 @@ export function SettingsPanel() {
               <Slider
                 value={[smartScanDays]}
                 onValueChange={([v]) => setSmartScanDays(v)}
-                min={0}
+                min={1}
                 max={14}
                 step={1}
                 data-testid="slider-smart-scan-days"
               />
             </div>
           )}
+          <p className="text-xs text-muted-foreground">
+            {smartScanEnabled
+              ? t("settings.smartScanOnHelp", { days: smartScanDays })
+              : t("settings.smartScanOffHelp")}
+          </p>
         </div>
 
         <Separator />

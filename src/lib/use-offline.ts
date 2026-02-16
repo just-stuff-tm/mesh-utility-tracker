@@ -26,7 +26,6 @@ export function useOfflineStatus() {
       if (result.synced > 0) {
         await db.nodes.where("id").startsWith("local-").delete();
         await db.scanResults.where("id").startsWith("local-").delete();
-        await db.coverageZones.where("id").startsWith("local-").delete();
       }
       // Query invalidation removed - using IndexedDB and Worker directly
     } finally {
