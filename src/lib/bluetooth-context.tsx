@@ -65,6 +65,7 @@ interface BluetoothContextValue {
   scanStatus: ScanStatus;
   lastScanResult: LastScanResult | null;
   uploadBatchInterval: number;
+  historyDays: number;
   queuedScansCount: number;
   lastUploadTime: number;
   connect: () => Promise<void>;
@@ -80,6 +81,7 @@ interface BluetoothContextValue {
   setUnitSystem: (v: UnitSystem) => void;
   setUpdateRadioPosition: (v: boolean) => void;
   setUploadBatchInterval: (v: number) => void;
+  setHistoryDays: (v: number) => void;
   manualSync: () => Promise<{ synced: number; failed: number }>;
   refreshQueuedScansCount: () => Promise<void>;
 }
@@ -129,6 +131,15 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem("mesh_upload_batch_interval");
       return stored ? parseInt(stored, 10) : 10; // default 10 minutes
     } catch { return 10; }
+  });
+  const [historyDays, setHistoryDaysState] = useState(() => {
+    try {
+      const stored = localStorage.getItem("mesh_history_days");
+      if (stored === null) return 7; // default 7-day cloud history window
+      const parsed = parseInt(stored, 10);
+      if (Number.isNaN(parsed) || parsed < 0) return 7;
+      return parsed;
+    } catch { return 7; }
   });
   const [queuedScansCount, setQueuedScansCount] = useState(0);
   const [lastUploadTime, setLastUploadTime] = useState<number>(0);
@@ -508,7 +519,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
           } catch {}
         }
 
-        if (result.repeaters.length === 0) {
+        const hasRepeaterWithStats = result.repeaters.some((rep) => !!rep.stats);
+        if (!hasRepeaterWithStats) {
           const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
 
           // Dead-zone scans are now synced to worker/GitHub with an empty node list.
@@ -859,6 +871,11 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
     setUploadBatchIntervalState(v);
     try { localStorage.setItem("mesh_upload_batch_interval", String(v)); } catch {}
   }, []);
+  const setHistoryDays = useCallback((v: number) => {
+    const next = Math.max(0, Math.floor(v));
+    setHistoryDaysState(next);
+    try { localStorage.setItem("mesh_history_days", String(next)); } catch {}
+  }, []);
 
   const refreshQueuedScansCount = useCallback(async () => {
     const count = await getOutboxCount();
@@ -950,9 +967,11 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
           try { localStorage.setItem("mesh_update_radio_position", String(v)); } catch {}
         },
         uploadBatchInterval,
+        historyDays,
         queuedScansCount,
         lastUploadTime,
         setUploadBatchInterval,
+        setHistoryDays,
         manualSync,
         refreshQueuedScansCount,
       }}

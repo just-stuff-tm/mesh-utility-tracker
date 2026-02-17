@@ -136,7 +136,7 @@ export async function fetchAndAggregate(
     const resp = await fetch(`${workerUrl}/history`);
     if (!resp.ok) throw new Error("Failed to fetch history days");
     const allDays: string[] = await resp.json();
-    targetDays = allDays.slice(-7); // Last 7 days
+    targetDays = allDays; // Online mode: include all available D1 history days
   }
 
   // Fetch all days in parallel
@@ -174,7 +174,7 @@ export async function fetchRawScans(
     const resp = await fetch(`${workerUrl}/history`);
     if (!resp.ok) throw new Error("Failed to fetch history days");
     const allDays: string[] = await resp.json();
-    targetDays = allDays.slice(-7);
+    targetDays = allDays; // Online mode: include all available D1 history days
   }
 
   const scanArrays = await Promise.all(

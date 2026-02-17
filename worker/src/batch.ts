@@ -24,15 +24,11 @@ interface ScanPayload {
   }>;
 }
 
-const DEAD_ZONE_RSSI = -130;
-const DEAD_ZONE_SNR = 0;
-
+const MASTER_CSV_PATH = 'scans.csv';
 const HEX_SIZE = 0.0007;
 const LNG_SCALE = 1.2;
 const ROW_SPACING = HEX_SIZE * 1.5;
 const COL_SPACING = HEX_SIZE * Math.sqrt(3) * LNG_SCALE;
-
-const MASTER_CSV_PATH = 'scans.csv';
 const MASTER_CSV_HEADERS = [
   'row_id',
   'radioId',
@@ -114,6 +110,10 @@ export class ScanBatcher {
       if (db) {
         try {
           for (const scan of newScans) {
+            if (scan.nodes.length > 0) {
+              await this.deleteDeadZonesForHex(scan.location.lat, scan.location.lon);
+            }
+
             await db.prepare(`
               INSERT INTO scans (radioId, timestamp, latitude, longitude, altitude, nodes, committed)
               VALUES (?, ?, ?, ?, ?, ?, 0)
@@ -297,11 +297,10 @@ export class ScanBatcher {
     existingContent: string | null,
     scans: ScanPayload[]
   ): { content: string; rowsAdded: number } {
-    const successfulHexes = this.collectSuccessfulScanHexes(scans);
-    const existingRows = this.normalizeExistingRows(existingContent, successfulHexes);
+    const existingRows = this.normalizeExistingRows(existingContent);
     const nextRowId = existingRows.length + 1;
 
-    const newRows = this.convertToCSVRows(scans, nextRowId, successfulHexes);
+    const newRows = this.convertToCSVRows(scans, nextRowId);
     const allRows = [...existingRows, ...newRows];
 
     return {
@@ -312,40 +311,16 @@ export class ScanBatcher {
 
   private convertToCSVRows(
     scans: ScanPayload[],
-    startRowId: number,
-    successfulHexes: Set<string>
+    startRowId: number
   ): string[] {
     const rows: string[] = [];
     let rowId = startRowId;
 
     for (const scan of scans) {
-      const scanHexKey = this.hexKey(scan.location.lat, scan.location.lon);
       const hasDetectedNodes = scan.nodes.length > 0;
 
-      // If the same batch contains successful scans in this hex, skip dead-zone rows for that hex.
       if (!hasDetectedNodes) {
-        if (successfulHexes.has(scanHexKey)) {
-          continue;
-        }
-
-        rows.push(
-          this.toCsvLine([
-            rowId++,
-            scan.radioId,
-            scan.timestamp,
-            new Date(scan.timestamp).toISOString(),
-            scan.location.lat.toFixed(6),
-            scan.location.lon.toFixed(6),
-            scan.location.altitude != null ? scan.location.altitude.toFixed(1) : '',
-            '',
-            DEAD_ZONE_RSSI,
-            DEAD_ZONE_SNR,
-            scan.observerName ?? '',
-            '',
-            '',
-            '',
-          ])
-        );
+        // Dead-zone scans are kept in D1 only; do not publish to GitHub CSV.
         continue;
       }
 
@@ -378,7 +353,7 @@ export class ScanBatcher {
     return rows;
   }
 
-  private normalizeExistingRows(existingContent: string | null, successfulHexes: Set<string>): string[] {
+  private normalizeExistingRows(existingContent: string | null): string[] {
     const csv = existingContent ? existingContent.replace(/\r\n/g, '\n').trimEnd() : '';
     if (!csv) {
       return [];
@@ -402,24 +377,13 @@ export class ScanBatcher {
       }
     }
 
-    let filtered = rows;
-    if (successfulHexes.size > 0) {
-      filtered = rows.filter((line) => {
-        const values = this.parseCsvLine(line);
-        const nodeId = values[7] ?? '';
-        if (nodeId.trim().length > 0) {
-          return true;
-        }
-
-        const lat = Number.parseFloat(values[4] ?? '');
-        const lon = Number.parseFloat(values[5] ?? '');
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          return true;
-        }
-
-        return !successfulHexes.has(this.hexKey(lat, lon));
-      });
-    }
+    // Keep only successful scan rows in GitHub CSV (nodeId present).
+    // This also cleans up any historical dead-zone rows on the next commit.
+    const filtered = rows.filter((line) => {
+      const values = this.parseCsvLine(line);
+      const nodeId = values[7] ?? '';
+      return nodeId.trim().length > 0;
+    });
 
     // Keep row_id dense and stable after dead-zone cleanup.
     return filtered.map((line, index) => {
@@ -532,14 +496,28 @@ export class ScanBatcher {
     };
   }
 
-  private collectSuccessfulScanHexes(scans: ScanPayload[]): Set<string> {
-    const hexes = new Set<string>();
-    for (const scan of scans) {
-      if (scan.nodes.length > 0) {
-        hexes.add(this.hexKey(scan.location.lat, scan.location.lon));
+  private async deleteDeadZonesForHex(lat: number, lon: number): Promise<void> {
+    const db = this.env.DB;
+    if (!db) return;
+
+    const targetHex = this.hexKey(lat, lon);
+    const range = 0.01;
+    const result = await db.prepare(`
+      SELECT id, latitude, longitude
+      FROM scans
+      WHERE nodes = '[]'
+        AND latitude BETWEEN ? AND ?
+        AND longitude BETWEEN ? AND ?
+    `)
+      .bind(lat - range, lat + range, lon - range, lon + range)
+      .all();
+
+    for (const row of result.results as Array<{ id: number; latitude: number; longitude: number }>) {
+      if (this.hexKey(row.latitude, row.longitude) !== targetHex) {
+        continue;
       }
+      await db.prepare(`DELETE FROM scans WHERE id = ?`).bind(row.id).run();
     }
-    return hexes;
   }
 
   private snapToHexGrid(lat: number, lon: number): { snapLat: number; snapLon: number } {

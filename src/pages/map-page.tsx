@@ -31,9 +31,12 @@ import { db, type LocalScanResult } from "@/lib/offline-store";
 import { useOfflineStatus } from "@/lib/use-offline";
 
 export default function MapPage() {
+  const INITIAL_HISTORY_DAYS = 3;
+  const RAW_SCAN_DAY_CAP = 14;
+  const MAX_RAW_SCANS = 50000;
   const { t } = useI18n();
   const { toast } = useToast();
-  const { observerPosition, autoCenter, setAutoCenter, connected, selfInfo, statsRadiusMiles, unitSystem } = useBluetoothContext();
+  const { observerPosition, autoCenter, setAutoCenter, connected, selfInfo, statsRadiusMiles, unitSystem, historyDays } = useBluetoothContext();
   const { online, forceOffline } = useOfflineStatus();
   const [selectedZone, setSelectedZone] = useState<CoverageZone | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -41,6 +44,7 @@ export default function MapPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
   const [fitBoundsTarget, setFitBoundsTarget] = useState<L.LatLngBoundsExpression | null>(null);
+  const [backgroundScans, setBackgroundScans] = useState<RawScan[]>([]);
 
   const searchString = useSearch();
   useEffect(() => {
@@ -67,9 +71,26 @@ export default function MapPage() {
   // Cloudflare Worker URL - configurable via env or default to localhost
   const workerUrl = import.meta.env.VITE_WORKER_URL || "http://127.0.0.1:8787";
 
-  // Fetch raw scans from Worker and IndexedDB
-  const { data: rawScans = [] } = useQuery({
-    queryKey: ["raw-scans", workerUrl, online, forceOffline],
+  const { data: serverCoverageZones = [] } = useQuery({
+    queryKey: ["coverage-zones", workerUrl, online, forceOffline, historyDays],
+    queryFn: async (): Promise<CoverageZone[]> => {
+      if (forceOffline) return [];
+      const daysParam = historyDays > 0 ? String(historyDays) : "0";
+      const resp = await fetch(`${workerUrl}/coverage?days=${encodeURIComponent(daysParam)}`);
+      if (!resp.ok) throw new Error("Failed to fetch coverage zones");
+      const rows = await resp.json() as Array<CoverageZone & { lastScanned: string }>;
+      return rows.map((row) => ({
+        ...row,
+        lastScanned: new Date(row.lastScanned),
+      }));
+    },
+    refetchInterval: 30000,
+    staleTime: 10000,
+  });
+
+  // Fetch newest scans first for fast initial render.
+  const { data: baseRawScans = [] } = useQuery({
+    queryKey: ["raw-scans-base", workerUrl, online, forceOffline, historyDays],
     queryFn: async (): Promise<RawScan[]> => {
       // Fetch from IndexedDB
       const localScans = await db.scanResults.toArray();
@@ -88,9 +109,17 @@ export default function MapPage() {
         radioId: scan.radioId ?? undefined,
       }));
 
-      // Try to fetch from Worker
+      // Try to fetch newest days from Worker for quick first paint
       try {
-        const workerScans = await fetchRawScans(workerUrl);
+        const daysResp = await fetch(`${workerUrl}/history`);
+        if (!daysResp.ok) throw new Error("Failed to fetch history days");
+        const allDays: string[] = await daysResp.json();
+        const selectedDays = historyDays > 0 ? allDays.slice(0, historyDays) : allDays;
+        const rawDays = selectedDays.slice(0, RAW_SCAN_DAY_CAP);
+        const recentDays = rawDays.slice(0, INITIAL_HISTORY_DAYS);
+        const workerScans = recentDays.length > 0
+          ? await fetchRawScans(workerUrl, recentDays)
+          : [];
         // Merge: deduplicate by id if present, otherwise combine all
         const combined = [...workerScans, ...localRawScans];
         return combined;
@@ -103,8 +132,54 @@ export default function MapPage() {
     staleTime: 10000,
   });
 
-  // Derive coverage zones, nodes, and scan results from raw data
-  const coverageZones = useMemo(() => aggregateScansToZones(rawScans), [rawScans]);
+  // Backfill older history in background so map remains responsive.
+  useEffect(() => {
+    let cancelled = false;
+    setBackgroundScans([]);
+
+    const loadOlderDays = async () => {
+      if (forceOffline) return;
+
+      try {
+        const daysResp = await fetch(`${workerUrl}/history`);
+        if (!daysResp.ok) return;
+        const allDays: string[] = await daysResp.json();
+        const selectedDays = historyDays > 0 ? allDays.slice(0, historyDays) : allDays;
+        const rawDays = selectedDays.slice(0, RAW_SCAN_DAY_CAP);
+        const olderDays = rawDays.slice(INITIAL_HISTORY_DAYS);
+        let total = baseRawScans.length;
+
+        for (const day of olderDays) {
+          if (cancelled) break;
+          const dayScans = await fetchRawScans(workerUrl, [day]);
+          if (dayScans.length === 0) continue;
+
+          const remaining = MAX_RAW_SCANS - total;
+          if (remaining <= 0) break;
+          const toAppend = dayScans.slice(0, remaining);
+          setBackgroundScans((prev) => [...prev, ...toAppend]);
+          total += toAppend.length;
+          if (toAppend.length < dayScans.length) break;
+        }
+      } catch {
+        // Keep base data if background loading fails
+      }
+    };
+
+    loadOlderDays();
+    return () => {
+      cancelled = true;
+    };
+  }, [workerUrl, forceOffline, baseRawScans.length, historyDays]);
+
+  const rawScans = useMemo(
+    () => [...baseRawScans, ...backgroundScans],
+    [baseRawScans, backgroundScans]
+  );
+
+  // Prefer server-side aggregated coverage for speed; fallback to local aggregation.
+  const fallbackCoverageZones = useMemo(() => aggregateScansToZones(rawScans), [rawScans]);
+  const coverageZones = serverCoverageZones.length > 0 ? serverCoverageZones : fallbackCoverageZones;
   const nodes = useMemo(() => extractNodes(rawScans), [rawScans]);
   const allScans = useMemo(() => convertToScanResults(rawScans), [rawScans]);
   const latestScans = useMemo(() => {

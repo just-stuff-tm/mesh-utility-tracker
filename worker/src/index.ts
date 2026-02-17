@@ -36,6 +36,10 @@ export interface ScanPayload {
 
 const DEAD_ZONE_RSSI = -130;
 const DEAD_ZONE_SNR = 0;
+const HEX_SIZE = 0.0007;
+const LNG_SCALE = 1.2;
+const ROW_SPACING = HEX_SIZE * 1.5;
+const COL_SPACING = HEX_SIZE * Math.sqrt(3) * LNG_SCALE;
 const MASTER_CSV_PATH = 'scans.csv';
 const DELETE_CHALLENGE_PREFIX = 'mesh-delete-v1';
 const DELETE_CHALLENGE_TTL_MS = 5 * 60 * 1000;
@@ -113,6 +117,122 @@ export default {
         const days = result.results.map((row: any) => row.day);
 
         return new Response(JSON.stringify(days), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Fast aggregated coverage endpoint for map rendering.
+      if (url.pathname === '/coverage' && request.method === 'GET') {
+        const daysParam = url.searchParams.get('days');
+        let maxDays = 7;
+        if (daysParam != null) {
+          const parsed = Number.parseInt(daysParam, 10);
+          if (Number.isFinite(parsed)) {
+            maxDays = Math.max(0, Math.min(parsed, 365));
+          }
+        }
+
+        const dayRows = await env.DB.prepare(`
+          SELECT DISTINCT date(timestamp / 1000, 'unixepoch') as day
+          FROM scans
+          ORDER BY day DESC
+        `).all();
+        const allDays = dayRows.results.map((row: any) => String(row.day));
+        const selectedDays = maxDays === 0 ? allDays : allDays.slice(0, maxDays);
+
+        if (selectedDays.length === 0) {
+          return new Response(JSON.stringify([]), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const dayPlaceholders = selectedDays.map(() => '?').join(',');
+        const scans = await env.DB.prepare(`
+          SELECT radioId, timestamp, latitude, longitude, nodes
+          FROM scans
+          WHERE date(timestamp / 1000, 'unixepoch') IN (${dayPlaceholders})
+          ORDER BY timestamp ASC
+        `)
+          .bind(...selectedDays)
+          .all();
+
+        type CoverageAgg = {
+          id: string;
+          centerLat: number;
+          centerLng: number;
+          radiusMeters: number;
+          avgRssi: number;
+          avgSnr: number | null;
+          scanCount: number;
+          lastScannedTs: number;
+          hasNodes: boolean;
+          polygon: [number, number][];
+          radioId?: string;
+        };
+
+        const zoneMap = new Map<string, CoverageAgg>();
+
+        for (const row of scans.results as Array<{ radioId: string; timestamp: number; latitude: number; longitude: number; nodes: string }>) {
+          let nodes: any[] = [];
+          try {
+            const parsed = JSON.parse(row.nodes);
+            if (Array.isArray(parsed)) nodes = parsed;
+          } catch {}
+
+          const { snapLat, snapLng } = snapToHexGrid(row.latitude, row.longitude);
+          const id = `${snapLat.toFixed(6)}:${snapLng.toFixed(6)}`;
+          let agg = zoneMap.get(id);
+          if (!agg) {
+            agg = {
+              id,
+              centerLat: snapLat,
+              centerLng: snapLng,
+              radiusMeters: 100,
+              avgRssi: DEAD_ZONE_RSSI,
+              avgSnr: null,
+              scanCount: 0,
+              lastScannedTs: 0,
+              hasNodes: false,
+              polygon: getHexVertices(snapLat, snapLng),
+              radioId: row.radioId,
+            };
+            zoneMap.set(id, agg);
+          }
+
+          agg.lastScannedTs = Math.max(agg.lastScannedTs, Number(row.timestamp || 0));
+
+          if (nodes.length === 0) {
+            agg.scanCount += 1;
+            continue;
+          }
+
+          agg.hasNodes = true;
+          for (const node of nodes) {
+            const rssi = typeof node?.rssi === 'number' ? node.rssi : DEAD_ZONE_RSSI;
+            const snr = typeof node?.snr === 'number' ? node.snr : null;
+            agg.avgRssi = Math.max(agg.avgRssi, rssi);
+            if (snr != null) {
+              agg.avgSnr = agg.avgSnr == null ? snr : Math.max(agg.avgSnr, snr);
+            }
+            agg.scanCount += 1;
+          }
+        }
+
+        const zones = Array.from(zoneMap.values()).map((agg) => ({
+          id: agg.id,
+          centerLat: agg.centerLat,
+          centerLng: agg.centerLng,
+          radiusMeters: agg.radiusMeters,
+          avgRssi: agg.avgRssi,
+          avgSnr: agg.avgSnr,
+          scanCount: agg.scanCount,
+          lastScanned: new Date(agg.lastScannedTs || Date.now()).toISOString(),
+          isDeadZone: !agg.hasNodes,
+          polygon: agg.polygon,
+          radioId: agg.radioId ?? null,
+        }));
+
+        return new Response(JSON.stringify(zones), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -389,6 +509,29 @@ function isHex(value: string, expectedLength: number): boolean {
 
 function radioIdFromPublicKeyHex(publicKey: string): string {
   return normalizeHex(publicKey).slice(0, 8);
+}
+
+function snapToHexGrid(lat: number, lon: number): { snapLat: number; snapLng: number } {
+  const row = Math.round(lat / ROW_SPACING);
+  const isOddRow = Math.abs(row) % 2 === 1;
+  const offset = isOddRow ? COL_SPACING / 2 : 0;
+  const col = Math.round((lon - offset) / COL_SPACING);
+  return {
+    snapLat: row * ROW_SPACING,
+    snapLng: col * COL_SPACING + offset,
+  };
+}
+
+function getHexVertices(centerLat: number, centerLng: number): [number, number][] {
+  const vertices: [number, number][] = [];
+  for (let i = 0; i < 6; i++) {
+    const angleDeg = 60 * i - 30;
+    const angleRad = (Math.PI / 180) * angleDeg;
+    const lat = centerLat + HEX_SIZE * Math.sin(angleRad);
+    const lng = centerLng + HEX_SIZE * Math.cos(angleRad) * LNG_SCALE;
+    vertices.push([lat, lng]);
+  }
+  return vertices;
 }
 
 function bytesToHex(bytes: Uint8Array): string {

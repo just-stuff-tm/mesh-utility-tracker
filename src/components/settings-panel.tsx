@@ -46,7 +46,9 @@ export function SettingsPanel() {
     connected,
     selfInfo,
     uploadBatchInterval,
+    historyDays,
     setUploadBatchInterval,
+    setHistoryDays,
     queuedScansCount,
     lastUploadTime,
     manualSync,
@@ -563,6 +565,38 @@ export function SettingsPanel() {
             </div>
           )}
         </div>
+
+        <Separator />
+
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs">Cloud History</Label>
+          </div>
+          <Select
+            value={String(historyDays)}
+            onValueChange={(v) => setHistoryDays(Number(v))}
+          >
+            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-history-days" data-no-close>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="14">Last 14 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="60">Last 60 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+              <SelectItem value="180">Last 180 days</SelectItem>
+              <SelectItem value="270">Last 270 days</SelectItem>
+              <SelectItem value="365">Last 365 days</SelectItem>
+              <SelectItem value="0">All days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Controls how many online history days are loaded on the map.
+        </p>
 
         <Separator />
 

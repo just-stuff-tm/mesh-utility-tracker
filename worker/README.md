@@ -8,6 +8,7 @@ Cloudflare Worker for ingesting scan data, batching writes, and committing scan 
 - Batches commits to GitHub (20 scans or 5 minutes)
 - Appends committed rows into a single master CSV file (`scans.csv`)
 - Serves scan history (`/history`, `/history/:day.ndjson`)
+- Serves pre-aggregated coverage zones for fast map rendering (`/coverage`)
 - Supports signed radio-owned deletion (`POST /delete/challenge`, `POST /delete/:radioId`)
 
 ## Setup
@@ -82,6 +83,13 @@ Example response:
 ### `GET /history/:day.ndjson`
 Returns newline-delimited scan rows for a day (`YYYY-MM-DD`).
 
+### `GET /coverage?days=7`
+Returns aggregated hex coverage zones from D1 for fast map rendering.
+
+- `days`:
+  - `1..365` = most recent N days
+  - `0` = all available days
+
 ### `POST /delete/challenge`
 Returns a short-lived challenge string for signed ownership verification.
 
@@ -108,7 +116,8 @@ Health check.
 ## Batching Behavior
 - Batch size trigger: 20 scans
 - Time trigger: 5 minutes
-- Commit output: append-only updates to `scans.csv`
+- Commit output: append-only updates to `scans.csv` for successful node detections only
+- Dead-zone scans (`nodes: []`) are persisted in D1 and served via `/history`, but are not written to GitHub CSV
 - CSV columns:
   `row_id,radioId,timestamp,datetime_utc,latitude,longitude,altitude,nodeId,rssi,snr,observerName,nodeName,snr_repeater_to_observer,snr_observer_to_repeater`
 
