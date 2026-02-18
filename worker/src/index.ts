@@ -156,17 +156,17 @@ export default {
           .bind(...selectedDays)
           .all();
 
-        type CoverageAgg = {
-          id: string;
-          centerLat: number;
-          centerLng: number;
-          radiusMeters: number;
-          avgRssi: number;
-          avgSnr: number | null;
-          scanCount: number;
-          lastScannedTs: number;
-          hasNodes: boolean;
-          polygon: [number, number][];
+type CoverageAgg = {
+  id: string;
+  centerLat: number;
+  centerLng: number;
+  radiusMeters: number;
+  avgRssi: number | null;
+  avgSnr: number | null;
+  scanCount: number;
+  lastScannedTs: number;
+  hasNodes: boolean;
+  polygon: [number, number][];
           radioId?: string;
         };
 
@@ -188,7 +188,7 @@ export default {
               centerLat: snapLat,
               centerLng: snapLng,
               radiusMeters: 100,
-              avgRssi: DEAD_ZONE_RSSI,
+              avgRssi: null,
               avgSnr: null,
               scanCount: 0,
               lastScannedTs: 0,
@@ -210,7 +210,7 @@ export default {
           for (const node of nodes) {
             const rssi = typeof node?.rssi === 'number' ? node.rssi : DEAD_ZONE_RSSI;
             const snr = typeof node?.snr === 'number' ? node.snr : null;
-            agg.avgRssi = Math.max(agg.avgRssi, rssi);
+            agg.avgRssi = agg.avgRssi == null ? rssi : Math.max(agg.avgRssi, rssi);
             if (snr != null) {
               agg.avgSnr = agg.avgSnr == null ? snr : Math.max(agg.avgSnr, snr);
             }

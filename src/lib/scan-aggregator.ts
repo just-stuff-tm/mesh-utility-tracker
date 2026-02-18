@@ -21,7 +21,7 @@ export interface CoverageZone {
   centerLat: number;
   centerLng: number;
   radiusMeters: number;
-  avgRssi: number;
+  avgRssi: number | null;
   avgSnr: number | null;
   scanCount: number;
   lastScanned: Date;
@@ -85,13 +85,15 @@ export function aggregateScansToZones(scans: RawScan[]): CoverageZone[] {
     const scansWithNodes = cellScans.filter((s: RawScan) => s.nodeId != null && s.nodeId !== "");
     const isDeadZone = scansWithNodes.length === 0;
 
-    // Find the best (strongest/least negative) RSSI
-    const bestRssi = Math.max(...cellScans.map((s: RawScan) => s.rssi));
+    // Dead zones should not report synthetic signal metrics.
+    const bestRssi = isDeadZone
+      ? null
+      : Math.max(...scansWithNodes.map((s: RawScan) => s.rssi));
 
-    // Find the best SNR
-    const snrScans = cellScans.filter((s: RawScan) => s.snr != null);
-    const bestSnr =
-      snrScans.length > 0
+    const snrScans = scansWithNodes.filter((s: RawScan) => s.snr != null);
+    const bestSnr = isDeadZone
+      ? null
+      : snrScans.length > 0
         ? Math.max(...snrScans.map((s: RawScan) => s.snr!))
         : null;
 
