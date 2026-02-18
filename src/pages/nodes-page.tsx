@@ -69,14 +69,14 @@ export default function NodesPage() {
 
   const nodes = useMemo(() => extractNodes(rawScans), [rawScans]);
   const allScans = useMemo(() => convertToScanResults(rawScans), [rawScans]);
-  const latestScans = useMemo(() => {
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    return allScans.filter((s) => s.timestamp.getTime() > oneDayAgo);
-  }, [allScans]);
+  const nodeScans = useMemo(
+    () => allScans.filter((s) => Boolean(s.nodeId)),
+    [allScans]
+  );
   const nodesLoading = rawLoading;
 
   const scanMap = new Map<string, ScanResult>();
-  latestScans.forEach((s) => {
+  nodeScans.forEach((s) => {
     if (!scanMap.has(s.nodeId) || new Date(s.timestamp!) > new Date(scanMap.get(s.nodeId)!.timestamp!)) {
       scanMap.set(s.nodeId, s);
     }

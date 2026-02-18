@@ -92,6 +92,7 @@ export default function HistoryPage() {
   const nodes = useMemo((): NodeEntry[] => {
     const nodeMap: Record<string, NodeEntry> = {};
     for (const scan of scans) {
+      if (!scan.nodeId) continue;
       const existing = nodeMap[scan.nodeId];
       if (existing) {
         existing.count++;

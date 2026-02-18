@@ -252,7 +252,7 @@ export function convertToScanResults(scans: RawScan[]): ScanResult[] {
   return scans.map((scan, idx) => ({
     id: `scan-${idx}`,
     observerId: scan.observerId || "unknown",
-    nodeId: scan.nodeId || "unknown",
+    nodeId: scan.nodeId ?? "",
     rssi: scan.rssi,
     snr: scan.snr ?? 0,
     snrIn: scan.snrIn ?? null,

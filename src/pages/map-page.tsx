@@ -204,6 +204,7 @@ export default function MapPage() {
   const zoneNodeMap = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const scan of allScans) {
+      if (!scan.nodeId) continue;
       const { snapLat, snapLng } = snapToHexGrid(scan.latitude, scan.longitude);
       const key = `${snapLat.toFixed(6)},${snapLng.toFixed(6)}`;
       if (!map.has(key)) map.set(key, new Set());
@@ -217,6 +218,7 @@ export default function MapPage() {
     const nodeMap = new Map<string, { nodeId: string; name: string; count: number }>();
     
     for (const scan of allScans) {
+      if (!scan.nodeId) continue;
       const existing = nodeMap.get(scan.nodeId);
       if (existing) {
         existing.count++;
