@@ -49,6 +49,7 @@ export default function MapPage() {
   const [selectedZone, setSelectedZone] = useState<CoverageZone | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filterNodeId, setFilterNodeId] = useState<string | null>(null);
+  const [pendingNodeFilter, setPendingNodeFilter] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
   const [fitBoundsTarget, setFitBoundsTarget] = useState<L.LatLngBoundsExpression | null>(null);
@@ -59,6 +60,7 @@ export default function MapPage() {
     const params = new URLSearchParams(searchString);
     const lat = parseFloat(params.get("lat") || "");
     const lng = parseFloat(params.get("lng") || "");
+    const nodeId = params.get("nodeId");
     if (!isNaN(lat) && !isNaN(lng)) {
       setFlyToTarget({ lat, lng });
       if (autoCenter) {
@@ -68,6 +70,8 @@ export default function MapPage() {
           description: t("toast.autoCenterOffDesc"),
         });
       }
+    } else if (nodeId) {
+      setPendingNodeFilter(nodeId);
       if (window.history.replaceState) {
         window.history.replaceState(null, "", "/");
       }
@@ -295,6 +299,12 @@ export default function MapPage() {
       setFitBoundsTarget(null);
     }
   }, [coverageZones, zoneNodeMap, autoCenter, setAutoCenter, toast, t]);
+
+  useEffect(() => {
+    if (!pendingNodeFilter) return;
+    handleFilterSelect(pendingNodeFilter);
+    setPendingNodeFilter(null);
+  }, [pendingNodeFilter, handleFilterSelect]);
 
   const controlsContent = (
     <div className="space-y-4">

@@ -142,8 +142,9 @@ export default function NodesPage() {
             return (
               <Card
                 key={node.id}
-                className="p-4 hover-elevate"
+                className="p-4 hover-elevate cursor-pointer"
                 data-testid={`card-node-detail-${node.id}`}
+                onClick={() => navigate(`/?nodeId=${encodeURIComponent(node.nodeId)}`)}
               >
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div>
