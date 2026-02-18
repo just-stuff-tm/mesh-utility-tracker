@@ -30,6 +30,14 @@ import {
 import { db, type LocalScanResult } from "@/lib/offline-store";
 import { useOfflineStatus } from "@/lib/use-offline";
 
+function normalizeDeadZoneFlag(zone: CoverageZone): CoverageZone {
+  // Defensive normalization for legacy data: if signal metrics exist, it is not a dead zone.
+  if (zone.isDeadZone && (zone.avgRssi != null || zone.avgSnr != null)) {
+    return { ...zone, isDeadZone: false };
+  }
+  return zone;
+}
+
 export default function MapPage() {
   const INITIAL_HISTORY_DAYS = 3;
   const RAW_SCAN_DAY_CAP = 14;
@@ -82,7 +90,7 @@ export default function MapPage() {
       return rows.map((row) => ({
         ...row,
         lastScanned: new Date(row.lastScanned),
-      }));
+      })).map(normalizeDeadZoneFlag);
     },
     refetchInterval: 30000,
     staleTime: 10000,
@@ -178,7 +186,10 @@ export default function MapPage() {
   );
 
   // Prefer server-side aggregated coverage for speed; fallback to local aggregation.
-  const fallbackCoverageZones = useMemo(() => aggregateScansToZones(rawScans), [rawScans]);
+  const fallbackCoverageZones = useMemo(
+    () => aggregateScansToZones(rawScans).map(normalizeDeadZoneFlag),
+    [rawScans]
+  );
   const coverageZones = serverCoverageZones.length > 0 ? serverCoverageZones : fallbackCoverageZones;
   const nodes = useMemo(() => extractNodes(rawScans), [rawScans]);
   const allScans = useMemo(() => convertToScanResults(rawScans), [rawScans]);

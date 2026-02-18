@@ -179,6 +179,10 @@ type CoverageAgg = {
             if (Array.isArray(parsed)) nodes = parsed;
           } catch {}
 
+          const repeaterNodes = nodes.filter(
+            (node) => typeof node?.nodeId === 'string' && node.nodeId.trim().length > 0
+          );
+
           const { snapLat, snapLng } = snapToHexGrid(row.latitude, row.longitude);
           const id = `${snapLat.toFixed(6)}:${snapLng.toFixed(6)}`;
           let agg = zoneMap.get(id);
@@ -201,13 +205,13 @@ type CoverageAgg = {
 
           agg.lastScannedTs = Math.max(agg.lastScannedTs, Number(row.timestamp || 0));
 
-          if (nodes.length === 0) {
+          if (repeaterNodes.length === 0) {
             agg.scanCount += 1;
             continue;
           }
 
           agg.hasNodes = true;
-          for (const node of nodes) {
+          for (const node of repeaterNodes) {
             const rssi = typeof node?.rssi === 'number' ? node.rssi : DEAD_ZONE_RSSI;
             const snr = typeof node?.snr === 'number' ? node.snr : null;
             agg.avgRssi = agg.avgRssi == null ? rssi : Math.max(agg.avgRssi, rssi);
