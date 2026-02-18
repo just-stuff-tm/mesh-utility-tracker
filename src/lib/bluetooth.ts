@@ -1,6 +1,26 @@
 import { WebBleConnection, Constants } from "@liamcottle/meshcore.js";
 
-export function remoteLog(level: string, ...args: any[]) {
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord | null {
+  return typeof value === "object" && value !== null ? (value as UnknownRecord) : null;
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function asUint8Array(value: unknown): Uint8Array {
+  if (value instanceof Uint8Array) return value;
+  if (Array.isArray(value)) return new Uint8Array(value as number[]);
+  return new Uint8Array();
+}
+
+export function remoteLog(level: string, ...args: unknown[]) {
   const message = args.map(a => {
     if (a instanceof Uint8Array) return Array.from(a.slice(0, 8)).map(b => b.toString(16).padStart(2, "0")).join("");
     if (typeof a === "object" && a !== null) {
@@ -69,20 +89,32 @@ export type MeshEventType =
   | "rx_log"
   | "contacts_loaded";
 
-type EventHandler = (data?: any) => void;
+type EventPayloadMap = {
+  connected: undefined;
+  disconnected: undefined;
+  contact: unknown;
+  advert: unknown;
+  new_advert: unknown;
+  device_info: DeviceInfo;
+  self_info: SelfInfo;
+  battery: { milliVolts: number };
+  rx_log: RxLogEntry;
+  contacts_loaded: MeshContact[];
+};
+type EventHandler<E extends MeshEventType = MeshEventType> = (data: EventPayloadMap[E]) => void;
 
-let connection: any = null;
-const eventHandlers: Map<MeshEventType, Set<EventHandler>> = new Map();
+let connection: WebBleConnection | null = null;
+const eventHandlers: Map<MeshEventType, Set<(data: unknown) => void>> = new Map();
 
-export function on(event: MeshEventType, handler: EventHandler) {
+export function on<E extends MeshEventType>(event: E, handler: EventHandler<E>) {
   if (!eventHandlers.has(event)) eventHandlers.set(event, new Set());
-  eventHandlers.get(event)!.add(handler);
+  eventHandlers.get(event)!.add(handler as (data: unknown) => void);
   return () => {
-    eventHandlers.get(event)?.delete(handler);
+    eventHandlers.get(event)?.delete(handler as (data: unknown) => void);
   };
 }
 
-function emit(event: MeshEventType, data?: any) {
+function emit<E extends MeshEventType>(event: E, data: EventPayloadMap[E]) {
   eventHandlers.get(event)?.forEach((h) => h(data));
 }
 
@@ -94,7 +126,7 @@ export function isConnected(): boolean {
   return connection !== null;
 }
 
-export function getConnection(): any {
+export function getConnection(): WebBleConnection | null {
   return connection;
 }
 
@@ -118,27 +150,29 @@ export async function connectToRadio(): Promise<{
     bleConnection.on("disconnected", () => {
       remoteLog("log", "BLE disconnected");
       connection = null;
-      emit("disconnected");
+      emit("disconnected", undefined);
     });
 
-    bleConnection.on(Constants.ResponseCodes.Contact, (contact: any) => {
+    bleConnection.on(Constants.ResponseCodes.Contact, (contact: unknown) => {
       emit("contact", contact);
     });
 
-    bleConnection.on(Constants.PushCodes.Advert, (data: any) => {
+    bleConnection.on(Constants.PushCodes.Advert, (data: unknown) => {
       emit("advert", data);
     });
 
-    bleConnection.on(Constants.PushCodes.NewAdvert, (data: any) => {
-      remoteLog("log", "NewAdvert received:", data?.advName);
+    bleConnection.on(Constants.PushCodes.NewAdvert, (data: unknown) => {
+      const payload = asRecord(data);
+      remoteLog("log", "NewAdvert received:", payload?.advName);
       emit("new_advert", data);
     });
 
-    bleConnection.on(Constants.ResponseCodes.DeviceInfo, (info: any) => {
-      remoteLog("log", "DeviceInfo raw keys:", Object.keys(info).join(", "));
-      remoteLog("log", "DeviceInfo:", JSON.stringify(info));
+    bleConnection.on(Constants.ResponseCodes.DeviceInfo, (info: unknown) => {
+      const payload = asRecord(info) ?? {};
+      remoteLog("log", "DeviceInfo raw keys:", Object.keys(payload).join(", "));
+      remoteLog("log", "DeviceInfo:", JSON.stringify(payload));
 
-      let model = info.manufacturerModel || "";
+      let model = asString(payload.manufacturerModel);
       let fwVersion = "";
       if (model.includes("\0")) {
         const parts = model.split("\0").filter((s: string) => s.length > 0);
@@ -146,41 +180,44 @@ export async function connectToRadio(): Promise<{
         fwVersion = parts.length > 1 ? parts[parts.length - 1] : "";
       }
 
-      remoteLog("log", `DeviceInfo parsed: model="${model}" fwVer="${fwVersion}" build="${info.firmware_build_date}"`);
+      remoteLog("log", `DeviceInfo parsed: model="${model}" fwVer="${fwVersion}" build="${asString(payload.firmware_build_date)}"`);
       emit("device_info", {
-        firmwareVer: info.firmwareVer,
-        firmwareBuildDate: info.firmware_build_date,
+        firmwareVer: asNumber(payload.firmwareVer),
+        firmwareBuildDate: asString(payload.firmware_build_date),
         manufacturerModel: model,
         firmwareVersion: fwVersion,
       } as DeviceInfo);
     });
 
-    bleConnection.on(Constants.ResponseCodes.SelfInfo, (info: any) => {
-      remoteLog("log", "SelfInfo:", info?.name, "type:", info?.type);
+    bleConnection.on(Constants.ResponseCodes.SelfInfo, (info: unknown) => {
+      const payload = asRecord(info) ?? {};
+      remoteLog("log", "SelfInfo:", payload?.name, "type:", payload?.type);
       emit("self_info", {
-        name: info.name,
-        type: info.type,
-        txPower: info.txPower,
-        maxTxPower: info.maxTxPower,
-        publicKey: info.publicKey,
-        advLat: info.advLat,
-        advLon: info.advLon,
-        radioFreq: info.radioFreq,
-        radioBw: info.radioBw,
-        radioSf: info.radioSf,
-        radioCr: info.radioCr,
+        name: asString(payload.name),
+        type: asNumber(payload.type),
+        txPower: asNumber(payload.txPower),
+        maxTxPower: asNumber(payload.maxTxPower),
+        publicKey: asUint8Array(payload.publicKey),
+        advLat: asNumber(payload.advLat),
+        advLon: asNumber(payload.advLon),
+        radioFreq: asNumber(payload.radioFreq),
+        radioBw: asNumber(payload.radioBw),
+        radioSf: asNumber(payload.radioSf),
+        radioCr: asNumber(payload.radioCr),
       } as SelfInfo);
     });
 
-    bleConnection.on(Constants.ResponseCodes.BatteryVoltage, (data: any) => {
-      emit("battery", { milliVolts: data.batteryMilliVolts });
+    bleConnection.on(Constants.ResponseCodes.BatteryVoltage, (data: unknown) => {
+      const payload = asRecord(data) ?? {};
+      emit("battery", { milliVolts: asNumber(payload.batteryMilliVolts) });
     });
 
-    bleConnection.on(Constants.PushCodes.LogRxData, (data: any) => {
+    bleConnection.on(Constants.PushCodes.LogRxData, (data: unknown) => {
+      const payload = asRecord(data) ?? {};
       emit("rx_log", {
-        lastSnr: data.lastSnr,
-        lastRssi: data.lastRssi,
-        raw: data.raw,
+        lastSnr: asNumber(payload.lastSnr),
+        lastRssi: asNumber(payload.lastRssi),
+        raw: asUint8Array(payload.raw),
       } as RxLogEntry);
     });
 
@@ -230,11 +267,12 @@ export async function connectToRadio(): Promise<{
     });
 
     connection = bleConnection;
-    emit("connected");
+    emit("connected", undefined);
     return { success: true, deviceName: name };
-  } catch (err: any) {
-    remoteLog("error", "connectToRadio error:", err?.message || err);
-    return { success: false, deviceName: null, error: err.message || "Connection failed" };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    remoteLog("error", "connectToRadio error:", message);
+    return { success: false, deviceName: null, error: message || "Connection failed" };
   }
 }
 
@@ -252,17 +290,20 @@ export async function getContacts(): Promise<MeshContact[]> {
   try {
     const contacts = await connection.getContacts();
     remoteLog("log", "getContacts returned", contacts.length, "contacts");
-    return contacts.map((c: any) => ({
-      publicKey: c.publicKey,
-      type: c.type,
-      flags: c.flags,
-      outPathLen: c.outPathLen,
-      advName: c.advName,
-      lastAdvert: c.lastAdvert,
-      advLat: c.advLat,
-      advLon: c.advLon,
-      lastMod: c.lastMod,
-    }));
+    return contacts.map((c: unknown) => {
+      const payload = asRecord(c) ?? {};
+      return {
+        publicKey: asUint8Array(payload.publicKey),
+        type: asNumber(payload.type),
+        flags: asNumber(payload.flags),
+        outPathLen: asNumber(payload.outPathLen),
+        advName: asString(payload.advName),
+        lastAdvert: asNumber(payload.lastAdvert),
+        advLat: asNumber(payload.advLat),
+        advLon: asNumber(payload.advLon),
+        lastMod: asNumber(payload.lastMod),
+      };
+    });
   } catch (err) {
     remoteLog("error", "getContacts error:", err);
     return [];
@@ -284,9 +325,15 @@ export async function getSelfInfo(): Promise<SelfInfo | null> {
 export async function getDeviceInfo(): Promise<DeviceInfo | null> {
   if (!connection) return null;
   try {
-    const info = await connection.deviceQuery(Constants.SupportedCompanionProtocolVersion);
-    remoteLog("log", "getDeviceInfo:", info?.manufacturerModel);
-    return info;
+    const rawInfo = await connection.deviceQuery(Constants.SupportedCompanionProtocolVersion);
+    const info = asRecord(rawInfo) ?? {};
+    remoteLog("log", "getDeviceInfo:", asString(info.manufacturerModel));
+    return {
+      firmwareVer: asNumber(info.firmwareVer),
+      firmwareBuildDate: asString(info.firmware_build_date),
+      manufacturerModel: asString(info.manufacturerModel),
+      firmwareVersion: "",
+    };
   } catch (err) {
     remoteLog("error", "getDeviceInfo error:", err);
     return null;
@@ -489,19 +536,21 @@ export async function discoverRepeaters(
       }
     };
 
-    const onNewAdvert = (data: any) => {
-      const key = pubKeyPrefixHex(data.publicKey.slice(0, 8));
-      remoteLog("log", `NewAdvert: "${data.advName}" type=${data.type} prefix=${key}`);
+    const onNewAdvert = (data: unknown) => {
+      const payload = asRecord(data) ?? {};
+      const publicKey = asUint8Array(payload.publicKey);
+      const key = pubKeyPrefixHex(publicKey.slice(0, 8));
+      remoteLog("log", `NewAdvert: "${asString(payload.advName)}" type=${asNumber(payload.type)} prefix=${key}`);
       discoveredAdverts.set(key, {
-        publicKey: data.publicKey,
-        type: data.type,
-        flags: data.flags,
-        outPathLen: data.outPathLen,
-        advName: data.advName,
-        lastAdvert: data.lastAdvert,
-        advLat: data.advLat,
-        advLon: data.advLon,
-        lastMod: data.lastMod,
+        publicKey,
+        type: asNumber(payload.type),
+        flags: asNumber(payload.flags),
+        outPathLen: asNumber(payload.outPathLen),
+        advName: asString(payload.advName),
+        lastAdvert: asNumber(payload.lastAdvert),
+        advLat: asNumber(payload.advLat),
+        advLon: asNumber(payload.advLon),
+        lastMod: asNumber(payload.lastMod),
       });
     };
 
@@ -580,8 +629,8 @@ export async function discoverRepeaters(
 
     remoteLog("log", "Discovery complete:", repeaters.length, "nodes found");
     return { contacts, repeaters, timestamp: new Date() };
-  } catch (err: any) {
-    remoteLog("error", "discoverRepeaters error:", err?.message || err);
+  } catch (err: unknown) {
+    remoteLog("error", "discoverRepeaters error:", err instanceof Error ? err.message : String(err));
     return null;
   }
 }

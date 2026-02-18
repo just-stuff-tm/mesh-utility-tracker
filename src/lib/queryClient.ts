@@ -97,7 +97,7 @@ export const getQueryFn: <T>(options: {
     if (!isOnline()) {
       const offlineData = await getOfflineData(endpoint);
       if (offlineData !== null) {
-        return offlineData as any;
+        return offlineData as never;
       }
     }
 
@@ -129,7 +129,7 @@ export const getQueryFn: <T>(options: {
     } catch (err) {
       const offlineData = await getOfflineData(endpoint);
       if (offlineData !== null) {
-        return offlineData as any;
+        return offlineData as never;
       }
       throw err;
     }

@@ -5,6 +5,7 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
+    "check": "tsc --noEmit",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create mesh-utility-db",
     "db:init": "wrangler d1 execute mesh-utility-db --file=./schema.sql",

@@ -1,14 +1,57 @@
 declare module "@liamcottle/meshcore.js" {
+  export interface MeshcoreContact {
+    publicKey: Uint8Array;
+    type: number;
+    flags: number;
+    outPathLen: number;
+    advName: string;
+    lastAdvert: number;
+    advLat: number;
+    advLon: number;
+    lastMod: number;
+  }
+
+  export interface MeshcoreDeviceInfo {
+    firmwareVer: number;
+    firmware_build_date: string;
+    manufacturerModel: string;
+  }
+
+  export interface MeshcoreSelfInfo {
+    name: string;
+    type: number;
+    txPower: number;
+    maxTxPower: number;
+    publicKey: Uint8Array;
+    advLat: number;
+    advLon: number;
+    radioFreq: number;
+    radioBw: number;
+    radioSf: number;
+    radioCr: number;
+  }
+
+  export interface MeshcoreBatteryVoltage {
+    batteryMilliVolts: number;
+  }
+
   export class WebBleConnection {
     constructor();
     static open(): Promise<WebBleConnection>;
     bleDevice?: { name?: string };
     connect(): Promise<void>;
     disconnect(): Promise<void>;
-    on(event: number | string, callback: (data: any) => void): void;
-    off(event: number | string, callback: (data: any) => void): void;
-    deviceQuery(query: number): Promise<any>;
-    // Add other methods as needed
+    close(): Promise<void>;
+    on<T = unknown>(event: number | string, callback: (data: T) => void): void;
+    off<T = unknown>(event: number | string, callback: (data: T) => void): void;
+    deviceQuery(query: number): Promise<unknown>;
+    getContacts(): Promise<MeshcoreContact[]>;
+    getSelfInfo(): Promise<MeshcoreSelfInfo>;
+    getBatteryVoltage(): Promise<MeshcoreBatteryVoltage>;
+    sendAdvert(type: number): Promise<void>;
+    setAdvertLatLong(lat: number, lon: number): Promise<void>;
+    sendToRadioFrame(frame: Uint8Array): Promise<void>;
+    sign(data: Uint8Array): Promise<Uint8Array | ArrayBuffer | number[]>;
   }
 
   export const Constants: {
@@ -31,8 +74,6 @@ declare module "@liamcottle/meshcore.js" {
       [key: string]: number;
     };
     SupportedCompanionProtocolVersion: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-
-  // Add other exports as needed
 }

@@ -17,6 +17,12 @@ import { db } from "@/lib/offline-store";
 import { usePrivacyContext } from "@/App";
 import { useI18n, LANGUAGES, type Language } from "@/lib/i18n";
 
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
+
+type WorkerScanPayload = { radioId?: string };
+
 export function SettingsPanel() {
   const { toast } = useToast();
   const { t, language, setLanguage } = useI18n();
@@ -114,7 +120,7 @@ export function SettingsPanel() {
 
       const outboxEntries = await db.outbox.toArray();
       for (const entry of outboxEntries) {
-        const payload = entry.payload as any;
+        const payload = entry.payload as WorkerScanPayload[] | undefined;
         if (
           Array.isArray(payload) &&
           payload.some((scan) => scan?.radioId === vars.radioId)
@@ -127,10 +133,10 @@ export function SettingsPanel() {
       toast({ title: t("toast.dataDeleted") });
       setConfirmDelete(false);
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({
         title: t("toast.deleteFailed"),
-        description: err?.message || undefined,
+        description: errorMessage(err, t("toast.deleteFailed")),
         variant: "destructive",
       });
     },
@@ -155,9 +161,9 @@ export function SettingsPanel() {
     mutationFn: async (data: { centerLat: number; centerLng: number }) => {
       const res = await apiRequest("POST", "/api/coverage-zones/dead-zone", data);
       if (isQueuedResponse(res)) {
-        return { queued: true } as any;
+        return { queued: true };
       }
-      return res.json();
+      return (await res.json()) as { queued?: boolean };
     },
     onSuccess: (data) => {
       if (data.queued) {
@@ -623,8 +629,8 @@ export function SettingsPanel() {
               try {
                 await manualSync();
                 toast({ title: "Scans uploaded successfully" });
-              } catch (err: any) {
-                toast({ title: err.message || "Sync failed", variant: "destructive" });
+              } catch (err: unknown) {
+                toast({ title: errorMessage(err, "Sync failed"), variant: "destructive" });
               }
             }}
             disabled={queuedScansCount === 0 || !online}

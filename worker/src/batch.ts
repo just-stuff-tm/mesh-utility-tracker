@@ -46,16 +46,22 @@ const MASTER_CSV_HEADERS = [
   'snr_observer_to_repeater',
 ];
 const MAX_MASTER_CSV_BYTES = 95 * 1024 * 1024;
+type StoredNode = {
+  nodeId?: string;
+  name?: string;
+  observerName?: string;
+  [key: string]: unknown;
+};
 
 export class ScanBatcher {
   private state: DurableObjectState;
-  private env: any;
+  private env: { DB?: D1Database };
   private scans: ScanPayload[] = [];
   private batchSize = 20; // Commit every 20 scans
   private batchTimeout = 5 * 60 * 1000; // Or every 5 minutes
-  private timeoutId: number | null = null;
+  private timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(state: DurableObjectState, env: any) {
+  constructor(state: DurableObjectState, env: { DB?: D1Database }) {
     this.state = state;
     this.env = env;
     this.init();
@@ -181,7 +187,6 @@ export class ScanBatcher {
       return; // Already scheduled
     }
 
-    // @ts-ignore - Durable Objects support setTimeout
     this.timeoutId = setTimeout(async () => {
       await this.commitBatch(headers);
       this.timeoutId = null;
@@ -623,7 +628,7 @@ export class ScanBatcher {
         .all();
 
       for (const row of rows.results as Array<{ id: number; nodes: string }>) {
-        let parsedNodes: any[];
+        let parsedNodes: StoredNode[];
         try {
           const parsed = JSON.parse(row.nodes);
           if (!Array.isArray(parsed)) {
@@ -720,7 +725,7 @@ export class ScanBatcher {
         .all();
 
       for (const row of rows.results as Array<{ id: number; nodes: string }>) {
-        let parsedNodes: any[];
+        let parsedNodes: StoredNode[];
         try {
           const parsed = JSON.parse(row.nodes);
           if (!Array.isArray(parsed)) {

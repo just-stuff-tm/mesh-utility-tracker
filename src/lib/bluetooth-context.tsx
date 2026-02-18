@@ -21,11 +21,14 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { db, generateLocalId, isOnline, enqueueMutation, drainOutbox, getOutboxCount } from "@/lib/offline-store";
 import { snapToHexGrid } from "@shared/grid";
 
-const DEAD_ZONE_RSSI = -130;
-const DEAD_ZONE_SNR = 0;
 
 export type ScanStatus = "idle" | "advertising" | "waiting" | "querying" | "submitting" | "done" | "error";
 export type UnitSystem = "imperial" | "metric";
+type WakeLockCapableNavigator = Navigator & {
+  wakeLock?: {
+    request: (type: "screen") => Promise<WakeLockSentinel>;
+  };
+};
 
 export interface LastScanResult {
   contactsFound: number;
@@ -558,8 +561,8 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
                 id: generateLocalId(),
                 observerId: radioId || "local-observer",
                 nodeId: "",
-                rssi: DEAD_ZONE_RSSI,
-                snr: DEAD_ZONE_SNR,
+                rssi: null,
+                snr: null,
                 snrIn: null,
                 latitude: pos[0],
                 longitude: pos[1],
@@ -611,7 +614,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
       setScanStatus("done");
 
       // Query invalidation removed - using IndexedDB and Worker directly now
-    } catch (err: any) {
+    } catch (err: unknown) {
       setScanStatus("error");
       setLastScanResult({
         contactsFound: 0,
@@ -619,7 +622,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         repeatersWithStats: 0,
         scanResultsSubmitted: 0,
         timestamp: new Date(),
-        errorMessage: err?.message || "Scan failed unexpectedly",
+        errorMessage: err instanceof Error ? err.message : "Scan failed unexpectedly",
       });
     }
   }, []);
@@ -692,7 +695,9 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
   const acquireWakeLock = useCallback(async () => {
     try {
       if ("wakeLock" in navigator) {
-        wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+        const wakeLockNav = navigator as WakeLockCapableNavigator;
+        wakeLockRef.current = await wakeLockNav.wakeLock?.request("screen") ?? null;
+        if (!wakeLockRef.current) return;
         setWakeLockActive(true);
         wakeLockRef.current!.addEventListener("release", () => {
           setWakeLockActive(false);
@@ -766,7 +771,7 @@ export function BluetoothProvider({ children }: { children: React.ReactNode }) {
         if (info) {
           const rid = info.publicKey?.length >= 4 ? publicKeyHex(info.publicKey) : null;
           remoteLog("log", `[CONNECT] selfInfo.publicKey: type=${typeof info.publicKey}, isUint8=${info.publicKey instanceof Uint8Array}, length=${info.publicKey?.length}, hex=${rid}`);
-          setSelfInfo(info as any);
+          setSelfInfo(info);
 
           if (rid) {
             const observerName = info.name || result.deviceName || "Observer";

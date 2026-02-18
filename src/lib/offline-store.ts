@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+type GenericRow = Record<string, unknown>;
 
 export interface LocalNode {
   id: string;
@@ -14,8 +15,8 @@ export interface LocalScanResult {
   id: string;
   observerId: string;
   nodeId: string;
-  rssi: number;
-  snr: number;
+  rssi: number | null;
+  snr: number | null;
   snrIn: number | null;
   latitude: number;
   longitude: number;
@@ -76,6 +77,33 @@ class MeshDB extends Dexie {
       observers: "id, deviceId",
       outbox: "++id, createdAt",
     });
+    this.version(2)
+      .stores({
+        nodes: "id, nodeId",
+        scanResults: "id, nodeId, observerId, timestamp",
+        coverageZones: "id, [centerLat+centerLng], isDeadZone",
+        observers: "id, deviceId",
+        outbox: "++id, createdAt",
+      })
+      .upgrade(async (tx) => {
+        // Normalize legacy dead-zone sentinel values from older app versions.
+        await tx.table("scanResults").toCollection().modify((row: GenericRow) => {
+          const nodeId = typeof row.nodeId === "string" ? row.nodeId.trim() : "";
+          if (nodeId.length === 0) {
+            if (row.rssi === -130) row.rssi = null;
+            if (row.snr === 0) row.snr = null;
+            if (row.senderName === "Dead Zone") row.senderName = null;
+          }
+        });
+
+        await tx.table("coverageZones").toCollection().modify((row: GenericRow) => {
+          if (row.isDeadZone === true) {
+            row.avgRssi = null;
+            row.avgSnr = null;
+            if (typeof row.scanCount !== "number" || row.scanCount < 0) row.scanCount = 0;
+          }
+        });
+      });
   }
 }
 
@@ -95,27 +123,38 @@ export function getTableForEndpoint(url: string): string | null {
   return ENDPOINT_TABLE_MAP[base] || null;
 }
 
+function getDynamicTable(tableName: string): Table<GenericRow, unknown> | undefined {
+  const maybeTable = (db as unknown as Record<string, unknown>)[tableName];
+  if (!maybeTable || typeof maybeTable !== "object") return undefined;
+  const table = maybeTable as Table<GenericRow, unknown>;
+  if (typeof table.toArray !== "function") return undefined;
+  return table;
+}
+
 export async function saveCollectionToLocal(tableName: string, data: unknown[]) {
-  const table = (db as any)[tableName] as Table | undefined;
+  const table = getDynamicTable(tableName);
   if (!table || !Array.isArray(data)) return;
-  await table.bulkPut(data.map((item: any) => ({
-    ...item,
-    lastSeen: item.lastSeen ? String(item.lastSeen) : null,
-    timestamp: item.timestamp ? String(item.timestamp) : null,
-    lastScanned: item.lastScanned ? String(item.lastScanned) : null,
-  })));
+  await table.bulkPut(data.map((item) => {
+    const row = typeof item === "object" && item !== null ? (item as GenericRow) : {};
+    return {
+      ...row,
+      lastSeen: row.lastSeen ? String(row.lastSeen) : null,
+      timestamp: row.timestamp ? String(row.timestamp) : null,
+      lastScanned: row.lastScanned ? String(row.lastScanned) : null,
+    };
+  }));
 }
 
 export async function getLocalCollection(tableName: string): Promise<unknown[]> {
-  const table = (db as any)[tableName] as Table | undefined;
+  const table = getDynamicTable(tableName);
   if (!table) return [];
   return table.toArray();
 }
 
 export async function getLocalOnlyEntries(tableName: string): Promise<unknown[]> {
-  const table = (db as any)[tableName] as Table | undefined;
+  const table = getDynamicTable(tableName);
   if (!table) return [];
-  return table.filter((item: any) => typeof item.id === "string" && item.id.startsWith("local-")).toArray();
+  return table.filter((item: GenericRow) => typeof item.id === "string" && item.id.startsWith("local-")).toArray();
 }
 
 export async function getLocalDeadZones(): Promise<LocalCoverageZone[]> {

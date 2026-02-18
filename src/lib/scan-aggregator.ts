@@ -5,8 +5,8 @@ export interface RawScan {
   nodeId?: string;
   latitude: number;
   longitude: number;
-  rssi: number;
-  snr?: number;
+  rssi: number | null;
+  snr?: number | null;
   snrIn?: number;
   altitude?: number;
   timestamp?: string;
@@ -82,15 +82,20 @@ export function aggregateScansToZones(scans: RawScan[]): CoverageZone[] {
     );
 
     // Check if any scans in this hex found actual nodes
-    const scansWithNodes = cellScans.filter((s: RawScan) => s.nodeId != null && s.nodeId !== "");
+    const scansWithNodes = cellScans.filter(
+      (s: RawScan) => s.nodeId != null && s.nodeId !== "" && typeof s.rssi === "number"
+    );
     const isDeadZone = scansWithNodes.length === 0;
+    const numericRssiScans = scansWithNodes.filter(
+      (s: RawScan): s is RawScan & { rssi: number } => typeof s.rssi === "number"
+    );
 
     // Dead zones should not report synthetic signal metrics.
     const bestRssi = isDeadZone
       ? null
-      : Math.max(...scansWithNodes.map((s: RawScan) => s.rssi));
+      : Math.max(...numericRssiScans.map((s) => s.rssi));
 
-    const snrScans = scansWithNodes.filter((s: RawScan) => s.snr != null);
+    const snrScans = numericRssiScans.filter((s: RawScan) => s.snr != null);
     const bestSnr = isDeadZone
       ? null
       : snrScans.length > 0
@@ -249,11 +254,13 @@ export function extractNodes(scans: RawScan[]): MeshNode[] {
  * Converts raw scans to ScanResult format.
  */
 export function convertToScanResults(scans: RawScan[]): ScanResult[] {
-  return scans.map((scan, idx) => ({
+  return scans
+    .filter((scan) => Boolean(scan.nodeId) && typeof scan.rssi === "number")
+    .map((scan, idx) => ({
     id: `scan-${idx}`,
     observerId: scan.observerId || "unknown",
     nodeId: scan.nodeId ?? "",
-    rssi: scan.rssi,
+    rssi: scan.rssi as number,
     snr: scan.snr ?? 0,
     snrIn: scan.snrIn ?? null,
     latitude: scan.latitude,

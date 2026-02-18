@@ -12,6 +12,8 @@ import { Bluetooth, Download, Smartphone, Monitor, ExternalLink } from "lucide-r
 import { useI18n } from "@/lib/i18n";
 
 type Platform = "ios" | "android" | "desktop";
+type NavigatorWithStandalone = Navigator & { standalone?: boolean };
+type NavigatorWithBluetooth = Navigator & { bluetooth?: unknown };
 
 function detectPlatform(): Platform {
   const ua = navigator.userAgent.toLowerCase();
@@ -21,7 +23,7 @@ function detectPlatform(): Platform {
 }
 
 function isStandalone(): boolean {
-  if ("standalone" in navigator && (navigator as any).standalone) return true;
+  if ((navigator as NavigatorWithStandalone).standalone) return true;
   if (window.matchMedia("(display-mode: standalone)").matches) return true;
   if (window.matchMedia("(display-mode: fullscreen)").matches) return true;
   return false;
@@ -33,7 +35,7 @@ function isBluefyOrWebBLE(): boolean {
 }
 
 function hasWebBluetooth(): boolean {
-  return !!(navigator as any).bluetooth;
+  return !!(navigator as NavigatorWithBluetooth).bluetooth;
 }
 
 const DISMISS_KEY = "mesh-compat-dismissed";

@@ -34,8 +34,6 @@ export interface ScanPayload {
   }>;
 }
 
-const DEAD_ZONE_RSSI = -130;
-const DEAD_ZONE_SNR = 0;
 const HEX_SIZE = 0.0007;
 const LNG_SCALE = 1.2;
 const ROW_SPACING = HEX_SIZE * 1.5;
@@ -44,6 +42,39 @@ const MASTER_CSV_PATH = 'scans.csv';
 const DELETE_CHALLENGE_PREFIX = 'mesh-delete-v1';
 const DELETE_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const DELETE_CHALLENGE_CLOCK_SKEW_MS = 30 * 1000;
+
+type DayRow = { day: string };
+type NodeEntry = {
+  nodeId?: string;
+  name?: string;
+  observerName?: string;
+  rssi?: number;
+  snr?: number;
+  snrIn?: number;
+};
+type StoredScanRow = {
+  radioId: string;
+  timestamp: number;
+  latitude: number;
+  longitude: number;
+  altitude?: number | null;
+  nodes: string;
+};
+type D1RunMeta = {
+  changes?: number;
+};
+type D1RunResultLike = {
+  meta?: D1RunMeta;
+};
+
+function parseNodeEntries(raw: string): NodeEntry[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as NodeEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -114,7 +145,7 @@ export default {
           ORDER BY day DESC
         `).all();
 
-        const days = result.results.map((row: any) => row.day);
+        const days = (result.results as DayRow[]).map((row) => row.day);
 
         return new Response(JSON.stringify(days), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -137,7 +168,7 @@ export default {
           FROM scans
           ORDER BY day DESC
         `).all();
-        const allDays = dayRows.results.map((row: any) => String(row.day));
+        const allDays = (dayRows.results as DayRow[]).map((row) => String(row.day));
         const selectedDays = maxDays === 0 ? allDays : allDays.slice(0, maxDays);
 
         if (selectedDays.length === 0) {
@@ -172,12 +203,8 @@ type CoverageAgg = {
 
         const zoneMap = new Map<string, CoverageAgg>();
 
-        for (const row of scans.results as Array<{ radioId: string; timestamp: number; latitude: number; longitude: number; nodes: string }>) {
-          let nodes: any[] = [];
-          try {
-            const parsed = JSON.parse(row.nodes);
-            if (Array.isArray(parsed)) nodes = parsed;
-          } catch {}
+        for (const row of scans.results as StoredScanRow[]) {
+          const nodes = parseNodeEntries(row.nodes);
 
           const repeaterNodes = nodes.filter(
             (node) => typeof node?.nodeId === 'string' && node.nodeId.trim().length > 0
@@ -212,7 +239,8 @@ type CoverageAgg = {
 
           agg.hasNodes = true;
           for (const node of repeaterNodes) {
-            const rssi = typeof node?.rssi === 'number' ? node.rssi : DEAD_ZONE_RSSI;
+            if (typeof node?.rssi !== 'number') continue;
+            const rssi = node.rssi;
             const snr = typeof node?.snr === 'number' ? node.snr : null;
             agg.avgRssi = agg.avgRssi == null ? rssi : Math.max(agg.avgRssi, rssi);
             if (snr != null) {
@@ -267,14 +295,8 @@ type CoverageAgg = {
           .all();
 
         // Convert to NDJSON format
-        const ndjsonLines = scans.results.flatMap((row: any) => {
-          let nodes: any[] = [];
-          try {
-            const parsed = JSON.parse(row.nodes);
-            if (Array.isArray(parsed)) {
-              nodes = parsed;
-            }
-          } catch {}
+        const ndjsonLines = (scans.results as StoredScanRow[]).flatMap((row) => {
+          const nodes = parseNodeEntries(row.nodes);
 
           if (nodes.length === 0) {
             return [
@@ -287,15 +309,15 @@ type CoverageAgg = {
                 nodeId: '',
                 senderName: null,
                 receiverName: null,
-                rssi: DEAD_ZONE_RSSI,
-                snr: DEAD_ZONE_SNR,
+                rssi: null,
+                snr: null,
                 snrIn: null,
                 receivedAt: new Date(row.timestamp).toISOString(),
               }),
             ];
           }
 
-          return nodes.map((node: any) =>
+          return nodes.map((node) =>
             JSON.stringify({
               radioId: row.radioId,
               timestamp: row.timestamp,
@@ -305,8 +327,8 @@ type CoverageAgg = {
               nodeId: typeof node?.nodeId === 'string' ? node.nodeId : '',
               senderName: typeof node?.name === 'string' ? node.name : null,
               receiverName: typeof node?.observerName === 'string' ? node.observerName : null,
-              rssi: typeof node?.rssi === 'number' ? node.rssi : DEAD_ZONE_RSSI,
-              snr: typeof node?.snr === 'number' ? node.snr : DEAD_ZONE_SNR,
+              rssi: typeof node?.rssi === 'number' ? node.rssi : null,
+              snr: typeof node?.snr === 'number' ? node.snr : null,
               snrIn: typeof node?.snrIn === 'number' ? node.snrIn : null,
               receivedAt: new Date(row.timestamp).toISOString(),
             })
@@ -434,7 +456,7 @@ type CoverageAgg = {
         const d1DeleteResult = await env.DB.prepare('DELETE FROM scans WHERE radioId = ?')
           .bind(radioId)
           .run();
-        const d1Deleted = Number((d1DeleteResult as any)?.meta?.changes || 0);
+        const d1Deleted = Number((d1DeleteResult as D1RunResultLike)?.meta?.changes || 0);
 
         const csvUpdate = await removeRadioRowsFromMasterCsv(env, radioId);
 
