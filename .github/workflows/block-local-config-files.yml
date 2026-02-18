@@ -1,0 +1,32 @@
+name: Block Local Config Files
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fail if local-only config files are tracked
+        shell: bash
+        run: |
+          blocked=(
+            "worker/wrangler.toml"
+            "wrangler-pages.toml"
+            ".env.development"
+            ".env.production"
+          )
+
+          fail=0
+          for file in "${blocked[@]}"; do
+            if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+              echo "::error file=$file::Local-only file must not be tracked. Use the corresponding .example template."
+              fail=1
+            fi
+          done
+
+          exit "$fail"
