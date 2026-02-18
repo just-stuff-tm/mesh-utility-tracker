@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://production.mesh-utility-tracker.pages.dev/"><b>🌐 Live App</b></a>
+  <a href="https://mesh-utility.org/"><b>🌐 Live App</b></a>
 </p>
 
 ---

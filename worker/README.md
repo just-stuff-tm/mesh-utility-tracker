@@ -46,7 +46,7 @@ In `wrangler.toml`:
 [vars]
 GITHUB_REPO = "owner/mesh-data"
 GITHUB_BRANCH = "main"
-ALLOWED_ORIGINS = "https://mesh-utility-tracker.pages.dev,http://localhost:5173"
+ALLOWED_ORIGINS = "https://mesh-utility-tracker.pages.dev,https://production.mesh-utility-tracker.pages.dev,https://mesh-utility.org,http://localhost:5173"
 ```
 
 ### 5. Run locally or deploy

@@ -240,7 +240,7 @@ hourly = all_data.groupby('hour').size()
 Data is automatically collected from mesh-utility-tracker users who opt-in.
 
 To contribute:
-1. Visit [mesh-utility-tracker](https://mesh-utility-tracker.pages.dev/)
+1. Visit [mesh-utility-tracker](https://mesh-utility.org/)
 2. Connect your MeshCore device
 3. Enable "Share scan data" in Settings
 4. Scans upload automatically
