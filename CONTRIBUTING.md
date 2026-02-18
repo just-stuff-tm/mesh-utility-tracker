@@ -1,276 +1,134 @@
 # Contributing to Mesh Utility Tracker
 
-Thank you for your interest in contributing! This guide will help you get started.
+Thanks for contributing.
 
-## Quick Start
+## Prerequisites
 
-### Prerequisites
-- Node.js 18+
-- Modern browser with Web Bluetooth support (Chrome/Edge recommended)
+- Node.js 20+
+- npm
 - Git
+- Chrome/Edge (for Web Bluetooth testing)
 
-### Development Setup
+## Local Setup
 
-1. **Fork and clone the repository**
-   ```bash
-   git clone https://github.com/just-stuff-tm/mesh-utility-tracker.git
-   cd mesh-utility-tracker
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Create environment file**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your local settings (optional for frontend-only development)
-   ```
-
-4. **Start development server**
-   ```bash
-   npm run dev
-   # Opens at http://localhost:5173
-   ```
-
-### Optional: Local Worker Development
-
-To test with the backend worker locally:
-
-1. **Navigate to worker directory**
-   ```bash
-   cd worker
-   npm install
-   ```
-
-2. **Start local worker**
-   ```bash
-   npm run dev
-   # Runs on http://127.0.0.1:8787
-   ```
-
-3. **Update frontend to use local worker**
-   ```bash
-   # In root directory
-   echo "VITE_WORKER_URL=http://127.0.0.1:8787" > .env
-   npm run dev
-   ```
-
-## Project Structure
-
-```
-mesh-utility-tracker/
-├── src/                    # React frontend
-│   ├── components/         # UI components
-│   │   └── ui/            # shadcn/ui components
-│   ├── pages/             # Route pages
-│   ├── lib/               # Core logic
-│   │   ├── bluetooth.ts   # MeshCore integration
-│   │   ├── offline-store.ts # IndexedDB
-│   │   └── scan-aggregator.ts # Coverage calculation
-│   └── types/             # TypeScript definitions
-├── worker/                # Cloudflare Worker backend
-│   └── src/
-│       ├── index.ts       # Main worker entry
-│       ├── github.ts      # GitHub API integration
-│       └── batch.ts       # Durable Object batcher
-├── shared/                # Shared utilities
-│   ├── grid.ts           # Hexagonal grid math
-│   └── schema.ts         # Data validation
-└── public/               # Static assets
-    ├── sw.js            # Service worker
-    └── manifest.json    # PWA manifest
-```
-
-## Development Workflow
-
-### 1. Create a Feature Branch
-
+1. Clone the repo:
 ```bash
-git checkout -b feature/your-feature-name
-# or
-git checkout -b fix/bug-description
+git clone https://github.com/just-stuff-tm/mesh-utility-tracker.git
+cd mesh-utility-tracker
 ```
 
-### 2. Make Your Changes
-
-- Write clean, readable code
-- Follow existing code style
-- Use TypeScript types
-- Test your changes in a browser
-
-### 3. Test Your Changes
-
-**Frontend Testing:**
-- Test with actual MeshCore device (if available)
-- Test offline mode behavior
-- Test on different screen sizes
-- Check browser console for errors
-
-**Worker Testing:**
-- Use `wrangler tail` to monitor logs
-- Test API endpoints with curl/Postman
-- Verify data formatting
-
-### 4. Commit Your Changes
-
+2. Install frontend dependencies:
 ```bash
-git add .
-git commit -m "Brief description of changes"
-```
-
-**Commit Message Format:**
-- `feat: Add new feature`
-- `fix: Fix bug description`
-- `docs: Update documentation`
-- `refactor: Code refactoring`
-- `style: Code style changes`
-- `test: Add tests`
-
-### 5. Push and Create Pull Request
-
-```bash
-git push origin feature/your-feature-name
-```
-
-Then create a pull request on GitHub with:
-- Clear description of changes
-- Why the change is needed
-- How to test it
-- Screenshots (if UI changes)
-
-## Code Style Guidelines
-
-### TypeScript/React
-- Use functional components with hooks
-- Prefer const over let
-- Use meaningful variable names
-- Add comments for complex logic
-- Export types from component files
-
-### Example Component Structure
-```tsx
-import { useState } from "react";
-
-interface MyComponentProps {
-  title: string;
-  onAction?: () => void;
-}
-
-export function MyComponent({ title, onAction }: MyComponentProps) {
-  const [state, setState] = useState<boolean>(false);
-  
-  return (
-    <div>
-      <h2>{title}</h2>
-      {/* Component JSX */}
-    </div>
-  );
-}
-```
-
-### CSS/Tailwind
-- Use Tailwind utility classes
-- Keep custom CSS minimal
-- Use shadcn/ui components when possible
-- Follow mobile-first responsive design
-
-## Key Technologies
-
-### Frontend
-- **React 18** - UI framework
-- **TypeScript** - Type safety
-- **Vite** - Build tool
-- **Tailwind CSS** - Styling
-- **Wouter** - Routing
-- **Leaflet** - Maps
-- **shadcn/ui** - Component library
-- **Dexie.js** - IndexedDB wrapper
-
-### Backend
-- **Cloudflare Workers** - Edge compute
-- **D1** - SQLite database
-- **Durable Objects** - Stateful processing
-- **GitHub API** - Data storage
-
-## Common Development Tasks
-
-### Adding a New UI Component
-
-1. Create component in `src/components/`
-2. Import and use in relevant page
-3. Add to exports if reusable
-
-### Modifying Bluetooth Integration
-
-See `src/lib/bluetooth.ts` and `src/lib/bluetooth-context.tsx`
-- Device connection logic
-- Scan processing
-- Data aggregation
-
-### Changing Data Upload Format
-
-1. Update `src/lib/bluetooth-context.tsx` (frontend)
-2. Update `worker/src/index.ts` (backend)
-3. Update `shared/schema.ts` (validation)
-4. Test end-to-end flow
-
-### Adding New Map Features
-
-1. Modify `src/components/coverage-map.tsx`
-2. Update `src/lib/scan-aggregator.ts` for data processing
-3. Update `shared/grid.ts` for grid calculations
-
-## Testing with MeshCore Devices
-
-### Supported Devices
-- Seeed Wio Tracker L1 (primary test device)
-- Any device running MeshCore firmware
-
-### Testing Checklist
-- [ ] Device connects via Web Bluetooth
-- [ ] Scans detect nearby nodes
-- [ ] Signal strength (RSSI/SNR) displays correctly
-- [ ] GPS coordinates captured
-- [ ] Offline mode works without network
-- [ ] Data uploads after network restored
-- [ ] Coverage map updates in real-time
-
-## Troubleshooting Development Issues
-
-### "Module not found" errors
-```bash
-rm -rf node_modules package-lock.json
 npm install
 ```
 
-### Vite build errors
+3. Start frontend dev server:
 ```bash
-npm run build
-# Check output for specific errors
+npm run dev
 ```
 
-### Worker deployment issues
+Optional local worker setup:
+
+1. Install worker dependencies:
 ```bash
 cd worker
-npx wrangler login
-npm run deploy
+npm install
 ```
 
-### Bluetooth connection fails
-- Use HTTPS or localhost only
-- Check browser compatibility
-- Ensure device is in pairing mode
-- Check browser console for errors
+2. Run worker locally:
+```bash
+npm run dev
+```
 
-## Need Help?
+3. Point frontend at local worker (from repo root):
+```bash
+echo "VITE_WORKER_URL=http://127.0.0.1:8787" > .env
+npm run dev
+```
 
-- 💬 **Questions:** [GitHub Discussions](https://github.com/just-stuff-tm/mesh-utility-tracker/discussions)
-- 🐛 **Bug Reports:** [GitHub Issues](https://github.com/just-stuff-tm/mesh-utility-tracker/issues)
-- 📖 **Documentation:** See deployment docs in repository (local only)
+## Project Structure
 
+```text
+src/        React frontend
+worker/     Cloudflare Worker + Durable Object
+shared/     Shared utilities (grid/math)
+public/     Static assets + SPA redirects
+```
+
+## Required Checks Before Push
+
+Frontend (repo root):
+```bash
+npm run check
+npm run build
+```
+
+Worker:
+```bash
+cd worker
+npm run check
+```
+
+These mirror CI in `.github/workflows/ci.yml`.
+
+## Branch and Contribution Flow
+
+External contributors:
+
+1. Create a branch:
+```bash
+git checkout -b feature/short-name
+```
+2. Commit and push:
+```bash
+git add -A
+git commit -m "feat: short description"
+git push origin feature/short-name
+```
+3. Open a pull request.
+
+Repo maintainers:
+
+- You can push directly to your target branch (for example `mesh-utility`) after running required checks.
+
+## Where to Make Changes
+
+- Bluetooth/radio behavior:
+  - `src/lib/bluetooth.ts`
+  - `src/lib/bluetooth-context.tsx`
+- Coverage aggregation and node extraction:
+  - `src/lib/scan-aggregator.ts`
+  - `src/components/coverage-map.tsx`
+- Offline/local persistence:
+  - `src/lib/offline-store.ts`
+- Worker ingest/history/coverage:
+  - `worker/src/index.ts`
+  - `worker/src/batch.ts`
+
+If you change API payload shape, update both frontend producer/consumer and worker parser in the same change.
+
+## Style Guidelines
+
+- Use TypeScript types; avoid `any` unless unavoidable.
+- Keep changes minimal and focused.
+- Preserve existing UI patterns unless intentionally redesigning.
+- Prefer readable code over clever code.
+
+## Testing Expectations
+
+When relevant, verify:
+
+- Scan flow with and without repeater responses.
+- Dead-zone behavior (`nodes: []` => no signal metrics).
+- Node list/history/map consistency.
+- Offline queue and later sync.
+- Mobile and desktop basic UI behavior.
+
+## Need Help
+
+- Issues: <https://github.com/just-stuff-tm/mesh-utility-tracker/issues>
+- Discussions: <https://github.com/just-stuff-tm/mesh-utility-tracker/discussions>
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree your contributions are licensed under MIT.
