@@ -21,6 +21,11 @@ cloudflare/.dev.vars
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+
+# Local cloud deployment config
+worker/wrangler.toml
 
 # Replit config
 .replit

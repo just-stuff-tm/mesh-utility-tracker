@@ -19,6 +19,7 @@ Cloudflare Worker for ingesting scan data, batching writes, and committing scan 
 cd worker
 npm install
 npx wrangler login
+copy wrangler.toml.example wrangler.toml
 ```
 
 ### 2. Create and initialize D1

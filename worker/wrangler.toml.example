@@ -8,7 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "mesh-utility-db"
-database_id = "4d4cfea8-16b2-491f-af62-e5beb56f324d"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
 
 # Durable Object binding for batch processing
 [[durable_objects.bindings]]
