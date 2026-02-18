@@ -114,12 +114,14 @@ export class ScanBatcher {
               await this.deleteDeadZonesForHex(scan.location.lat, scan.location.lon);
             }
 
+            const normalizedRadioId = this.normalizeRadioId(scan.radioId);
+
             await db.prepare(`
               INSERT INTO scans (radioId, timestamp, latitude, longitude, altitude, nodes, committed)
               VALUES (?, ?, ?, ?, ?, ?, 0)
             `)
               .bind(
-                scan.radioId,
+                normalizedRadioId,
                 scan.timestamp,
                 scan.location.lat,
                 scan.location.lon,
@@ -128,6 +130,9 @@ export class ScanBatcher {
               )
               .run();
           }
+
+          await this.backfillNodeNamesInD1(db, newScans);
+          await this.backfillRadioMetadataInD1(db, newScans);
         } catch (error) {
           console.error('Failed to store scans in D1:', error);
           // Continue with batching even if D1 storage fails
@@ -578,5 +583,192 @@ export class ScanBatcher {
       return `"${escaped}"`;
     }
     return escaped;
+  }
+
+  /**
+   * Backfill historical scan rows when we receive a better/current node name.
+   * This keeps older D1 records consistent for history views.
+   */
+  private async backfillNodeNamesInD1(db: D1Database, scans: ScanPayload[]): Promise<void> {
+    const nameUpdates = new Map<string, string>();
+
+    for (const scan of scans) {
+      for (const node of scan.nodes) {
+        const nodeId = typeof node.nodeId === 'string' ? node.nodeId.trim() : '';
+        const name = typeof node.name === 'string' ? node.name.trim() : '';
+        if (!nodeId || !name) {
+          continue;
+        }
+        if (name.startsWith('Unknown (')) {
+          continue;
+        }
+        nameUpdates.set(nodeId, name);
+      }
+    }
+
+    if (nameUpdates.size === 0) {
+      return;
+    }
+
+    for (const [nodeId, latestName] of nameUpdates.entries()) {
+      const likeNodeId = this.escapeLikePattern(nodeId);
+      const rows = await db.prepare(
+        `
+          SELECT id, nodes
+          FROM scans
+          WHERE nodes LIKE ? ESCAPE '\\'
+        `
+      )
+        .bind(`%"nodeId":"${likeNodeId}"%`)
+        .all();
+
+      for (const row of rows.results as Array<{ id: number; nodes: string }>) {
+        let parsedNodes: any[];
+        try {
+          const parsed = JSON.parse(row.nodes);
+          if (!Array.isArray(parsed)) {
+            continue;
+          }
+          parsedNodes = parsed;
+        } catch {
+          continue;
+        }
+
+        let changed = false;
+        for (const parsedNode of parsedNodes) {
+          if (!parsedNode || parsedNode.nodeId !== nodeId) {
+            continue;
+          }
+          const existingName =
+            typeof parsedNode.name === 'string' ? parsedNode.name.trim() : '';
+          if (existingName === latestName) {
+            continue;
+          }
+          parsedNode.name = latestName;
+          changed = true;
+        }
+
+        if (!changed) {
+          continue;
+        }
+
+        await db.prepare(
+          `
+            UPDATE scans
+            SET nodes = ?
+            WHERE id = ?
+          `
+        )
+          .bind(JSON.stringify(parsedNodes), row.id)
+          .run();
+      }
+    }
+  }
+
+  private async backfillRadioMetadataInD1(db: D1Database, scans: ScanPayload[]): Promise<void> {
+    const observerNameUpdates = new Map<string, string>();
+    const normalizedRadioIds = new Set<string>();
+
+    for (const scan of scans) {
+      const normalizedRadioId = this.normalizeRadioId(scan.radioId);
+      if (!normalizedRadioId) {
+        continue;
+      }
+
+      normalizedRadioIds.add(normalizedRadioId);
+
+      const observerName =
+        typeof scan.observerName === 'string' ? scan.observerName.trim() : '';
+      if (!observerName || observerName.startsWith('Unknown (')) {
+        continue;
+      }
+      observerNameUpdates.set(normalizedRadioId, observerName);
+    }
+
+    if (normalizedRadioIds.size === 0) {
+      return;
+    }
+
+    // Ensure canonical uppercase radioId across all rows.
+    for (const normalizedRadioId of normalizedRadioIds) {
+      await db.prepare(
+        `
+          UPDATE scans
+          SET radioId = ?
+          WHERE UPPER(radioId) = ?
+            AND radioId != ?
+        `
+      )
+        .bind(normalizedRadioId, normalizedRadioId, normalizedRadioId)
+        .run();
+    }
+
+    if (observerNameUpdates.size === 0) {
+      return;
+    }
+
+    // Backfill observerName in embedded nodes JSON for history output consistency.
+    for (const [radioId, observerName] of observerNameUpdates.entries()) {
+      const rows = await db.prepare(
+        `
+          SELECT id, nodes
+          FROM scans
+          WHERE radioId = ?
+        `
+      )
+        .bind(radioId)
+        .all();
+
+      for (const row of rows.results as Array<{ id: number; nodes: string }>) {
+        let parsedNodes: any[];
+        try {
+          const parsed = JSON.parse(row.nodes);
+          if (!Array.isArray(parsed)) {
+            continue;
+          }
+          parsedNodes = parsed;
+        } catch {
+          continue;
+        }
+
+        let changed = false;
+        for (const parsedNode of parsedNodes) {
+          if (!parsedNode) {
+            continue;
+          }
+          const existingObserver =
+            typeof parsedNode.observerName === 'string'
+              ? parsedNode.observerName.trim()
+              : '';
+          if (existingObserver === observerName) {
+            continue;
+          }
+          parsedNode.observerName = observerName;
+          changed = true;
+        }
+
+        if (!changed) {
+          continue;
+        }
+
+        await db.prepare(
+          `
+            UPDATE scans
+            SET nodes = ?
+            WHERE id = ?
+          `
+        )
+          .bind(JSON.stringify(parsedNodes), row.id)
+          .run();
+      }
+    }
+  }
+
+  private escapeLikePattern(value: string): string {
+    return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  }
+
+  private normalizeRadioId(value: unknown): string {
+    return typeof value === 'string' ? value.trim().toUpperCase() : '';
   }
 }
