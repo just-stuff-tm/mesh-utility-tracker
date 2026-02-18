@@ -105,7 +105,8 @@ const sections: Section[] = [
     title: "Scan History",
     content: [
       "The History page shows a timeline of your recent scans. Each entry includes the signal readings, which repeater responded, your location, altitude, and when the scan happened.",
-      "The app keeps the 5 most recent scans per hex zone to save space. Older scans at the same location are automatically cleaned up.",
+      "History combines cloud data from the Worker with local cached scans on your device.",
+      "Use the Cloud History setting to control how many online days are loaded on the map (from last 7 days up to all days).",
     ],
   },
   {
@@ -128,6 +129,8 @@ const sections: Section[] = [
       "Stats Radius filters the bottom stats bar to only show data within a certain distance from you. Set to 0 to include everything.",
       "Smart Scanning and the freshness slider control whether the app skips areas scanned within a certain number of days.",
       "Dead Zone button marks your current spot as a dead zone when no repeaters can reach it.",
+      "Upload Interval controls how often queued scans are uploaded when online.",
+      "Clear Scan Cache removes only local cached scans/zones/outbox data on this device.",
     ],
   },
   {
@@ -138,7 +141,7 @@ const sections: Section[] = [
       "When you lose internet, everything keeps working. Scan results are saved locally and queued up. When connectivity returns, queued items sync to the server automatically.",
       "You can also force offline mode using the toggle in settings. This is handy if you're on a slow or metered connection and want to batch your uploads for later. When you switch back online, any pending data syncs right away.",
       "The header bar shows your connection status: an orange badge for offline, blue for items waiting to sync. In settings, you can tap Sync Now to manually push queued data.",
-      "If uploads seem stuck or sync stops working, tap Fix Sync Issues in settings. This resets the server's database connections and usually resolves the problem without any data loss.",
+      "If uploads are delayed, keep the app online and use Sync Now from settings to push queued scans immediately.",
     ],
   },
   {
